@@ -4,7 +4,7 @@ A browser-based prototype for generating Swedish-style crosswords (arrowwords / 
 
 ## Current status
 
-Version 0.4 focuses on **structural validity**, not PDF export.
+The `r-and-d/valid-arrowword-generator` branch contains version 0.5, a **validation-first placement engine**.
 
 The generator:
 
@@ -15,6 +15,7 @@ The generator:
 - validates every contiguous horizontal and vertical letter run;
 - rejects grids containing accidental pseudo-words;
 - renders unused areas as explicit graphic panels rather than blank answer cells;
+- performs multiple seeded restarts and keeps the highest-scoring valid result;
 - exports an A5 SVG and a JSON project file;
 - can reveal answers for validation.
 
@@ -29,7 +30,13 @@ A generated grid is accepted only when:
 5. There are no blank clue cells.
 6. Non-answer areas are represented as explicit panel cells.
 
-These rules are intentionally stricter than the earlier density-only prototype.
+Density is scored only after all structural checks pass.
+
+## Generation strategies
+
+Version 0.5 uses a strict word-first placement strategy as the stable baseline. Side-adjacency checks guarantee that placing one answer cannot silently create another unassigned letter run.
+
+A denser closed-fill/CSP strategy is being developed separately. It is not used as the default yet because a dense topology is useful only when every resulting slot can be filled with reviewed answers.
 
 ## Running locally
 
@@ -41,19 +48,30 @@ python3 -m http.server 8080
 
 Then open `http://localhost:8080`.
 
+## Regression benchmark
+
+Run the multi-seed structural benchmark with Node.js:
+
+```bash
+node tools/benchmark.cjs
+```
+
+The benchmark fails immediately if any generated grid contains an accidental run, an orphan letter, a crossing conflict, or a duplicate clue direction.
+
 ## Files
 
 ```text
-index.html       Browser interface
-styles.css       Interface styling
-words.js         Main Russian answer dictionary
-short-words.js   Compact answers for short slots
-clues.js         Short clue dictionary
-core.js          Grid templates and shared metrics
-solver.js        Constraint-aware fill and validation
-renderer.js      A5 SVG renderer
-ui.js            Browser UI and JSON export
-docs/            Design notes and research summary
+index.html          Browser interface
+styles.css          Interface styling
+words.js            Main Russian answer dictionary
+short-words.js      Compact answers for short slots
+clues.js            Short clue dictionary
+core.js             Shared randomization and dictionary utilities
+solver.js           Multi-restart placement engine and validator
+renderer.js         A5 SVG renderer
+ui.js               Browser UI and JSON export
+tools/benchmark.cjs Multi-seed structural regression benchmark
+docs/               Design notes and research summary
 ```
 
 ## Why PDF is deferred
@@ -73,6 +91,6 @@ At that point PDF becomes a presentation/export layer rather than part of the ge
 
 - reduce the panel-cell ratio without violating structural validity;
 - add a larger reviewed answer-and-clue corpus;
-- introduce stock templates and compare them with generated templates;
-- add automated multi-seed regression tests;
+- finish the dense closed-fill/CSP strategy;
+- add stock templates and compare them with generated topologies;
 - add print-ready PDF and solution-page export.
