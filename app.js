@@ -63,45 +63,31 @@
     return result;
   }
 
-  function generatePseudoWords(count, random) {
-    const starts = [
-      "Б", "В", "Г", "Д", "Ж", "З", "К", "Л", "М", "Н", "П", "Р", "С", "Т", "Ф", "Х",
-      "БР", "ВЛ", "ГР", "ДР", "КЛ", "КР", "ПЛ", "ПР", "СТ", "ТР", "ХР", "Ш",
-    ];
-    const vowels = ["А", "Е", "И", "О", "У", "Ы", "Э", "Я"];
-    const middles = [
-      "Б", "В", "Г", "Д", "Ж", "З", "К", "Л", "М", "Н", "П", "Р", "С", "Т", "Ф", "Х", "Ч", "Ш",
-      "БР", "ВР", "ГЛ", "ГР", "ДР", "КЛ", "КР", "ЛЬ", "МН", "НТ", "ПР", "РТ", "СК", "СТ", "ТР",
-    ];
-    const endings = [
-      "А", "АН", "АР", "АС", "АТ", "ЕН", "ЕР", "ИК", "ИН", "ИР", "ИС", "ИТ", "ИЯ", "ОН", "ОР", "ОС",
-      "ОТ", "УН", "УР", "УС", "КА", "НА", "РА", "ТА", "НИК", "ЛИЯ", "РИЯ", "ТОР",
-    ];
+  function generateWordPool(count, random) {
+    const source = Array.isArray(window.RUSSIAN_WORDS) ? window.RUSSIAN_WORDS : [];
+    const unique = [];
+    const seen = new Set();
 
-    const result = new Set();
-    let guard = 0;
+    for (const rawWord of source) {
+      const answer = String(rawWord)
+        .trim()
+        .toUpperCase()
+        .replaceAll("Ё", "Е");
 
-    while (result.size < count && guard < count * 100) {
-      guard += 1;
-      const syllables = random() < 0.6 ? 2 : random() < 0.88 ? 3 : 4;
-      let word = pick(starts, random) + pick(vowels, random);
-
-      for (let i = 1; i < syllables; i += 1) {
-        word += pick(middles, random) + pick(vowels, random);
+      if (!/^[А-Я]+$/.test(answer) || answer.length < 4 || answer.length > 12 || seen.has(answer)) {
+        continue;
       }
 
-      if (random() < 0.85) word += pick(endings, random);
-      word = word.replace(/([АЕИОУЫЭЯ])\1+/g, "$1");
-
-      if (word.length >= 4 && word.length <= 12) result.add(word);
+      seen.add(answer);
+      unique.push({
+        id: unique.length + 1,
+        answer,
+        clue: "Определение будет добавлено на следующем этапе",
+        priority: 3,
+      });
     }
 
-    return [...result].map((answer, index) => ({
-      id: index + 1,
-      answer,
-      clue: `Синтетическое слово №${index + 1}`,
-      priority: 3,
-    }));
+    return shuffle(unique, random).slice(0, Math.min(count, unique.length));
   }
 
   function createGrid(rows, cols) {
@@ -256,6 +242,7 @@
     const candidates = [];
 
     for (const direction of directions) {
+      const { dr, dc } = DIRECTIONS[direction];
       const startRow = direction === "right"
         ? Math.floor(state.rows / 2)
         : Math.max(1, Math.floor((state.rows - word.answer.length) / 2));
@@ -320,7 +307,7 @@
 
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       const random = makeRandom(`${seed}:attempt:${attempt}`);
-      const words = generatePseudoWords(poolSize, random);
+      const words = generateWordPool(poolSize, random);
       const state = buildGrid(words, rows, cols, targetWords, random);
       const score = stateScore(state, targetWords);
       const candidate = { ...state, pool: words, score, attempt };
@@ -350,6 +337,7 @@
       (pageHeight - top - bottom) / result.rows,
     );
     const gridWidth = cell * result.cols;
+    const gridHeight = cell * result.rows;
     const left = (pageWidth - gridWidth) / 2;
     const lineWidth = Math.max(0.18, cell * 0.035);
     const letterSize = cell * 0.5;
@@ -470,7 +458,7 @@
       seed: els.seed.value.trim() || "scanword",
       cols: Math.max(11, Math.min(25, Number(els.cols.value) || 17)),
       rows: Math.max(15, Math.min(35, Number(els.rows.value) || 24)),
-      poolSize: Math.max(100, Math.min(3000, Number(els.poolSize.value) || 500)),
+      poolSize: Math.max(100, Math.min(window.RUSSIAN_WORDS?.length || 1000, Number(els.poolSize.value) || 500)),
       targetWords: Math.max(10, Math.min(90, Number(els.targetWords.value) || 40)),
     };
   }
@@ -513,6 +501,8 @@
     if (!currentResult) return;
     download("scanword-project.json", JSON.stringify(exportResult(currentResult), null, 2), "application/json;charset=utf-8");
   });
+
+  window.ScanwordGenerator = { generateBest, renderSvg, exportResult };
 
   runGeneration();
 })();
