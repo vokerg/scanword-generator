@@ -10,11 +10,11 @@
   <main class="app-shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">ARROWORD GENERATOR · MVP 0.4</p>
+        <p class="eyebrow">ARROWORD GENERATOR · R&amp;D 0.5</p>
         <h1>Structurally valid arrowword grids</h1>
         <p class="lead">
-          Generates in-grid clues and arrows, fills them with real Russian answers,
-          rejects accidental letter runs, and exports an exact A5 SVG or JSON project.
+          Runs multiple placement attempts, rejects accidental letter runs, and keeps
+          the best valid A5 arrowword generated from real Russian answers.
         </p>
       </div>
       <div class="badge">A5<br />SVG + JSON</div>
@@ -26,7 +26,7 @@
 
         <label>
           Seed
-          <input id="seed" type="text" value="arrowword-004" />
+          <input id="seed" type="text" value="arrowword-rnd-005" />
         </label>
 
         <div class="field-row">
@@ -46,14 +46,14 @@
             <input id="poolSize" type="number" min="100" max="500" value="500" />
           </label>
           <label>
-            Minimum answers
+            Target answers
             <input id="targetWords" type="number" min="12" max="60" value="28" />
           </label>
         </div>
 
         <label>
           Clue-cell density, %
-          <input id="clueDensity" type="number" min="16" max="38" value="27" />
+          <input id="clueDensity" type="number" min="16" max="38" value="27" disabled />
         </label>
 
         <label class="check-row">
@@ -71,8 +71,8 @@
         <div id="stats" class="stats" aria-live="polite"></div>
 
         <div class="note">
-          <strong>Validation-first mode:</strong> density is optimized only after the grid passes
-          the accidental-run, crossing-letter, orphan-letter, and clue-direction checks.
+          <strong>Strict placement mode:</strong> every result is validated after 32 seeded restarts.
+          Density is scored only after the grid has zero accidental runs and zero orphan letters.
         </div>
       </aside>
 
