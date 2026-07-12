@@ -10,7 +10,7 @@
   <main class="app-shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">SCANWORD GENERATOR · MVP 0.2</p>
+        <p class="eyebrow">SCANWORD GENERATOR · MVP 0.3</p>
         <h1>Настоящая сканвордная сетка</h1>
         <p class="lead">
           Генерирует серые клетки с определениями и стрелками, извлекает слоты,
@@ -26,7 +26,7 @@
 
         <label>
           Seed
-          <input id="seed" type="text" value="scanword-002" />
+          <input id="seed" type="text" value="scanword-004" />
         </label>
 
         <div class="field-row">
@@ -46,14 +46,14 @@
             <input id="poolSize" type="number" min="100" max="500" value="500" />
           </label>
           <label>
-            Цель
+            Минимум слов
             <input id="targetWords" type="number" min="12" max="60" value="42" />
           </label>
         </div>
 
         <label>
           Плотность клеток вопросов, %
-          <input id="clueDensity" type="number" min="16" max="34" value="23" />
+          <input id="clueDensity" type="number" min="16" max="38" value="27" />
         </label>
 
         <label class="check-row">
@@ -71,8 +71,8 @@
         <div id="stats" class="stats" aria-live="polite"></div>
 
         <div class="note">
-          <strong>Сейчас работает:</strong> процедурный шаблон, горизонтальные и вертикальные ответы,
-          две подсказки в одной клетке, перенос коротких определений и подбор слов по пересечениям.
+          <strong>Уплотнение 0.3:</strong> генератор добирает слова сверх минимума, обрезает пустые края,
+          штрафует внутренние пустоты и показывает процент заполнения, пустые серые клетки и связность.
         </div>
       </aside>
 
@@ -103,6 +103,9 @@
   <script src="words.js"></script>
   <script src="short-words.js"></script>
   <script src="clues.js"></script>
-  <script src="app.js"></script>
+  <script src="core.js"></script>
+  <script src="solver.js"></script>
+  <script src="renderer.js"></script>
+  <script src="ui.js"></script>
 </body>
 </html>
