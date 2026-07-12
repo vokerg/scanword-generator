@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scanword Generator MVP</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">SCANWORD GENERATOR · MVP 0.1</p>
+        <h1>Алгоритмический генератор сетки</h1>
+        <p class="lead">
+          Создаёт 500 синтетических слов, размещает лучшие пересечения в сетке A5
+          и выгружает результат в SVG или JSON.
+        </p>
+      </div>
+      <div class="badge">Без сервера<br />Без зависимостей</div>
+    </header>
+
+    <section class="workspace">
+      <aside class="panel controls-panel">
+        <h2>Параметры</h2>
+
+        <label>
+          Seed
+          <input id="seed" type="text" value="scanword-001" />
+        </label>
+
+        <div class="field-row">
+          <label>
+            Колонки
+            <input id="cols" type="number" min="11" max="25" value="17" />
+          </label>
+          <label>
+            Строки
+            <input id="rows" type="number" min="15" max="35" value="24" />
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label>
+            Пул слов
+            <input id="poolSize" type="number" min="100" max="3000" value="500" />
+          </label>
+          <label>
+            Цель
+            <input id="targetWords" type="number" min="10" max="90" value="40" />
+          </label>
+        </div>
+
+        <label class="check-row">
+          <input id="showAnswers" type="checkbox" />
+          <span>Показать ответы</span>
+        </label>
+
+        <button id="generate" class="primary">Сгенерировать</button>
+
+        <div class="button-grid">
+          <button id="downloadSvg">Скачать SVG</button>
+          <button id="downloadJson">Скачать JSON</button>
+        </div>
+
+        <div id="stats" class="stats" aria-live="polite"></div>
+
+        <div class="note">
+          <strong>Важно:</strong> сейчас это проверка алгоритма раскладки. Слова — псевдорусские,
+          а клетки вопросов содержат номер и стрелку. Настоящий словарь и определения подключаются следующим слоем.
+        </div>
+      </aside>
+
+      <section class="preview-panel">
+        <div class="preview-toolbar">
+          <div>
+            <span class="dot"></span>
+            Предпросмотр A5 · 148 × 210 мм
+          </div>
+          <span id="generationStatus">готов</span>
+        </div>
+        <div id="preview" class="paper-wrap"></div>
+      </section>
+    </section>
+
+    <section class="panel words-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">РЕЗУЛЬТАТ</p>
+          <h2>Размещённые слова</h2>
+        </div>
+        <p>Список нужен для отладки геометрии и проверки пересечений.</p>
+      </div>
+      <div id="wordsTable" class="table-wrap"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
