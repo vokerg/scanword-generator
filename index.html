@@ -3,21 +3,21 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Scanword Generator MVP</title>
+  <title>Генератор сканвордов A5</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <main class="app-shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">SCANWORD GENERATOR · MVP 0.1</p>
-        <h1>Алгоритмический генератор сетки</h1>
+        <p class="eyebrow">SCANWORD GENERATOR · MVP 0.2</p>
+        <h1>Настоящая сканвордная сетка</h1>
         <p class="lead">
-          Выбирает 500 настоящих русских слов из встроенного словаря, размещает лучшие
-          пересечения в сетке A5 и выгружает результат в SVG или JSON.
+          Генерирует серые клетки с определениями и стрелками, извлекает слоты,
+          заполняет их реальными русскими словами и экспортирует страницу A5.
         </p>
       </div>
-      <div class="badge">Без сервера<br />Без зависимостей</div>
+      <div class="badge">A5<br />SVG + JSON</div>
     </header>
 
     <section class="workspace">
@@ -26,17 +26,17 @@
 
         <label>
           Seed
-          <input id="seed" type="text" value="scanword-001" />
+          <input id="seed" type="text" value="scanword-002" />
         </label>
 
         <div class="field-row">
           <label>
             Колонки
-            <input id="cols" type="number" min="11" max="25" value="17" />
+            <input id="cols" type="number" min="11" max="19" value="13" />
           </label>
           <label>
             Строки
-            <input id="rows" type="number" min="15" max="35" value="24" />
+            <input id="rows" type="number" min="13" max="27" value="17" />
           </label>
         </div>
 
@@ -47,9 +47,14 @@
           </label>
           <label>
             Цель
-            <input id="targetWords" type="number" min="10" max="90" value="40" />
+            <input id="targetWords" type="number" min="12" max="60" value="42" />
           </label>
         </div>
+
+        <label>
+          Плотность клеток вопросов, %
+          <input id="clueDensity" type="number" min="16" max="34" value="23" />
+        </label>
 
         <label class="check-row">
           <input id="showAnswers" type="checkbox" />
@@ -66,8 +71,8 @@
         <div id="stats" class="stats" aria-live="polite"></div>
 
         <div class="note">
-          <strong>Важно:</strong> сейчас это проверка алгоритма раскладки. Встроенный словарь содержит
-          500 настоящих слов, но определения пока не выводятся: клетки вопросов содержат номер и стрелку.
+          <strong>Сейчас работает:</strong> процедурный шаблон, горизонтальные и вертикальные ответы,
+          две подсказки в одной клетке, перенос коротких определений и подбор слов по пересечениям.
         </div>
       </aside>
 
@@ -87,15 +92,16 @@
       <div class="section-heading">
         <div>
           <p class="eyebrow">РЕЗУЛЬТАТ</p>
-          <h2>Размещённые слова</h2>
+          <h2>Заполненные слоты</h2>
         </div>
-        <p>Список нужен для отладки геометрии и проверки пересечений.</p>
+        <p>Таблица показывает определения, ответы и координаты каждого направления.</p>
       </div>
       <div id="wordsTable" class="table-wrap"></div>
     </section>
   </main>
 
   <script src="words.js"></script>
+  <script src="clues.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
