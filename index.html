@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>A5 Arrowword Generator</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">ARROWORD GENERATOR · MVP 0.4</p>
+        <h1>Structurally valid arrowword grids</h1>
+        <p class="lead">
+          Generates in-grid clues and arrows, fills them with real Russian answers,
+          rejects accidental letter runs, and exports an exact A5 SVG or JSON project.
+        </p>
+      </div>
+      <div class="badge">A5<br />SVG + JSON</div>
+    </header>
+
+    <section class="workspace">
+      <aside class="panel controls-panel">
+        <h2>Generation settings</h2>
+
+        <label>
+          Seed
+          <input id="seed" type="text" value="arrowword-004" />
+        </label>
+
+        <div class="field-row">
+          <label>
+            Columns
+            <input id="cols" type="number" min="11" max="19" value="13" />
+          </label>
+          <label>
+            Rows
+            <input id="rows" type="number" min="13" max="27" value="17" />
+          </label>
+        </div>
+
+        <div class="field-row">
+          <label>
+            Word pool
+            <input id="poolSize" type="number" min="100" max="500" value="500" />
+          </label>
+          <label>
+            Minimum answers
+            <input id="targetWords" type="number" min="12" max="60" value="28" />
+          </label>
+        </div>
+
+        <label>
+          Clue-cell density, %
+          <input id="clueDensity" type="number" min="16" max="38" value="27" />
+        </label>
+
+        <label class="check-row">
+          <input id="showAnswers" type="checkbox" />
+          <span>Reveal answers</span>
+        </label>
+
+        <button id="generate" class="primary">Generate</button>
+
+        <div class="button-grid">
+          <button id="downloadSvg">Download SVG</button>
+          <button id="downloadJson">Download JSON</button>
+        </div>
+
+        <div id="stats" class="stats" aria-live="polite"></div>
+
+        <div class="note">
+          <strong>Validation-first mode:</strong> density is optimized only after the grid passes
+          the accidental-run, crossing-letter, orphan-letter, and clue-direction checks.
+        </div>
+      </aside>
+
+      <section class="preview-panel">
+        <div class="preview-toolbar">
+          <div><span class="dot"></span>A5 preview · 148 × 210 mm</div>
+          <span id="generationStatus">ready</span>
+        </div>
+        <div id="preview" class="paper-wrap"></div>
+      </section>
+    </section>
+
+    <section class="panel words-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">RESULT</p>
+          <h2>Assigned answers</h2>
+        </div>
+        <p>The table exposes every clue, answer, direction, and start coordinate for review.</p>
+      </div>
+      <div id="wordsTable" class="table-wrap"></div>
+    </section>
+  </main>
+
+  <script src="words.js"></script>
+  <script src="short-words.js"></script>
+  <script src="clues.js"></script>
+  <script src="core.js"></script>
+  <script src="solver.js"></script>
+  <script src="renderer.js"></script>
+  <script src="ui.js"></script>
+</body>
+</html>
