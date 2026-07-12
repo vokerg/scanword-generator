@@ -1,20 +1,20 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Генератор сканвордов A5</title>
+  <title>A5 Arrowword Generator</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <main class="app-shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">SCANWORD GENERATOR · MVP 0.3</p>
-        <h1>Настоящая сканвордная сетка</h1>
+        <p class="eyebrow">ARROWORD GENERATOR · MVP 0.4</p>
+        <h1>Structurally valid arrowword grids</h1>
         <p class="lead">
-          Генерирует серые клетки с определениями и стрелками, извлекает слоты,
-          заполняет их реальными русскими словами и экспортирует страницу A5.
+          Generates in-grid clues and arrows, fills them with real Russian answers,
+          rejects accidental letter runs, and exports an exact A5 SVG or JSON project.
         </p>
       </div>
       <div class="badge">A5<br />SVG + JSON</div>
@@ -22,67 +22,64 @@
 
     <section class="workspace">
       <aside class="panel controls-panel">
-        <h2>Параметры</h2>
+        <h2>Generation settings</h2>
 
         <label>
           Seed
-          <input id="seed" type="text" value="scanword-004" />
+          <input id="seed" type="text" value="arrowword-004" />
         </label>
 
         <div class="field-row">
           <label>
-            Колонки
+            Columns
             <input id="cols" type="number" min="11" max="19" value="13" />
           </label>
           <label>
-            Строки
+            Rows
             <input id="rows" type="number" min="13" max="27" value="17" />
           </label>
         </div>
 
         <div class="field-row">
           <label>
-            Пул слов
+            Word pool
             <input id="poolSize" type="number" min="100" max="500" value="500" />
           </label>
           <label>
-            Минимум слов
+            Minimum answers
             <input id="targetWords" type="number" min="12" max="60" value="42" />
           </label>
         </div>
 
         <label>
-          Плотность клеток вопросов, %
+          Clue-cell density, %
           <input id="clueDensity" type="number" min="16" max="38" value="27" />
         </label>
 
         <label class="check-row">
           <input id="showAnswers" type="checkbox" />
-          <span>Показать ответы</span>
+          <span>Reveal answers</span>
         </label>
 
-        <button id="generate" class="primary">Сгенерировать</button>
+        <button id="generate" class="primary">Generate</button>
 
         <div class="button-grid">
-          <button id="downloadSvg">Скачать SVG</button>
-          <button id="downloadJson">Скачать JSON</button>
+          <button id="downloadSvg">Download SVG</button>
+          <button id="downloadJson">Download JSON</button>
         </div>
 
         <div id="stats" class="stats" aria-live="polite"></div>
 
         <div class="note">
-          <strong>Уплотнение 0.3:</strong> генератор добирает слова сверх минимума, обрезает пустые края,
-          штрафует внутренние пустоты и показывает процент заполнения, пустые серые клетки и связность.
+          <strong>Validation-first mode:</strong> density is optimized only after the grid passes
+          the accidental-run, crossing-letter, orphan-letter, and clue-direction checks.
         </div>
       </aside>
 
       <section class="preview-panel">
         <div class="preview-toolbar">
-          <div>
-            <span class="dot"></span>
-            Предпросмотр A5 · 148 × 210 мм
-          </div>
-          <span id="generationStatus">готов</span>
+          <div><span class="dot"></span>A5 preview · 148 × 210 mm</div>
+          <span id="generationStatus">ready</span>
         </div>
         <div id="preview" class="paper-wrap"></div>
       </section>
@@ -91,10 +88,10 @@
     <section class="panel words-panel">
       <div class="section-heading">
         <div>
-          <p class="eyebrow">РЕЗУЛЬТАТ</p>
-          <h2>Заполненные слоты</h2>
+          <p class="eyebrow">RESULT</p>
+          <h2>Assigned answers</h2>
         </div>
-        <p>Таблица показывает определения, ответы и координаты каждого направления.</p>
+        <p>The table exposes every clue, answer, direction, and start coordinate for review.</p>
       </div>
       <div id="wordsTable" class="table-wrap"></div>
     </section>
