@@ -2,7 +2,7 @@
   "use strict";
 
   const { DIRECTIONS, createMask, extractSlots, analyzeAssignments } = window.ScanwordCore;
-  const { generateBest } = window.ScanwordSolver;
+  const { generateBest, validateGrid } = window.ScanwordSolver;
   const { renderSvg, escapeXml } = window.ScanwordRenderer;
 
   const els = {
@@ -25,41 +25,35 @@
   let currentResult = null;
 
   function renderStats(result) {
-    const emptyPercent = Math.round((1 - result.fillRatio) * 100);
+    const validity = result.validation?.valid ? "YES" : "NO";
     const values = [
-      [result.placed.length, "размещено"],
-      [result.intersections, "пересечений"],
-      [`${Math.round(result.fillRatio * 100)}%`, "занято клеток"],
-      [`${Math.round(result.answerCoverage * 100)}%`, "белых заполнено"],
-      [result.blankClues, "пустых серых"],
-      [result.components, "компонентов"],
+      [result.placed.length, "words"],
+      [result.intersections, "crossings"],
+      [`${Math.round((1 - result.panelRatio) * 100)}%`, "active cells"],
+      [result.panelCells, "panel cells"],
+      [result.validation?.accidentalRuns?.length || 0, "accidental runs"],
+      [validity, "structurally valid"],
     ];
-
     els.stats.innerHTML = values
       .map(([value, label]) => `<div class="stat"><b>${value}</b><span>${label}</span></div>`)
       .join("");
-    els.stats.dataset.emptyPercent = String(emptyPercent);
   }
 
   function renderWords(result) {
-    const rows = result.placed
-      .map((word) => `
-        <tr>
-          <td>${word.id}</td>
-          <td>${escapeXml(word.clue)}</td>
-          <td class="word">${word.answer}</td>
-          <td>${word.length}</td>
-          <td>${DIRECTIONS[word.direction].label} ${DIRECTIONS[word.direction].arrow}</td>
-          <td>${word.startRow + 1}:${word.startCol + 1}</td>
-        </tr>
-      `)
-      .join("");
+    const rows = result.placed.map((word) => `
+      <tr>
+        <td>${word.id}</td>
+        <td>${escapeXml(word.clue)}</td>
+        <td class="word">${word.answer}</td>
+        <td>${word.length}</td>
+        <td>${DIRECTIONS[word.direction].label} ${DIRECTIONS[word.direction].arrow}</td>
+        <td>${word.startRow + 1}:${word.startCol + 1}</td>
+      </tr>
+    `).join("");
 
     els.wordsTable.innerHTML = `
       <table>
-        <thead>
-          <tr><th>№</th><th>Определение</th><th>Ответ</th><th>Длина</th><th>Направление</th><th>Старт</th></tr>
-        </thead>
+        <thead><tr><th>#</th><th>Clue</th><th>Answer</th><th>Length</th><th>Direction</th><th>Start</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
@@ -67,29 +61,28 @@
 
   function exportResult(result) {
     return {
-      version: "0.3.0",
+      version: "0.4.0",
       page: { format: "A5", orientation: "portrait", widthMm: 148, heightMm: 210 },
       grid: { rows: result.rows, cols: result.cols },
       seed: els.seed.value.trim(),
       generatedPoolSize: result.pool.length,
       quality: {
-        fillRatio: result.fillRatio,
-        answerCoverage: result.answerCoverage,
-        clueUsage: result.clueUsage,
-        blankClues: result.blankClues,
-        emptyCells: result.emptyCells,
-        components: result.components,
+        structurallyValid: result.validation?.valid || false,
+        accidentalRuns: result.validation?.accidentalRuns?.length || 0,
+        conflicts: result.validation?.conflicts || 0,
+        orphanLetters: result.validation?.orphanLetters || 0,
+        clueDirectionConflicts: result.validation?.clueDirectionConflicts || 0,
+        panelCells: result.panelCells,
+        panelRatio: result.panelRatio,
         intersections: result.intersections,
       },
       placedWords: result.placed,
-      cells: result.grid.map((row) =>
-        row.map((cell) => ({
-          type: cell.type,
-          char: cell.char,
-          slotIds: cell.slotIds,
-          clues: cell.clues,
-        })),
-      ),
+      cells: result.grid.map((row) => row.map((cell) => ({
+        type: cell.type,
+        char: cell.char,
+        slotIds: cell.slotIds,
+        clues: cell.clues,
+      }))),
     };
   }
 
@@ -115,45 +108,59 @@
   }
 
   function rerenderSvg() {
-    if (!currentResult) return;
-    els.preview.innerHTML = renderSvg(currentResult, els.showAnswers.checked);
+    if (currentResult) els.preview.innerHTML = renderSvg(currentResult, els.showAnswers.checked);
   }
 
   function runGeneration() {
     const settings = readSettings();
-    els.generationStatus.textContent = "генерация…";
+    els.generationStatus.textContent = "generating…";
     els.generate.disabled = true;
 
     window.setTimeout(() => {
-      currentResult = generateBest(
-        settings.seed,
-        settings.poolSize,
-        settings.rows,
-        settings.cols,
-        settings.targetWords,
-        settings.clueDensity,
-      );
-      rerenderSvg();
-      renderStats(currentResult);
-      renderWords(currentResult);
-      els.generationStatus.textContent = `шаблон ${currentResult.attempt + 1}/16 · пустых ${Math.round((1 - currentResult.fillRatio) * 100)}%`;
-      els.generate.disabled = false;
+      try {
+        currentResult = generateBest(
+          settings.seed,
+          settings.poolSize,
+          settings.rows,
+          settings.cols,
+          settings.targetWords,
+          settings.clueDensity,
+        );
+        currentResult.validation = validateGrid(currentResult.grid, currentResult.placed);
+        rerenderSvg();
+        renderStats(currentResult);
+        renderWords(currentResult);
+        els.generationStatus.textContent = `template ${currentResult.attempt + 1}/32 · valid · panels ${Math.round(currentResult.panelRatio * 100)}%`;
+      } catch (error) {
+        currentResult = null;
+        els.preview.innerHTML = `<div class="generation-error"><strong>Generation failed.</strong><br>${escapeXml(error.message)}</div>`;
+        els.stats.innerHTML = "";
+        els.wordsTable.innerHTML = "";
+        els.generationStatus.textContent = "no valid grid";
+      } finally {
+        els.generate.disabled = false;
+      }
     }, 20);
   }
 
   els.generate.addEventListener("click", runGeneration);
   els.showAnswers.addEventListener("change", rerenderSvg);
-
   els.downloadSvg.addEventListener("click", () => {
-    if (!currentResult) return;
-    download("scanword-a5.svg", renderSvg(currentResult, els.showAnswers.checked), "image/svg+xml;charset=utf-8");
+    if (currentResult) download("arrowword-a5.svg", renderSvg(currentResult, els.showAnswers.checked), "image/svg+xml;charset=utf-8");
   });
-
   els.downloadJson.addEventListener("click", () => {
-    if (!currentResult) return;
-    download("scanword-project.json", JSON.stringify(exportResult(currentResult), null, 2), "application/json;charset=utf-8");
+    if (currentResult) download("arrowword-project.json", JSON.stringify(exportResult(currentResult), null, 2), "application/json;charset=utf-8");
   });
 
-  window.ScanwordGenerator = { generateBest, renderSvg, exportResult, createMask, extractSlots, analyzeAssignments, getCurrentResult: () => currentResult };
+  window.ScanwordGenerator = {
+    generateBest,
+    renderSvg,
+    exportResult,
+    validateGrid,
+    createMask,
+    extractSlots,
+    analyzeAssignments,
+    getCurrentResult: () => currentResult,
+  };
   runGeneration();
 })();
