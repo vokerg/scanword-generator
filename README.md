@@ -1,69 +1,78 @@
-# Scanword Generator MVP
+# Arrowword Generator
 
-Браузерный прототип алгоритмического генератора сканворда формата A5.
+A browser-based prototype for generating Swedish-style crosswords (arrowwords / scanwords) on an A5 page.
 
-## Что умеет версия 0.3
+## Current status
 
-- строит процедурный шаблон из серых клеток-вопросов;
-- извлекает горизонтальные и вертикальные слоты длиной 3–12 букв;
-- заполняет сетку реальными русскими словами из локального словаря;
-- проверяет совпадение букв на пересечениях;
-- поддерживает две подсказки в одной клетке;
-- переносит короткие определения внутри серой клетки;
-- продолжает заполнять сетку после достижения заданного минимума слов;
-- награждает покрытие новых клеток и использование клеток-барьеров;
-- штрафует пустые области, несвязные компоненты и пустые серые клетки;
-- обрезает полностью неиспользуемые края шаблона;
-- показывает метрики плотности и связности;
-- экспортирует SVG A5 и JSON проекта.
+Version 0.4 focuses on **structural validity**, not PDF export.
 
-## Запуск
+The generator:
 
-Откройте `index.html` в современном браузере или запустите локальный сервер:
+- uses a built-in Russian answer dictionary;
+- places clues directly inside the grid;
+- supports right and down answers;
+- supports one or two clues in the same clue cell;
+- validates every contiguous horizontal and vertical letter run;
+- rejects grids containing accidental pseudo-words;
+- renders unused areas as explicit graphic panels rather than blank answer cells;
+- exports an A5 SVG and a JSON project file;
+- can reveal answers for validation.
+
+## Structural invariants
+
+A generated grid is accepted only when:
+
+1. Every contiguous letter run of length two or more is exactly one assigned answer.
+2. Every letter cell belongs to at least one assigned answer.
+3. Crossing letters agree.
+4. A clue cell contains at most one right clue and one down clue.
+5. There are no blank clue cells.
+6. Non-answer areas are represented as explicit panel cells.
+
+These rules are intentionally stricter than the earlier density-only prototype.
+
+## Running locally
+
+Open `index.html` directly in a modern browser, or run a local server:
 
 ```bash
 python3 -m http.server 8080
 ```
 
-Затем откройте `http://localhost:8080`.
+Then open `http://localhost:8080`.
 
-## Метрики качества
-
-Интерфейс показывает:
-
-- количество размещённых слов;
-- количество пересечений;
-- долю занятых клеток в итоговом прямоугольнике;
-- долю заполненных белых клеток;
-- количество структурных серых клеток без определения;
-- количество связных компонентов.
-
-`Минимум слов` — нижняя цель, а не жёсткий предел. Генератор может добавить дополнительные ответы, если они повышают плотность.
-
-## Почему пока нет PDF
-
-SVG уже хранит физический размер A5 и печатается без потери качества. PDF-экспорт имеет смысл добавить после стабилизации топологии сетки, размеров шрифта и правил переноса определений. Тогда PDF будет тонким экспортным слоем поверх готового SVG-макета.
-
-## Ограничения
-
-- определения пока покрывают только встроенную тестовую часть словаря;
-- некоторые структурные серые клетки могут оставаться без текста;
-- нет ручного редактора;
-- нет приоритетных и обязательных слов;
-- используется только направление вправо и вниз;
-- PDF пока не экспортируется.
-
-## Структура
+## Files
 
 ```text
-index.html       — интерфейс
-styles.css       — оформление
-words.js         — основной словарь ответов
-short-words.js   — короткие ответы для компактных слотов
-clues.js         — встроенные определения
-core.js          — шаблон, слоты, метрики и уплотнение
-solver.js        — подбор слов и оценка вариантов
-renderer.js      — SVG-рендер страницы A5
-ui.js            — интерфейс, статистика и экспорт JSON/SVG
-app.js           — предыдущая монолитная версия, больше не подключается
+index.html       Browser interface
+styles.css       Interface styling
+words.js         Main Russian answer dictionary
+short-words.js   Compact answers for short slots
+clues.js         Short clue dictionary
+core.js          Grid templates and shared metrics
+solver.js        Constraint-aware fill and validation
+renderer.js      A5 SVG renderer
+ui.js            Browser UI and JSON export
+docs/            Design notes and research summary
 ```
+
+## Why PDF is deferred
+
+SVG already preserves the exact physical A5 dimensions and prints without raster quality loss. PDF export will be added after the following are stable:
+
+- grid topology;
+- panel frequency;
+- clue typography;
+- arrow placement;
+- answer and clue quality;
+- solution-page layout.
+
+At that point PDF becomes a presentation/export layer rather than part of the generation algorithm.
+
+## Next milestones
+
+- reduce the panel-cell ratio without violating structural validity;
+- add a larger reviewed answer-and-clue corpus;
+- introduce stock templates and compare them with generated templates;
+- add automated multi-seed regression tests;
+- add print-ready PDF and solution-page export.
