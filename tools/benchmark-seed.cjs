@@ -19,6 +19,7 @@ for (const file of [
   "construction-v2-runtime.js",
   "construction-v2.js",
   "construction-portfolio.js",
+  "construction-polish.js",
 ]) {
   require(path.join(root, file));
 }
