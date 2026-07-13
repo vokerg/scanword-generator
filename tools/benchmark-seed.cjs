@@ -18,6 +18,7 @@ for (const file of [
   "closed-fill-rollback.js",
   "construction-v2-runtime.js",
   "construction-v2.js",
+  "construction-portfolio.js",
 ]) {
   require(path.join(root, file));
 }
