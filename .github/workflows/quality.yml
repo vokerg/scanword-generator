@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - r-and-d/valid-arrowword-generator
+      - r-and-d/coverage-090
   pull_request:
     branches:
       - main
@@ -15,7 +16,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -26,47 +27,7 @@ jobs:
           node-version: 22
 
       - name: Audit dictionary
-        id: audit
-        continue-on-error: true
-        shell: bash
-        run: |
-          set +e
-          node tools/dictionary-audit.cjs > dictionary-audit.log 2>&1
-          code=$?
-          cat dictionary-audit.log
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          exit 0
+        run: node tools/dictionary-audit.cjs
 
-      - name: Run multi-seed structural benchmark
-        id: benchmark
-        continue-on-error: true
-        shell: bash
-        run: |
-          set +e
-          node tools/benchmark.cjs > benchmark.log 2>&1
-          code=$?
-          cat benchmark.log
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          exit 0
-
-      - name: Upload quality reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: arrowword-quality-reports
-          path: |
-            dictionary-audit.log
-            benchmark.log
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Enforce quality gate
-        if: always()
-        shell: bash
-        run: |
-          audit="${{ steps.audit.outputs.exit_code }}"
-          benchmark="${{ steps.benchmark.outputs.exit_code }}"
-          if [[ "$audit" != "0" || "$benchmark" != "0" ]]; then
-            echo "Quality gate failed: audit=$audit benchmark=$benchmark"
-            exit 1
-          fi
+      - name: Run 40-seed coverage benchmark
+        run: node tools/benchmark.cjs

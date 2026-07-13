@@ -10,11 +10,11 @@
   <main class="app-shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">ARROWORD GENERATOR · R&amp;D 0.8</p>
+        <p class="eyebrow">ARROWORD GENERATOR · R&amp;D 0.9</p>
         <h1>Dense, structurally valid arrowword grids</h1>
         <p class="lead">
-          Separates clue text from arrow anchors, rejects accidental letter runs, and keeps
-          the densest valid A5 arrowword generated from reviewed Russian answers.
+          Builds one connected answer graph, expands real clues into compact multi-cell footprints,
+          and rejects every accidental letter run before a result can be selected.
         </p>
       </div>
       <div class="badge">A5<br />SVG + JSON</div>
@@ -26,7 +26,7 @@
 
         <label>
           Seed
-          <input id="seed" type="text" value="arrowword-rnd-008" />
+          <input id="seed" type="text" value="arrowword-rnd-009" />
         </label>
 
         <div class="field-row">
@@ -71,9 +71,9 @@
         <div id="stats" class="stats" aria-live="polite"></div>
 
         <div class="note">
-          <strong>Split-clue topology:</strong> clue text occupies neighbouring cells where possible,
-          while arrow anchors remain attached to their exact answers. Twelve deterministic restarts
-          are scored only after every structural validation check passes.
+          <strong>90% coverage checkpoint:</strong> the solver searches adaptively from 24 to 240 seeded
+          attempts. A result must keep one connected answer component, at least 90% active cells,
+          at most 20 residual panels, and zero accidental letter runs.
         </div>
       </aside>
 

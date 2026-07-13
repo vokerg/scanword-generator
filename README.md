@@ -1,62 +1,86 @@
 # Arrowword Generator
 
-A browser-based R&D prototype for generating Swedish-style crosswords (arrowwords / scanwords) on an A5 page.
+A browser-based R&D prototype for generating Swedish-style crosswords (arrowwords / scanwords) on an exact A5 page.
 
-## Current checkpoint
+## Current checkpoint: 0.9
 
-The `r-and-d/valid-arrowword-generator` branch contains version 0.8, a **split-clue topology engine**.
+Version 0.9 raises the default 13 × 17 grid from the previous 78% quality floor to a strict **90% active-cell checkpoint** while keeping every answer in one connected component.
 
 The generator:
 
-- uses only Russian answers with reviewed, human-readable clues;
-- includes reviewed two-letter and 3–12-letter answers;
+- uses only reviewed Russian answers and human-readable clues;
+- supports answer lengths from 2 to 12 letters;
 - places answers algorithmically and validates every crossing;
 - rejects accidental horizontal and vertical letter runs;
-- supports right and down answers;
-- supports one or two arrows in a shared arrow cell;
-- moves clue text into neighbouring cells where space is available;
-- keeps the original arrow cell attached to the exact answer start;
+- supports right and down answers and dual arrow cells;
+- expands clue text into connected one-to-four-cell footprints when space is available;
+- keeps every arrow anchor attached to the exact answer start;
 - uses no placeholder definitions or pseudo-words;
-- exports an exact A5 SVG and a JSON project file;
+- exports exact A5 SVG and JSON project files;
 - can reveal answers for visual validation.
 
-## Why split clue cells matter
+## Coverage model
 
-Printed arrowwords frequently devote one cell to clue text and an adjacent cell to the arrow anchor. Earlier checkpoints rendered clue text and the arrow inside one cell, leaving many unrelated panel cells elsewhere in the grid.
+Three separate measurements are reported:
 
-Version 0.8 performs a maximum matching pass after word placement:
+- **Active coverage** — letter cells, arrow cells, and real clue-footprint cells divided by the whole grid.
+- **Answer-space coverage** — letter cells divided by cells not occupied by clues.
+- **Residual panels** — cells that are neither answers nor real clues.
 
-1. each clue searches neighbouring unused cells;
-2. clue-to-cell assignments are resolved without reusing a cell;
-3. assigned cells become clue-text cells;
-4. the original cell becomes an arrow anchor;
-5. unmatched clues remain in compact combined cells.
+This prevents a misleading single density number. Version 0.9 requires at least 90% active coverage, at least 65% answer-space coverage, and no more than 20 residual panels on the default A5 grid.
 
-This does not fake density. A converted cell contains a real clue linked to a real answer. The word layout and all crossing checks remain unchanged.
+## Multi-cell clue footprints
+
+Long definitions often do not fit legibly beside an arrow. The post-layout clue allocator now:
+
+1. finds connected panel footprints next to each arrow anchor;
+2. generates one-to-four-cell candidate shapes;
+3. runs deterministic randomized set-packing passes;
+4. prevents two clues from claiming the same cell;
+5. prefers footprints that consume small or isolated panel regions;
+6. renders the footprint as one outlined clue area.
+
+Each converted cell contains a real clue associated with a real answer. No cells are counted as active merely to inflate the metric.
 
 ## Structural invariants
 
 A generated grid is accepted only when:
 
 1. Every contiguous letter run of length two or more is exactly one assigned answer.
-2. Every letter cell belongs to at least one assigned answer.
+2. Every letter belongs to at least one assigned answer.
 3. Crossing letters agree.
 4. An arrow cell contains at most one right arrow and one down arrow.
-5. Every clue-text cell points to an existing arrow and answer.
-6. Every used answer has a reviewed clue; placeholder clues are excluded.
-7. Residual non-answer areas are explicit panel cells, never blank answer cells.
+5. Every external clue footprint points to an existing arrow and answer.
+6. Every used answer has a reviewed clue.
+7. The answer graph is one connected component.
+8. Residual non-answer areas are explicit panel cells, never blank answer cells.
 
 ## Generation strategy
 
-Version 0.8 is still word-first, but now has three phases:
+Version 0.9 remains word-first but adds a coverage-oriented selection layer:
 
-1. reach the requested minimum answer count using intersecting placements;
-2. continue filling valid answer groups in unused regions;
-3. assign neighbouring panel cells to clue text with bipartite matching.
+1. build one connected answer graph;
+2. continue dense valid placements after the requested minimum is reached;
+3. allocate multi-cell clue footprints over remaining panel regions;
+4. score valid candidates by active coverage, answer-space coverage, residual panels, intersections, and clue sharing;
+5. stop early on a preferred result, continue to 120 attempts for the mandatory checkpoint, and extend to 240 attempts only when necessary.
 
-The engine runs twelve deterministic restarts and keeps the highest-scoring structurally valid result. The default grid allows at most three answer groups, down from six in version 0.7.
+## Verified 40-seed results
 
-A closed-fill template CSP remains a separate R&D track. It is the path to eliminating the last residual panels, but it requires a substantially larger reviewed lexicon and stronger constraint propagation.
+Local deterministic regression run on the default 13 × 17 grid:
+
+```text
+Answers:               41–50, average 44.08
+Active coverage:       91.0–95.0%, average 92.44%
+Answer-space coverage: 85.0–91.3%, average 87.14%
+Residual panels:       11–20, average 16.70
+Answer components:     exactly 1
+Crossings:             43–53, average 47.38
+Accidental runs:       0
+Fallback clues:        0
+```
+
+The GitHub Actions gate runs the same 40 deterministic seeds before the branch can be considered merge-ready.
 
 ## Running locally
 
@@ -70,27 +94,22 @@ Then open `http://localhost:8080`.
 
 ## Quality gates
 
-Run the dictionary audit:
-
 ```bash
 node tools/dictionary-audit.cjs
-```
-
-Run the deterministic 40-seed benchmark:
-
-```bash
 node tools/benchmark.cjs
 ```
 
-The benchmark rejects any result that:
+The benchmark rejects a result that:
 
 - fails structural validation;
-- contains fewer than 40 answers on the default 13 × 17 grid;
-- occupies less than 78% of grid cells with answers, arrow anchors, or real clue text;
-- uses more than three answer groups;
-- externalizes fewer than 20 clue texts;
-- leaves more than 49 residual panel cells;
-- uses a fallback placeholder clue.
+- contains fewer than 40 answers;
+- has less than 90% active coverage;
+- has less than 65% answer-space coverage;
+- has more than 20 residual panels;
+- contains more or fewer than one answer component;
+- externalizes fewer than 24 real clues;
+- uses fewer than 45 clue-footprint cells;
+- uses a fallback clue.
 
 ## Files
 
@@ -102,24 +121,24 @@ short-words.js             Three-letter compact answers
 clues.js                   Original clue dictionary
 extra-dictionary.js        Reviewed answer-and-clue expansion
 two-letter-words.js        Reviewed two-letter answers
-core.js                    Shared randomization and dictionary utilities
+core.js                    Randomization and dictionary utilities
 dictionary-policy.js       Restricts generation to reviewed clues
-solver.js                  Word placement and split-clue topology
-renderer.js                A5 SVG renderer
+solver.js                  Connected word placement and clue-footprint allocation
+renderer.js                A5 SVG renderer with merged clue footprints
 ui.js                      Browser UI and JSON export
-tools/benchmark.cjs        Multi-seed structural regression benchmark
+tools/benchmark.cjs        40-seed coverage regression benchmark
 tools/dictionary-audit.cjs Dictionary validation and length audit
-docs/                      Design notes and research summary
 ```
 
 ## Why PDF is deferred
 
-SVG already preserves exact A5 dimensions and prints without raster quality loss. PDF export will be added after grid topology, clue typography, arrow placement, and the solution-page layout are stable.
+SVG already preserves exact A5 dimensions and prints without raster quality loss. PDF export will be added after clue typography, arrow placement, and the solution-page layout are stable.
 
 ## Next milestones
 
-- reduce residual panel cells below 10% without inventing answers;
+- replace the remaining residual panels through local closed-fill CSP patches;
+- raise the active checkpoint above 94%;
 - expand the reviewed lexicon into the low thousands;
-- add bent and offset arrow-anchor variants used by printed scanwords;
-- develop the closed-fill template CSP;
+- add bent and offset arrow variants used by printed scanwords;
+- move long generation runs into a Web Worker;
 - add print-ready PDF and solution-page export.
