@@ -130,6 +130,8 @@ Replace random sampling with indexes:
 
 Candidate sets should be intersected from indexes and then ranked. A 10,000-entry dictionary must not require scanning or randomly sampling all entries at each placement.
 
+**Status:** first checkpoint implemented. The solver now uses a letter-position index, rare-anchor-first traversal, bounded bucket sampling, and duplicate-placement suppression. A 100-seed run passed all structural gates and reduced average residual panels from the 0.9 baseline of 16.70 to 15.42. Full measurements are recorded in `docs/indexed-candidate-ab.md`.
+
 ### Experiment D — weighted fill search
 
 Compare the current adaptive restart search against:

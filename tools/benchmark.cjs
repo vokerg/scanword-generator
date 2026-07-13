@@ -61,6 +61,8 @@ console.log({
   averagePanelCells: average(metric("panelCells")),
   averageCrossings: average(metric("crossings")),
   averageAttemptsUsed: average(metric("attemptsUsed")),
+  averageCandidateChecks: average(metric("candidateChecks")),
+  averageCandidateLookups: average(metric("candidateLookups")),
   averageSeedMs: average(metric("elapsedMs")),
   elapsedMs: Date.now() - started,
 });
