@@ -14,7 +14,7 @@
         <h1>Structurally valid arrowword grids</h1>
         <p class="lead">
           Runs multiple placement attempts, rejects accidental letter runs, and keeps
-          the best valid A5 arrowword generated from real Russian answers.
+          the best connected A5 arrowword generated from reviewed Russian answers.
         </p>
       </div>
       <div class="badge">A5<br />SVG + JSON</div>
@@ -47,7 +47,7 @@
           </label>
           <label>
             Target answers
-            <input id="targetWords" type="number" min="12" max="60" value="28" />
+            <input id="targetWords" type="number" min="12" max="60" value="30" />
           </label>
         </div>
 
@@ -71,7 +71,7 @@
         <div id="stats" class="stats" aria-live="polite"></div>
 
         <div class="note">
-          <strong>Strict placement mode:</strong> every result is validated after 32 seeded restarts.
+          <strong>Strict connected mode:</strong> every result is validated after 96 seeded restarts.
           The expanded reviewed dictionary improves crossing options; density is scored only after all structural checks pass.
         </div>
       </aside>
