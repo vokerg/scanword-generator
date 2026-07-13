@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - r-and-d/valid-arrowword-generator
+      - r-and-d/coverage-090
   pull_request:
     branches:
       - main
@@ -59,6 +60,29 @@ jobs:
             benchmark.log
           if-no-files-found: error
           retention-days: 7
+
+      - name: Upload coverage R&D source
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-090-source
+          path: |
+            README.md
+            index.html
+            styles.css
+            words.js
+            short-words.js
+            clues.js
+            extra-dictionary.js
+            dictionary-policy.js
+            two-letter-words.js
+            core.js
+            solver.js
+            renderer.js
+            ui.js
+            tools/*.cjs
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Enforce quality gate
         if: always()
