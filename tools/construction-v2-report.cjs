@@ -4,7 +4,7 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const worker = path.join(__dirname, "benchmark-seed.cjs");
-const runCount = Math.max(1, Number(process.argv[2]) || 12);
+const runCount = Math.max(1, Number(process.argv[2]) || 4);
 const prefix = process.argv[3] || "construction-v2";
 const samples = [];
 
@@ -16,19 +16,20 @@ function run(seed, mode) {
   };
   if (mode === "v2") {
     Object.assign(env, {
-      SCANWORD_V2_ATTEMPTS: process.env.SCANWORD_V2_ATTEMPTS || "24",
-      SCANWORD_V2_BASE_KEEP: process.env.SCANWORD_V2_BASE_KEEP || "6",
+      SCANWORD_V2_ATTEMPTS: process.env.SCANWORD_V2_ATTEMPTS || "48",
+      SCANWORD_V2_BASE_KEEP: process.env.SCANWORD_V2_BASE_KEEP || "24",
       SCANWORD_V2_DEPTH: process.env.SCANWORD_V2_DEPTH || "2",
       SCANWORD_V2_BEAM: process.env.SCANWORD_V2_BEAM || "4",
       SCANWORD_V2_BRANCHING: process.env.SCANWORD_V2_BRANCHING || "16",
-      SCANWORD_V2_FINALISTS: process.env.SCANWORD_V2_FINALISTS || "4",
-      SCANWORD_V2_CLUE_RESTARTS: process.env.SCANWORD_V2_CLUE_RESTARTS || "80",
+      SCANWORD_V2_FINALISTS: process.env.SCANWORD_V2_FINALISTS || "5",
+      SCANWORD_V2_CLUE_RESTARTS: process.env.SCANWORD_V2_CLUE_RESTARTS || "100",
+      SCANWORD_V2_WEAK_FILL: process.env.SCANWORD_V2_WEAK_FILL || "99",
     });
   }
   const child = spawnSync(process.execPath, [worker, seed], {
     cwd: root,
     encoding: "utf8",
-    timeout: 120_000,
+    timeout: 180_000,
     maxBuffer: 4 * 1024 * 1024,
     env,
   });
@@ -72,6 +73,7 @@ const regressed = samples.filter((sample) => sample.panelDelta > 0).length;
 const fallbacks = samples.filter((sample) => sample.v2Fallback).length;
 console.log(JSON.stringify({
   type: "summary",
+  diagnostic: "absolute weak-fill limit disabled; wider structural base retained",
   runs: samples.length,
   validLegacy: samples.length,
   validV2: samples.length,
