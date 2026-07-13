@@ -16,6 +16,7 @@ for (const file of [
   "dictionary-policy.js",
   "solver.js",
   "closed-fill.js",
+  "closed-fill-rollback.js",
 ]) {
   require(path.join(root, file));
 }
@@ -30,12 +31,18 @@ for (const seed of ["closed-fill-smoke-0", "closed-fill-smoke-1", "closed-fill-s
   assert.ok(Number.isFinite(result.rawLetterCoverage), `${seed}: raw letter coverage missing`);
   assert.equal(result.closedFill?.mode, "local-indexed-csp", `${seed}: active CSP mode not reached`);
   assert.equal(result.closedFill?.error, undefined, `${seed}: ${result.closedFill?.error}`);
+  assert.equal(result.closedFill?.rollbackError, undefined, `${seed}: ${result.closedFill?.rollbackError}`);
   assert.ok(result.closedFill.panelsAfter <= result.closedFill.panelsBefore, `${seed}: panel regression`);
+  assert.ok(result.clueTextCells >= 45, `${seed}: clue-footprint gate regressed`);
   samples.push({
     seed,
     panelsBefore: result.closedFill.panelsBefore,
     panelsAfter: result.closedFill.panelsAfter,
     regionsSolved: result.closedFill.regionsSolved,
+    rollbackDepthUsed: result.closedFill.rollbackDepthUsed,
+    rollbackWordsTried: result.closedFill.rollbackWordsTried,
+    rollbackCandidatesAccepted: result.closedFill.rollbackCandidatesAccepted,
+    rollbackSlotsEnumerated: result.closedFill.rollbackSlotsEnumerated,
     rawLetterPercent: +(result.rawLetterCoverage * 100).toFixed(1),
     cspNodes: result.closedFill.cspNodes,
   });
