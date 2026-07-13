@@ -10,7 +10,7 @@
   <main class="app-shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">ARROWORD GENERATOR · R&amp;D 0.5</p>
+        <p class="eyebrow">ARROWORD GENERATOR · R&amp;D 0.6</p>
         <h1>Structurally valid arrowword grids</h1>
         <p class="lead">
           Runs multiple placement attempts, rejects accidental letter runs, and keeps
@@ -26,7 +26,7 @@
 
         <label>
           Seed
-          <input id="seed" type="text" value="arrowword-rnd-005" />
+          <input id="seed" type="text" value="arrowword-rnd-006" />
         </label>
 
         <div class="field-row">
@@ -43,7 +43,7 @@
         <div class="field-row">
           <label>
             Word pool
-            <input id="poolSize" type="number" min="100" max="500" value="500" />
+            <input id="poolSize" type="number" min="100" max="1000" value="800" />
           </label>
           <label>
             Target answers
@@ -72,7 +72,7 @@
 
         <div class="note">
           <strong>Strict placement mode:</strong> every result is validated after 32 seeded restarts.
-          Density is scored only after the grid has zero accidental runs and zero orphan letters.
+          The expanded reviewed dictionary improves crossing options; density is scored only after all structural checks pass.
         </div>
       </aside>
 
@@ -100,7 +100,9 @@
   <script src="words.js"></script>
   <script src="short-words.js"></script>
   <script src="clues.js"></script>
+  <script src="extra-dictionary.js"></script>
   <script src="core.js"></script>
+  <script src="dictionary-policy.js"></script>
   <script src="solver.js"></script>
   <script src="renderer.js"></script>
   <script src="ui.js"></script>
