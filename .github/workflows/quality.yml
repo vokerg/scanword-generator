@@ -38,8 +38,10 @@ jobs:
       - name: Run 100-seed active closed-fill diagnostic
         run: node tools/closed-fill-report.cjs 100 > closed-fill-report.jsonl
 
-      - name: Compare legacy and panel-first portfolio construction
-        run: node tools/construction-v2-report.cjs 40 > construction-v2-report.jsonl
+      - name: Compare legacy and polished panel-first portfolio
+        env:
+          SCANWORD_PORTFOLIO_ATTEMPTS: 240
+        run: node tools/construction-v2-report.cjs 20 > construction-v2-report.jsonl
 
       - name: Mine scarce dictionary patterns
         run: RUN_COUNT=30 SEED_PREFIX=dictionary-demand node tools/pattern-demand.cjs > pattern-demand.txt
