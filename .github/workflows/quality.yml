@@ -29,6 +29,9 @@ jobs:
       - name: Test deterministic closed-fill primitives
         run: node tools/closed-fill-test.cjs
 
+      - name: Smoke-test active closed-fill integration
+        run: node tools/closed-fill-smoke.cjs
+
       - name: Audit dictionary
         run: node tools/dictionary-audit.cjs
 
