@@ -57,7 +57,7 @@
 
     for (const rawWord of source) {
       const answer = normalizeWord(rawWord);
-      if (!/^[А-Я]+$/.test(answer) || answer.length < 3 || answer.length > 12 || seen.has(answer)) continue;
+      if (!/^[А-Я]+$/.test(answer) || answer.length < 2 || answer.length > 12 || seen.has(answer)) continue;
 
       seen.add(answer);
       const key = String(rawWord).trim().toLowerCase().replaceAll("ё", "е");

@@ -43,20 +43,55 @@
     return `<path d="M ${xx.toFixed(3)} ${(y + cell * 0.58).toFixed(3)} L ${xx.toFixed(3)} ${(y + cell * 0.94).toFixed(3)}" fill="none" stroke="#111" stroke-width="${stroke}" marker-end="url(#arrowhead)"/>`;
   }
 
+  function renderClueTextCell(data, x, y, cell) {
+    const clue = data.clues[0];
+    const fontSize = Math.max(1.15, cell * 0.155);
+    const maxChars = Math.max(7, Math.floor(cell / (fontSize * 0.52)));
+    const lines = wrapText(clue.text, maxChars, 5);
+    const totalHeight = Math.max(1, lines.length) * fontSize * 1.04;
+    const startY = y + Math.max(fontSize, (cell - totalHeight) / 2 + fontSize * 0.72);
+    return svgTextLines(lines, x + cell * 0.5, startY, fontSize, fontSize * 1.04);
+  }
+
+  function renderArrowOnly(x, y, cell, clues) {
+    if (clues.length === 1) {
+      const clue = clues[0];
+      const stroke = Math.max(0.22, cell * 0.032).toFixed(3);
+      if (clue.direction === "right") {
+        return `<path d="M ${(x + cell * 0.12).toFixed(3)} ${(y + cell * 0.84).toFixed(3)} L ${(x + cell * 0.42).toFixed(3)} ${(y + cell * 0.54).toFixed(3)} L ${(x + cell * 0.88).toFixed(3)} ${(y + cell * 0.54).toFixed(3)}" fill="none" stroke="#111" stroke-width="${stroke}" marker-end="url(#arrowhead)"/>`;
+      }
+      return `<path d="M ${(x + cell * 0.14).toFixed(3)} ${(y + cell * 0.18).toFixed(3)} L ${(x + cell * 0.50).toFixed(3)} ${(y + cell * 0.18).toFixed(3)} L ${(x + cell * 0.50).toFixed(3)} ${(y + cell * 0.88).toFixed(3)}" fill="none" stroke="#111" stroke-width="${stroke}" marker-end="url(#arrowhead)"/>`;
+    }
+    const diagonal = `<path d="M ${(x + cell * 0.08).toFixed(3)} ${(y + cell * 0.92).toFixed(3)} L ${(x + cell * 0.92).toFixed(3)} ${(y + cell * 0.08).toFixed(3)}" fill="none" stroke="#111" stroke-width="${Math.max(0.18, cell * 0.025).toFixed(3)}"/>`;
+    return `${diagonal}${renderArrow(x, y, cell, "right", true)}${renderArrow(x, y, cell, "down", true)}`;
+  }
+
   function renderClueContent(data, x, y, cell) {
     if (!data.clues.length) return "";
-    if (data.clues.length === 1) {
-      const clue = data.clues[0];
-      const fontSize = Math.max(1.2, cell * 0.165);
-      const lines = wrapText(clue.text, Math.max(7, Math.floor(cell / (fontSize * 0.52))), 4);
-      return `${svgTextLines(lines, x + cell * 0.48, y + cell * 0.18, fontSize, fontSize * 1.08)}${renderArrow(x, y, cell, clue.direction)}`;
+    const external = data.clues.filter((clue) => clue.externalText);
+    const internal = data.clues.filter((clue) => !clue.externalText);
+    if (!internal.length) return renderArrowOnly(x, y, cell, external);
+    if (!external.length) {
+      if (data.clues.length === 1) {
+        const clue = data.clues[0];
+        const fontSize = Math.max(1.2, cell * 0.165);
+        const lines = wrapText(clue.text, Math.max(7, Math.floor(cell / (fontSize * 0.52))), 4);
+        return `${svgTextLines(lines, x + cell * 0.48, y + cell * 0.18, fontSize, fontSize * 1.08)}${renderArrow(x, y, cell, clue.direction)}`;
+      }
+      const rightClue = data.clues.find((clue) => clue.direction === "right") || data.clues[0];
+      const downClue = data.clues.find((clue) => clue.direction === "down") || data.clues[1];
+      const fontSize = Math.max(0.98, cell * 0.112);
+      const diagonal = `<path d="M ${x.toFixed(3)} ${(y + cell).toFixed(3)} L ${(x + cell).toFixed(3)} ${y.toFixed(3)}" fill="none" stroke="#111" stroke-width="${Math.max(0.16, cell * 0.02).toFixed(3)}"/>`;
+      return `${diagonal}${svgTextLines(wrapText(rightClue.text, 9, 3), x + cell * 0.35, y + cell * 0.12, fontSize, fontSize)}${svgTextLines(wrapText(downClue.text, 9, 3), x + cell * 0.65, y + cell * 0.61, fontSize, fontSize)}${renderArrow(x, y, cell, "right", true)}${renderArrow(x, y, cell, "down", true)}`;
     }
-
-    const rightClue = data.clues.find((clue) => clue.direction === "right") || data.clues[0];
-    const downClue = data.clues.find((clue) => clue.direction === "down") || data.clues[1];
-    const fontSize = Math.max(0.98, cell * 0.112);
+    const clue = internal[0];
+    const fontSize = Math.max(0.95, cell * 0.112);
+    const lines = wrapText(clue.text, 9, 3);
+    const textX = clue.direction === "right" ? x + cell * 0.35 : x + cell * 0.65;
+    const textY = clue.direction === "right" ? y + cell * 0.13 : y + cell * 0.61;
     const diagonal = `<path d="M ${x.toFixed(3)} ${(y + cell).toFixed(3)} L ${(x + cell).toFixed(3)} ${y.toFixed(3)}" fill="none" stroke="#111" stroke-width="${Math.max(0.16, cell * 0.02).toFixed(3)}"/>`;
-    return `${diagonal}${svgTextLines(wrapText(rightClue.text, 9, 3), x + cell * 0.35, y + cell * 0.12, fontSize, fontSize)}${svgTextLines(wrapText(downClue.text, 9, 3), x + cell * 0.65, y + cell * 0.61, fontSize, fontSize)}${renderArrow(x, y, cell, "right", true)}${renderArrow(x, y, cell, "down", true)}`;
+    const arrows = data.clues.map((item) => renderArrow(x, y, cell, item.direction, true)).join("");
+    return `${diagonal}${svgTextLines(lines, textX, textY, fontSize, fontSize)}${arrows}`;
   }
 
   function renderPanel(x, y, cell, row, col) {
@@ -88,9 +123,10 @@
         const x = left + col * cell;
         const y = top + row * cell;
         const data = result.grid[row][col];
-        const fill = data.type === "clue" ? "#e4e4e4" : data.type === "panel" ? "#d2d2d2" : "#fff";
+        const fill = data.type === "clue" || data.type === "clueText" ? "#f1f1f1" : data.type === "panel" ? "#d2d2d2" : "#fff";
         parts.push(`<rect x="${x.toFixed(3)}" y="${y.toFixed(3)}" width="${cell.toFixed(3)}" height="${cell.toFixed(3)}" fill="${fill}" stroke="#111" stroke-width="${lineWidth.toFixed(3)}"/>`);
         if (data.type === "panel") parts.push(renderPanel(x, y, cell, row, col));
+        if (data.type === "clueText") parts.push(renderClueTextCell(data, x, y, cell));
         if (data.type === "letter" && showAnswers) {
           parts.push(`<text x="${(x + cell / 2).toFixed(3)}" y="${(y + cell * 0.68).toFixed(3)}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${letterSize.toFixed(3)}" font-weight="700" fill="#111">${escapeXml(data.char)}</text>`);
         }
