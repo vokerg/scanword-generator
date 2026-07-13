@@ -25,6 +25,7 @@ for (let index = 0; index < runCount; index += 1) {
   if (!sample.exactCluesOnly) throw new Error(`Fallback clue used for ${seed}`);
   if (!sample.validationReport) throw new Error(`Validation report missing for ${seed}`);
   if (sample.closedFillMode !== "local-indexed-csp") throw new Error(`Active closed-fill path failed for ${seed}: ${sample.closedFillError || sample.closedFillMode}`);
+  if (sample.closedFillError) throw new Error(`Closed-fill error for ${seed}: ${sample.closedFillError}`);
   if (sample.panelsAfterClosedFill > sample.panelsBeforeClosedFill) {
     throw new Error(`Panel regression for ${seed}: ${sample.panelsBeforeClosedFill} -> ${sample.panelsAfterClosedFill}`);
   }
@@ -43,15 +44,24 @@ for (let index = 0; index < runCount; index += 1) {
     cspNodes: sample.closedFillCspNodes,
     forwardPrunes: sample.closedFillForwardPrunes,
     patternChecks: sample.closedFillPatternChecks,
+    rollbackDepthUsed: sample.rollbackDepthUsed,
+    rollbackWordsTried: sample.rollbackWordsTried,
+    rollbackCandidatesAccepted: sample.rollbackCandidatesAccepted,
+    rollbackSlotsEnumerated: sample.rollbackSlotsEnumerated,
+    rollbackTopologiesTried: sample.rollbackTopologiesTried,
+    rollbackCspNodes: sample.rollbackCspNodes,
+    rollbackPatternChecks: sample.rollbackPatternChecks,
     elapsedMs: sample.elapsedMs,
   }));
 }
 
-const values = (key) => samples.map((sample) => sample[key]);
+const values = (key) => samples.map((sample) => sample[key] || 0);
 const sum = (items) => items.reduce((total, value) => total + value, 0);
 const average = (items) => +(sum(items) / items.length).toFixed(2);
 const zeroPanelSeeds = samples.filter((sample) => sample.panelCells === 0).length;
 const improvedSeeds = samples.filter((sample) => sample.panelsAfterClosedFill < sample.panelsBeforeClosedFill).length;
+const rollbackAcceptedSeeds = samples.filter((sample) => sample.rollbackCandidatesAccepted > 0).length;
+const rollbackDepthOneSeeds = samples.filter((sample) => sample.rollbackDepthUsed === 1).length;
 const summary = {
   type: "summary",
   runs: samples.length,
@@ -74,6 +84,14 @@ const summary = {
   totalCspNodes: sum(values("closedFillCspNodes")),
   totalForwardPrunes: sum(values("closedFillForwardPrunes")),
   totalPatternChecks: sum(values("closedFillPatternChecks")),
+  rollbackAcceptedSeeds,
+  rollbackDepthOneSeeds,
+  totalRollbackWordsTried: sum(values("rollbackWordsTried")),
+  totalRollbackCandidatesAccepted: sum(values("rollbackCandidatesAccepted")),
+  totalRollbackSlotsEnumerated: sum(values("rollbackSlotsEnumerated")),
+  totalRollbackTopologiesTried: sum(values("rollbackTopologiesTried")),
+  totalRollbackCspNodes: sum(values("rollbackCspNodes")),
+  totalRollbackPatternChecks: sum(values("rollbackPatternChecks")),
   averageSeedMs: average(values("elapsedMs")),
   checkpointA: {
     averagePanelsAtMost8: average(values("panelsAfterClosedFill")) <= 8,
