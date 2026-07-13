@@ -4,8 +4,8 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const worker = path.join(__dirname, "benchmark-seed.cjs");
-const runCount = Math.max(1, Number(process.argv[2]) || 4);
-const prefix = process.argv[3] || "construction-v2";
+const runCount = Math.max(1, Number(process.argv[2]) || 8);
+const prefix = process.argv[3] || "construction-portfolio";
 const samples = [];
 
 function run(seed, mode) {
@@ -14,16 +14,10 @@ function run(seed, mode) {
     SCANWORD_CONSTRUCTION_MODE: mode,
     SCANWORD_CLOSED_FILL: "diagnostic",
   };
-  if (mode === "v2") {
+  if (mode === "portfolio") {
     Object.assign(env, {
-      SCANWORD_V2_ATTEMPTS: process.env.SCANWORD_V2_ATTEMPTS || "48",
-      SCANWORD_V2_BASE_KEEP: process.env.SCANWORD_V2_BASE_KEEP || "24",
-      SCANWORD_V2_DEPTH: process.env.SCANWORD_V2_DEPTH || "2",
-      SCANWORD_V2_BEAM: process.env.SCANWORD_V2_BEAM || "4",
-      SCANWORD_V2_BRANCHING: process.env.SCANWORD_V2_BRANCHING || "16",
-      SCANWORD_V2_FINALISTS: process.env.SCANWORD_V2_FINALISTS || "5",
-      SCANWORD_V2_CLUE_RESTARTS: process.env.SCANWORD_V2_CLUE_RESTARTS || "100",
-      SCANWORD_V2_WEAK_FILL: process.env.SCANWORD_V2_WEAK_FILL || "99",
+      SCANWORD_PORTFOLIO_ATTEMPTS: process.env.SCANWORD_PORTFOLIO_ATTEMPTS || "120",
+      SCANWORD_PORTFOLIO_CLUE_RESTARTS: process.env.SCANWORD_PORTFOLIO_CLUE_RESTARTS || "160",
     });
   }
   const child = spawnSync(process.execPath, [worker, seed], {
@@ -46,7 +40,7 @@ function run(seed, mode) {
 for (let index = 0; index < runCount; index += 1) {
   const seed = `${prefix}-${index}`;
   const legacy = run(seed, "legacy");
-  const v2 = run(seed, "v2");
+  const v2 = run(seed, "portfolio");
   const row = {
     seed,
     legacyPanels: legacy.panelCells,
@@ -58,7 +52,7 @@ for (let index = 0; index < runCount; index += 1) {
     legacyAnswers: legacy.answers,
     v2Answers: v2.answers,
     v2Mode: v2.constructionMode,
-    v2Fallback: v2.constructionV2?.mode === "v2-fallback",
+    v2Fallback: v2.constructionV2?.mode === "portfolio-fallback",
     v2Telemetry: v2.constructionV2,
     legacyMs: legacy.elapsedMs,
     v2Ms: v2.elapsedMs,
@@ -73,7 +67,7 @@ const regressed = samples.filter((sample) => sample.panelDelta > 0).length;
 const fallbacks = samples.filter((sample) => sample.v2Fallback).length;
 console.log(JSON.stringify({
   type: "summary",
-  diagnostic: "absolute weak-fill limit disabled; wider structural base retained",
+  diagnostic: "identical attempt seeds; final clue layouts selected lexicographically by panels, raw letters, lexical weakness and clue area",
   runs: samples.length,
   validLegacy: samples.length,
   validV2: samples.length,
