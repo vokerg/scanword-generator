@@ -33,11 +33,17 @@ for (let index = 0; index < runCount; index += 1) {
   if (result.placed.length < 40) {
     throw new Error(`Answer coverage missed for seed ${seed}: ${result.placed.length}/40`);
   }
-  if (result.components > 6) {
+  if (result.components > 3) {
     throw new Error(`Too many answer components for seed ${seed}: ${result.components}`);
   }
-  if (result.fillRatio < 0.65) {
+  if (result.fillRatio < 0.78) {
     throw new Error(`Active-cell coverage missed for seed ${seed}: ${Math.round(result.fillRatio * 100)}%`);
+  }
+  if (result.externalClueTexts < 20) {
+    throw new Error(`Too few split clue footprints for seed ${seed}: ${result.externalClueTexts}`);
+  }
+  if (result.panelCells > 49) {
+    throw new Error(`Too many residual panel cells for seed ${seed}: ${result.panelCells}`);
   }
   if (result.placed.some((entry) => !entry.hasExactClue)) {
     throw new Error(`Fallback clue used for seed ${seed}`);
@@ -50,6 +56,8 @@ for (let index = 0; index < runCount; index += 1) {
     activePercent: Math.round(result.fillRatio * 100),
     panelCells: result.panelCells,
     components: result.components,
+    clueTextCells: result.clueTextCells,
+    residualPanels: result.panelCells,
     attempt: result.attempt + 1,
   });
 }
@@ -63,7 +71,7 @@ console.log({
   runs: samples.length,
   valid: samples.length,
   exactCluesOnly: true,
-  maxComponentsAllowed: 6,
+  maxComponentsAllowed: 3,
   minAnswers: Math.min(...answers),
   maxAnswers: Math.max(...answers),
   averageAnswers: +(answers.reduce((sum, value) => sum + value, 0) / answers.length).toFixed(2),

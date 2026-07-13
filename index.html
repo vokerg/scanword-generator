@@ -10,11 +10,11 @@
   <main class="app-shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">ARROWORD GENERATOR · R&amp;D 0.7</p>
+        <p class="eyebrow">ARROWORD GENERATOR · R&amp;D 0.8</p>
         <h1>Dense, structurally valid arrowword grids</h1>
         <p class="lead">
-          Builds a strict A5 arrowword from reviewed Russian answers, rejects every accidental
-          letter run, and continues filling the grid after the requested answer count is reached.
+          Separates clue text from arrow anchors, rejects accidental letter runs, and keeps
+          the densest valid A5 arrowword generated from reviewed Russian answers.
         </p>
       </div>
       <div class="badge">A5<br />SVG + JSON</div>
@@ -26,7 +26,7 @@
 
         <label>
           Seed
-          <input id="seed" type="text" value="arrowword-rnd-007" />
+          <input id="seed" type="text" value="arrowword-rnd-008" />
         </label>
 
         <div class="field-row">
@@ -71,9 +71,9 @@
         <div id="stats" class="stats" aria-live="polite"></div>
 
         <div class="note">
-          <strong>Strict dense mode:</strong> eight seeded attempts are validated independently.
-          The engine may use several isolated answer groups to occupy otherwise dead regions, but
-          every horizontal and vertical letter run must still have its own clue.
+          <strong>Split-clue topology:</strong> clue text occupies neighbouring cells where possible,
+          while arrow anchors remain attached to their exact answers. Twelve deterministic restarts
+          are scored only after every structural validation check passes.
         </div>
       </aside>
 

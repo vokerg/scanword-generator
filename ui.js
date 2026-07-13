@@ -30,7 +30,9 @@
       [result.placed.length, "words"],
       [result.intersections, "crossings"],
       [`${Math.round((1 - result.panelRatio) * 100)}%`, "active cells"],
-      [result.panelCells, "panel cells"],
+      [result.clueTextCells || 0, "split clue cells"],
+      [result.panelCells, "residual panels"],
+      [result.components, "answer groups"],
       [result.validation?.accidentalRuns?.length || 0, "accidental runs"],
       [validity, "structurally valid"],
     ];
@@ -61,7 +63,7 @@
 
   function exportResult(result) {
     return {
-      version: "0.7.0",
+      version: "0.8.0",
       page: { format: "A5", orientation: "portrait", widthMm: 148, heightMm: 210 },
       grid: { rows: result.rows, cols: result.cols },
       seed: els.seed.value.trim(),
@@ -76,6 +78,10 @@
         panelRatio: result.panelRatio,
         intersections: result.intersections,
         components: result.components,
+        externalClueTexts: result.externalClueTexts || 0,
+        clueTextCells: result.clueTextCells || 0,
+        panelRegions: result.panelRegions || 0,
+        isolatedPanels: result.isolatedPanels || 0,
       },
       placedWords: result.placed,
       cells: result.grid.map((row) => row.map((cell) => ({
@@ -131,7 +137,7 @@
         rerenderSvg();
         renderStats(currentResult);
         renderWords(currentResult);
-        els.generationStatus.textContent = `attempt ${currentResult.attempt + 1}/8 · valid · ${currentResult.components} components · panels ${Math.round(currentResult.panelRatio * 100)}%`;
+        els.generationStatus.textContent = `attempt ${currentResult.attempt + 1}/12 · valid · ${currentResult.components} groups · active ${Math.round(currentResult.fillRatio * 100)}%`;
       } catch (error) {
         currentResult = null;
         els.preview.innerHTML = `<div class="generation-error"><strong>Generation failed.</strong><br>${escapeXml(error.message)}</div>`;
