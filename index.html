@@ -10,7 +10,7 @@
   <main class="app-shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">ARROWORD GENERATOR · R&amp;D 0.12</p>
+        <p class="eyebrow">ARROWORD GENERATOR · R&amp;D 0.11</p>
         <h1>Dense, structurally valid arrowword grids</h1>
         <p class="lead">
           Builds one connected answer graph, expands real clues into compact multi-cell footprints,
@@ -71,8 +71,8 @@
         <div id="stats" class="stats" aria-live="polite"></div>
 
         <div class="note">
-          <strong>Construction portfolio R&amp;D:</strong> final clue layouts are compared lexicographically by
-          residual panels, raw letters, lexical weakness, and clue area. Legacy remains the browser default.
+          <strong>Construction V2 R&amp;D:</strong> panel-first selection can replace one low-value leaf answer with a
+          bounded one- or two-slot bundle before clue-text packing. Legacy remains the default and guards regressions.
         </div>
       </aside>
 
@@ -110,6 +110,7 @@
   <script src="closed-fill-rollback.js"></script>
   <script src="construction-v2-runtime.js"></script>
   <script src="construction-v2.js"></script>
+  <script src="construction-victim.js"></script>
   <script src="construction-portfolio.js"></script>
   <script src="construction-polish.js"></script>
   <script src="construction-guard.js"></script>
