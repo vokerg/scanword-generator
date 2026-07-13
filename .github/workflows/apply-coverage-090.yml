@@ -37,3 +37,5 @@ jobs:
           git add -A
           git commit -m 'feat: raise arrowword coverage checkpoint to 90 percent'
           git push origin HEAD:r-and-d/coverage-090
+
+# Separate trigger commit: workflow now exists in the parent revision.
