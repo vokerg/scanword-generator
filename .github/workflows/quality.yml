@@ -60,6 +60,28 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Upload R&D source snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arrowword-rnd-source
+          path: |
+            README.md
+            index.html
+            styles.css
+            words.js
+            short-words.js
+            clues.js
+            extra-dictionary.js
+            dictionary-policy.js
+            core.js
+            solver.js
+            renderer.js
+            ui.js
+            tools/*.cjs
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Enforce quality gate
         if: always()
         shell: bash
