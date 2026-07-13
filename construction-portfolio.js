@@ -77,12 +77,41 @@
     if (a.clueTextCells !== b.clueTextCells) return a.clueTextCells - b.clueTextCells;
     if (a.intersections !== b.intersections) return b.intersections - a.intersections;
     if (a.placed.length !== b.placed.length) return b.placed.length - a.placed.length;
+    if (Boolean(a.victimReplacement) !== Boolean(b.victimReplacement)) return Number(Boolean(a.victimReplacement)) - Number(Boolean(b.victimReplacement));
     return a.attempt - b.attempt;
+  }
+
+  function addTelemetry(target, source) {
+    for (const key of [
+      "victimsConsidered",
+      "victimsRemoved",
+      "slotsEnumerated",
+      "movesEnumerated",
+      "bundlesTried",
+      "statesAccepted",
+      "patternLookups",
+      "patternChecks",
+    ]) target[key] += Number(source?.[key] || 0);
+    target.depthReached = Math.max(target.depthReached, Number(source?.depthReached || 0));
   }
 
   function generatePortfolio(seed, poolSize, rows, cols, targetWords) {
     const attempts = numericOption("SCANWORD_PORTFOLIO_ATTEMPTS", 120);
     const clueRestarts = numericOption("SCANWORD_PORTFOLIO_CLUE_RESTARTS", 160);
+    const victimOptions = {
+      baseCount: numericOption("SCANWORD_VICTIM_BASES", 12),
+      maxVictims: numericOption("SCANWORD_VICTIM_WORDS", 6),
+      depth: numericOption("SCANWORD_VICTIM_DEPTH", 2),
+      beamWidth: numericOption("SCANWORD_VICTIM_BEAM", 5),
+      branching: numericOption("SCANWORD_VICTIM_BRANCHING", 18),
+      maxVariants: numericOption("SCANWORD_VICTIM_VARIANTS", 8),
+      maxRegions: numericOption("SCANWORD_VICTIM_REGIONS", 3),
+      maxSlotCandidates: numericOption("SCANWORD_VICTIM_SLOT_CANDIDATES", 220),
+      maxDomainSize: numericOption("SCANWORD_VICTIM_DOMAIN", 128),
+      maxSlots: numericOption("SCANWORD_VICTIM_SLOTS", 36),
+      valuesPerSlot: numericOption("SCANWORD_VICTIM_VALUES", 2),
+      maxMoves: numericOption("SCANWORD_VICTIM_MOVES", 48),
+    };
     const pool = core.generateWordPool(poolSize, core.makeRandom(`${seed}:pool`));
     if (!pool.length) throw new Error("The word pool is empty.");
     const poolIndex = solver.buildPoolIndex(pool);
@@ -103,6 +132,7 @@
       && candidate.placed.every((entry) => entry.hasExactClue));
 
     const candidates = [];
+    const structuralByAttempt = new Map();
     let structurallyValid = 0;
     let checkpointValid = 0;
     let minimumObservedPanels = Infinity;
@@ -119,6 +149,7 @@
         "indexed",
       );
       if (state.placed.length < targetWords) continue;
+      const structural = solver.cloneVictimState ? solver.cloneVictimState(state) : null;
       const clueLayout = solver.assignClueTextCellsV2(
         state,
         core.makeRandom(`${seed}:clues:${attempt}`),
@@ -132,9 +163,56 @@
       if (!passesCheckpoint(candidate)) continue;
       checkpointValid += 1;
       candidates.push(candidate);
+      if (structural) structuralByAttempt.set(attempt, structural);
     }
 
     if (!candidates.length) return null;
+    candidates.sort((a, b) => compareCandidates(a, b, poolByAnswer));
+
+    const victimTelemetry = {
+      mode: "prelayout-victim-bundles-v1",
+      basesExpanded: 0,
+      victimsConsidered: 0,
+      victimsRemoved: 0,
+      slotsEnumerated: 0,
+      movesEnumerated: 0,
+      bundlesTried: 0,
+      statesAccepted: 0,
+      finalistsEvaluated: 0,
+      finalistsPassingCheckpoint: 0,
+      depthReached: 0,
+      patternLookups: 0,
+      patternChecks: 0,
+    };
+
+    if (solver.generateVictimReplacementVariants) {
+      const bases = candidates.slice(0, victimOptions.baseCount);
+      for (const base of bases) {
+        const structural = structuralByAttempt.get(base.attempt);
+        if (!structural) continue;
+        victimTelemetry.basesExpanded += 1;
+        const generated = solver.generateVictimReplacementVariants(structural, pool, victimOptions);
+        addTelemetry(victimTelemetry, generated.telemetry);
+        for (let variantIndex = 0; variantIndex < generated.states.length; variantIndex += 1) {
+          const state = generated.states[variantIndex];
+          const clueLayout = solver.assignClueTextCellsV2(
+            state,
+            core.makeRandom(`${seed}:victim:clues:${base.attempt}:${variantIndex}`),
+            clueRestarts,
+          );
+          const candidate = makeCandidate(state, pool, poolIndex, rows, cols, base.attempt, clueLayout);
+          victimTelemetry.finalistsEvaluated += 1;
+          if (!candidate || !passesCheckpoint(candidate)) continue;
+          victimTelemetry.finalistsPassingCheckpoint += 1;
+          candidate.victimReplacement = {
+            baseAttempt: base.attempt + 1,
+            variant: variantIndex + 1,
+          };
+          candidates.push(candidate);
+        }
+      }
+    }
+
     candidates.sort((a, b) => compareCandidates(a, b, poolByAnswer));
     const best = candidates[0];
     best.attemptBudget = attempts;
@@ -159,16 +237,18 @@
       selectedPanels: best.panelCells,
       selectedRawLetterCoverage: best.rawLetterCoverage,
       selectedWeakFillCount: countWeakFill(best.placed, poolByAnswer),
+      selectedVictimReplacement: best.victimReplacement || null,
+      victimReplacement: victimTelemetry,
     };
     return solver.attachValidationReport(best, seed, {
       mode: "portfolio-panel-first-v2",
-      rollbackDepthUsed: 0,
+      rollbackDepthUsed: best.victimReplacement ? 1 : 0,
       regionsBefore: closedFill.extractResidualRegions(best).length,
       regionsAfter: closedFill.extractResidualRegions(best).length,
       panelsBefore: best.panelCells,
       panelsAfter: best.panelCells,
-      regionsAttempted: 0,
-      regionsSolved: 0,
+      regionsAttempted: victimTelemetry.basesExpanded,
+      regionsSolved: best.victimReplacement ? 1 : 0,
       portfolio: best.constructionV2,
     });
   }
