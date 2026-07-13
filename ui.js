@@ -61,7 +61,7 @@
 
   function exportResult(result) {
     return {
-      version: "0.6.0",
+      version: "0.7.0",
       page: { format: "A5", orientation: "portrait", widthMm: 148, heightMm: 210 },
       grid: { rows: result.rows, cols: result.cols },
       seed: els.seed.value.trim(),
@@ -102,7 +102,7 @@
       seed: els.seed.value.trim() || "arrowword",
       cols: Math.max(11, Math.min(19, Number(els.cols.value) || 13)),
       rows: Math.max(13, Math.min(27, Number(els.rows.value) || 17)),
-      poolSize: Math.max(100, Math.min(window.RUSSIAN_WORDS?.length || 800, Number(els.poolSize.value) || 800)),
+      poolSize: Math.max(100, Math.min(window.RUSSIAN_WORDS?.length || 800, Number(els.poolSize.value) || window.RUSSIAN_WORDS?.length || 800)),
       targetWords: Math.max(12, Math.min(60, Number(els.targetWords.value) || 30)),
       clueDensity: Math.max(16, Math.min(38, Number(els.clueDensity.value) || 27)),
     };
@@ -131,7 +131,7 @@
         rerenderSvg();
         renderStats(currentResult);
         renderWords(currentResult);
-        els.generationStatus.textContent = `restart ${currentResult.attempt + 1}/96 · valid · one component · panels ${Math.round(currentResult.panelRatio * 100)}%`;
+        els.generationStatus.textContent = `attempt ${currentResult.attempt + 1}/8 · valid · ${currentResult.components} components · panels ${Math.round(currentResult.panelRatio * 100)}%`;
       } catch (error) {
         currentResult = null;
         els.preview.innerHTML = `<div class="generation-error"><strong>Generation failed.</strong><br>${escapeXml(error.message)}</div>`;

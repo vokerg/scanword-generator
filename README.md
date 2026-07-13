@@ -1,25 +1,24 @@
 # Arrowword Generator
 
-A browser-based prototype for generating Swedish-style crosswords (arrowwords / scanwords) on an A5 page.
+A browser-based R&D prototype for generating Swedish-style crosswords (arrowwords / scanwords) on an A5 page.
 
-## Current status
+## Current checkpoint
 
-The `r-and-d/valid-arrowword-generator` branch contains version 0.6, a **validation-first connected placement engine**.
+The `r-and-d/valid-arrowword-generator` branch contains version 0.7, a **strict dense placement engine**.
 
 The generator:
 
-- uses only answers with reviewed, human-readable clues;
-- uses a built-in Russian answer dictionary with a reviewed expansion focused on 3–8-letter nouns;
+- uses only Russian answers with reviewed, human-readable clues;
+- includes a reviewed expansion focused on common 3–8-letter nouns;
+- includes a small reviewed set of two-letter answers because authentic arrowword grids commonly contain short slots;
 - places clues directly inside the grid;
-- supports right and down answers;
-- supports one or two clues in the same clue cell;
-- validates every contiguous horizontal and vertical letter run;
-- rejects grids containing accidental pseudo-words;
-- requires all placed answers to belong to one connected component;
-- renders unused areas as explicit graphic panels rather than blank answer cells;
-- performs 96 seeded restarts and keeps the highest-scoring valid result;
-- exports an A5 SVG and a JSON project file;
-- can reveal answers for validation.
+- supports right and down answers and one or two clues in the same clue cell;
+- rejects accidental horizontal or vertical letter runs;
+- verifies crossing letters, clue directions, and orphan cells;
+- continues filling after the requested minimum answer count is reached;
+- may use up to six isolated answer groups to occupy otherwise dead areas without inventing pseudo-words;
+- exports an exact A5 SVG and a JSON project file;
+- can reveal answers for visual validation.
 
 ## Structural invariants
 
@@ -30,20 +29,24 @@ A generated grid is accepted only when:
 3. Crossing letters agree.
 4. A clue cell contains at most one right clue and one down clue.
 5. There are no blank clue cells.
-6. Every answer is connected to the same answer graph through crossings.
-7. Non-answer areas are represented as explicit panel cells.
+6. Every used answer has a reviewed clue; placeholder clues are excluded.
+7. Non-answer areas are explicit panel cells, not blank answer cells.
 
-Density is scored only after all structural checks pass.
+Answer groups do not have to form one global crossing component. This is a density strategy, not a relaxation of word validity: each run still requires a clue and passes the same validator.
 
 ## Generation strategy
 
-Version 0.6 uses a compact word-first placement strategy as the stable baseline. Side-adjacency checks guarantee that placing one answer cannot silently create another unassigned letter run. Candidate scoring strongly favors crossings and compact placements, while the initial answer is limited to a practical 5–8-letter range.
+Version 0.7 is word-first and two-phase:
 
-A denser closed-fill/CSP strategy is being developed separately. It is not used as the default yet because a dense topology is useful only when every resulting slot can be filled with reviewed answers.
+1. reach the requested minimum answer count using compact, highly intersecting placements;
+2. continue adding valid answers and, when necessary, seed additional isolated groups in unused regions;
+3. run eight deterministic restarts and keep the highest-scoring valid result.
+
+A fixed-template closed-fill CSP remains a separate R&D track. It will need a substantially larger reviewed lexicon before it can reliably fill authentic newspaper-style templates.
 
 ## Running locally
 
-Open `index.html` directly in a modern browser, or run a local server:
+Open `index.html` directly in a modern browser, or run:
 
 ```bash
 python3 -m http.server 8080
@@ -51,33 +54,35 @@ python3 -m http.server 8080
 
 Then open `http://localhost:8080`.
 
-## Regression benchmark
+## Quality gates
 
-Run the multi-seed structural benchmark with Node.js:
-
-```bash
-node tools/benchmark.cjs
-```
-
-The benchmark runs 40 deterministic seeds and fails immediately if any generated grid:
-
-- contains an accidental run, orphan letter, or crossing conflict;
-- uses a duplicate clue direction;
-- uses a fallback placeholder clue;
-- contains more than one connected answer component;
-- produces fewer than 30 answers on the default 13 × 17 grid.
-
-The local checkpoint before this commit passed all 40 seeds with 30 answers each, 32–38 crossings, and 58–64% active cells.
-
-## Dictionary quality gate
-
-Run:
+Run the dictionary audit:
 
 ```bash
 node tools/dictionary-audit.cjs
 ```
 
-The audit rejects invalid characters, duplicate normalized answers, unsupported lengths, and malformed entries in the reviewed expansion. It reports legacy entries that still rely on fallback clues, but the generator excludes those entries from production grids.
+Run the deterministic 40-seed benchmark:
+
+```bash
+node tools/benchmark.cjs
+```
+
+The benchmark rejects any result that:
+
+- fails structural validation;
+- contains fewer than 40 answers on the default 13 × 17 grid;
+- fills less than 65% of grid cells with answers or clues;
+- uses more than six answer components;
+- uses a fallback placeholder clue.
+
+The locally verified checkpoint across 40 deterministic seeds produced:
+
+- 43–50 answers;
+- 67.4–76.0% active cells;
+- 46.35 answers on average;
+- 45.08 crossings on average;
+- zero fallback clues and zero accidental runs.
 
 ## Files
 
@@ -85,36 +90,28 @@ The audit rejects invalid characters, duplicate normalized answers, unsupported 
 index.html                 Browser interface
 styles.css                 Interface styling
 words.js                   Main Russian answer dictionary
-short-words.js             Compact answers for short slots
-clues.js                   Original short clue dictionary
+short-words.js             Three-letter compact answers
+clues.js                   Original clue dictionary
 extra-dictionary.js        Reviewed answer-and-clue expansion
+two-letter-words.js        Reviewed two-letter answers
 core.js                    Shared randomization and dictionary utilities
 dictionary-policy.js       Restricts generation to reviewed clues
-solver.js                  Multi-restart connected placement engine
+solver.js                  Strict two-phase density engine
 renderer.js                A5 SVG renderer
 ui.js                      Browser UI and JSON export
 tools/benchmark.cjs        Multi-seed structural regression benchmark
-tools/dictionary-audit.cjs Dictionary validation and length-distribution audit
+tools/dictionary-audit.cjs Dictionary validation and length audit
 docs/                      Design notes and research summary
 ```
 
 ## Why PDF is deferred
 
-SVG already preserves the exact physical A5 dimensions and prints without raster quality loss. PDF export will be added after the following are stable:
-
-- grid topology;
-- panel frequency;
-- clue typography;
-- arrow placement;
-- answer and clue quality;
-- solution-page layout.
-
-At that point PDF becomes a presentation/export layer rather than part of the generation algorithm.
+SVG already preserves exact A5 dimensions and prints without raster quality loss. PDF export will be added after grid topology, clue typography, arrow placement, and the solution-page layout are stable.
 
 ## Next milestones
 
-- reduce the panel-cell ratio without violating structural validity;
-- continue reviewing and expanding the answer-and-clue corpus;
-- finish the dense closed-fill/CSP strategy;
-- add stock templates and compare them with generated topologies;
+- replace generic panel cells with better clue-cell topology;
+- expand the reviewed lexicon into the low thousands;
+- add bent arrow anchors used by printed scanwords;
+- finish the authentic-template CSP track;
 - add print-ready PDF and solution-page export.

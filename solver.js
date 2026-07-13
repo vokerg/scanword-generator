@@ -84,7 +84,7 @@
     const distance = Math.abs(centerRow - (state.rows - 1) / 2) + Math.abs(centerCol - (state.cols - 1) / 2);
     const dualClueBonus = clueCell.clues.length === 1 ? 42 : 0;
     const exactClueBonus = entry.hasExactClue ? 18 : 0;
-    const score = intersections * 220 - newCells * 0.5 + futureHooks * 1.2 + dualClueBonus + exactClueBonus - distance * 0.9;
+    const score = intersections * 220 + futureHooks * 1.2 + dualClueBonus + exactClueBonus - distance * 0.9;
 
     return { startRow, startCol, direction, clue, intersections, newCells, score };
   }
@@ -164,7 +164,7 @@
     return result;
   }
 
-  function insertTopCandidate(top, candidate, limit = 32) {
+  function insertTopCandidate(top, candidate, limit = 96) {
     let index = top.findIndex((item) => candidate.score > item.score);
     if (index < 0) index = top.length;
     top.splice(index, 0, candidate);
@@ -193,6 +193,32 @@
             const placement = validatePlacement(state, entry, startRow, startCol, direction, true);
             if (!placement) continue;
             insertTopCandidate(top, { entry, placement, score: placement.score + random() * 5 });
+          }
+        }
+      }
+    }
+    return top;
+  }
+
+  function findSeedCandidates(state, pool, random, sampleLimit) {
+    const unused = pool.filter((entry) => !state.usedAnswers.has(entry.answer));
+    for (let index = unused.length - 1; index > 0; index -= 1) {
+      const other = Math.floor(random() * (index + 1));
+      [unused[index], unused[other]] = [unused[other], unused[index]];
+    }
+
+    const top = [];
+    for (const entry of unused.slice(0, sampleLimit)) {
+      for (const direction of ["right", "down"]) {
+        for (let row = 0; row < state.rows; row += 1) {
+          for (let col = 0; col < state.cols; col += 1) {
+            const placement = validatePlacement(state, entry, row, col, direction, false);
+            if (!placement || placement.intersections !== 0) continue;
+            const centerRow = row + (direction === "down" ? (entry.answer.length - 1) / 2 : 0);
+            const centerCol = col + (direction === "right" ? (entry.answer.length - 1) / 2 : 0);
+            const edgeSpread = Math.abs(centerRow - (state.rows - 1) / 2) + Math.abs(centerCol - (state.cols - 1) / 2);
+            const seedScore = placement.score + placement.newCells * 14 + edgeSpread * 1.5 + random() * 5;
+            insertTopCandidate(top, { entry, placement, score: seedScore }, 32);
           }
         }
       }
@@ -324,19 +350,49 @@
     const first = initialCandidates[Math.floor(random() * initialCandidates.length)] || pool[0];
     if (!first || !placeInitialWord(state, first, random)) return state;
 
+    const maxComponents = 6;
     let stalled = 0;
     while (state.placed.length < targetWords && stalled < 8) {
-      const candidates = findCrossingCandidates(state, pool, random, Math.min(700, pool.length));
-      if (!candidates.length) {
-        stalled += 1;
-        continue;
+      let candidates = findCrossingCandidates(state, pool, random, Math.min(700, pool.length));
+      let seeded = false;
+      if (!candidates.length && state.componentsStarted < maxComponents) {
+        candidates = findSeedCandidates(state, pool, random, Math.min(320, pool.length));
+        seeded = candidates.length > 0;
       }
+      if (!candidates.length) { stalled += 1; continue; }
       const remaining = targetWords - state.placed.length;
-      const shortlistSize = remaining <= 3 ? 3 : 8;
+      if (!seeded) {
+        const penalty = remaining <= 5 ? 6 : 3;
+        candidates.sort((a, b) => (b.score - penalty * b.placement.newCells) - (a.score - penalty * a.placement.newCells));
+      }
+      const shortlistSize = seeded ? 5 : (remaining <= 5 ? 1 : 4);
       const shortlist = candidates.slice(0, Math.min(shortlistSize, candidates.length));
       const selected = shortlist[Math.floor(random() * shortlist.length)];
       commitPlacement(state, selected.entry, selected.placement);
+      if (seeded) state.componentsStarted += 1;
       stalled = 0;
+    }
+
+    if (state.placed.length >= targetWords) {
+      let denseStalled = 0;
+      const denseLimit = 65;
+      while (state.placed.length < denseLimit && denseStalled < 6) {
+        let candidates = findCrossingCandidates(state, pool, random, Math.min(700, pool.length));
+        let seeded = false;
+        if (!candidates.length && state.componentsStarted < maxComponents) {
+          candidates = findSeedCandidates(state, pool, random, Math.min(320, pool.length));
+          seeded = candidates.length > 0;
+        }
+        if (!candidates.length) { denseStalled += 1; continue; }
+        if (!seeded) {
+          candidates.sort((a, b) => (b.score + 4 * b.placement.newCells) - (a.score + 4 * a.placement.newCells));
+        }
+        const shortlist = candidates.slice(0, Math.min(seeded ? 4 : 5, candidates.length));
+        const selected = shortlist[Math.floor(random() * shortlist.length)];
+        commitPlacement(state, selected.entry, selected.placement);
+        if (seeded) state.componentsStarted += 1;
+        denseStalled = 0;
+      }
     }
     return state;
   }
@@ -346,7 +402,7 @@
     if (!pool.length) throw new Error("The word pool is empty.");
 
     let best = null;
-    const attempts = 160;
+    const attempts = 8;
     for (let attempt = 0; attempt < attempts; attempt += 1) {
       const state = buildAttempt(pool, rows, cols, targetWords, makeRandom(`${seed}:placement:${attempt}`));
       const metrics = resultMetrics(state);

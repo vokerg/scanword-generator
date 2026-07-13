@@ -4,10 +4,9 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 global.window = global;
 
-require(path.join(root, "words.js"));
-require(path.join(root, "short-words.js"));
-require(path.join(root, "clues.js"));
-require(path.join(root, "extra-dictionary.js"));
+for (const file of ["words.js", "short-words.js", "clues.js", "extra-dictionary.js", "two-letter-words.js"]) {
+  require(path.join(root, file));
+}
 
 const normalize = (value) => String(value).trim().toUpperCase().replaceAll("Ё", "Е");
 const clueKey = (value) => String(value).trim().toLowerCase().replaceAll("ё", "е");
@@ -22,19 +21,24 @@ for (const raw of window.RUSSIAN_WORDS) {
   const clue = window.RUSSIAN_CLUES[clueKey(raw)];
 
   if (!/^[А-Я]+$/.test(answer)) failures.push(`${raw}: invalid characters`);
-  if (answer.length < 3 || answer.length > 12) failures.push(`${raw}: unsupported length ${answer.length}`);
+  if (answer.length < 2 || answer.length > 12) failures.push(`${raw}: unsupported length ${answer.length}`);
   if (seen.has(answer)) failures.push(`${raw}: duplicate of ${seen.get(answer)}`);
   else seen.set(answer, raw);
 
   if (clue && String(clue).trim()) withClue += 1;
-  else warnings.push(`${raw}: no reviewed clue; fallback clue remains available`);
+  else warnings.push(`${raw}: no reviewed clue; excluded by production dictionary policy`);
 
   lengths.set(answer.length, (lengths.get(answer.length) || 0) + 1);
 }
 
-for (const raw of window.EXTRA_DICTIONARY_WORDS || []) {
+const reviewedExpansion = [
+  ...(window.EXTRA_DICTIONARY_WORDS || []),
+  ...(window.TWO_LETTER_WORDS || []),
+];
+
+for (const raw of reviewedExpansion) {
   const clue = window.RUSSIAN_CLUES[clueKey(raw)];
-  if (!clue || !String(clue).trim()) failures.push(`${raw}: expansion entry is missing a clue`);
+  if (!clue || !String(clue).trim()) failures.push(`${raw}: reviewed entry is missing a clue`);
   if (clue && String(clue).length > 68) failures.push(`${raw}: clue is too long (${String(clue).length})`);
 
   const escaped = String(raw).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -46,14 +50,14 @@ console.table([...lengths.entries()].sort((a, b) => a[0] - b[0]).map(([length, c
 console.log({
   sourceEntries: window.RUSSIAN_WORDS.length,
   normalizedUnique: seen.size,
-  expansionAdded: (window.EXTRA_DICTIONARY_WORDS || []).length,
+  reviewedExpansion: reviewedExpansion.length,
   reviewedClues: withClue,
   clueCoveragePercent: Math.round((withClue / Math.max(1, window.RUSSIAN_WORDS.length)) * 100),
-  fallbackClueWarnings: warnings.length,
+  excludedLegacyEntries: warnings.length,
 });
 
 if (warnings.length) console.warn(warnings.slice(0, 20).join("\n"));
-if (warnings.length > 20) console.warn(`...and ${warnings.length - 20} more fallback-clue warnings`);
+if (warnings.length > 20) console.warn(`...and ${warnings.length - 20} more excluded legacy entries`);
 
 if (failures.length) {
   console.error(failures.join("\n"));

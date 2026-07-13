@@ -10,11 +10,11 @@
   <main class="app-shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">ARROWORD GENERATOR · R&amp;D 0.6</p>
-        <h1>Structurally valid arrowword grids</h1>
+        <p class="eyebrow">ARROWORD GENERATOR · R&amp;D 0.7</p>
+        <h1>Dense, structurally valid arrowword grids</h1>
         <p class="lead">
-          Runs multiple placement attempts, rejects accidental letter runs, and keeps
-          the best connected A5 arrowword generated from reviewed Russian answers.
+          Builds a strict A5 arrowword from reviewed Russian answers, rejects every accidental
+          letter run, and continues filling the grid after the requested answer count is reached.
         </p>
       </div>
       <div class="badge">A5<br />SVG + JSON</div>
@@ -26,7 +26,7 @@
 
         <label>
           Seed
-          <input id="seed" type="text" value="arrowword-rnd-006" />
+          <input id="seed" type="text" value="arrowword-rnd-007" />
         </label>
 
         <div class="field-row">
@@ -43,10 +43,10 @@
         <div class="field-row">
           <label>
             Word pool
-            <input id="poolSize" type="number" min="100" max="1000" value="800" />
+            <input id="poolSize" type="number" min="100" max="1000" value="1000" />
           </label>
           <label>
-            Target answers
+            Minimum answers
             <input id="targetWords" type="number" min="12" max="60" value="30" />
           </label>
         </div>
@@ -71,8 +71,9 @@
         <div id="stats" class="stats" aria-live="polite"></div>
 
         <div class="note">
-          <strong>Strict connected mode:</strong> every result is validated after 96 seeded restarts.
-          The expanded reviewed dictionary improves crossing options; density is scored only after all structural checks pass.
+          <strong>Strict dense mode:</strong> eight seeded attempts are validated independently.
+          The engine may use several isolated answer groups to occupy otherwise dead regions, but
+          every horizontal and vertical letter run must still have its own clue.
         </div>
       </aside>
 
@@ -101,6 +102,7 @@
   <script src="short-words.js"></script>
   <script src="clues.js"></script>
   <script src="extra-dictionary.js"></script>
+  <script src="two-letter-words.js"></script>
   <script src="core.js"></script>
   <script src="dictionary-policy.js"></script>
   <script src="solver.js"></script>
