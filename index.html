@@ -10,7 +10,7 @@
   <main class="app-shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">ARROWORD GENERATOR · R&amp;D 0.10</p>
+        <p class="eyebrow">ARROWORD GENERATOR · R&amp;D 0.11</p>
         <h1>Dense, structurally valid arrowword grids</h1>
         <p class="lead">
           Builds one connected answer graph, expands real clues into compact multi-cell footprints,
@@ -71,8 +71,8 @@
         <div id="stats" class="stats" aria-live="polite"></div>
 
         <div class="note">
-          <strong>Closed-fill R&amp;D:</strong> residual regions and raw letter coverage are reported deterministically.
-          The local indexed CSP remains diagnostic by default until its tested quality checkpoint is green.
+          <strong>Construction V2 R&amp;D:</strong> a bounded structural beam explores competing answer slots before
+          clue-text packing. Legacy generation remains the default until the comparison gate is green.
         </div>
       </aside>
 
@@ -104,9 +104,12 @@
   <script src="two-letter-words.js"></script>
   <script src="core.js"></script>
   <script src="dictionary-policy.js"></script>
+  <script src="lexical-policy-v2.js"></script>
   <script src="solver.js"></script>
   <script src="closed-fill.js"></script>
   <script src="closed-fill-rollback.js"></script>
+  <script src="construction-v2-runtime.js"></script>
+  <script src="construction-v2.js"></script>
   <script src="renderer.js"></script>
   <script src="ui.js"></script>
 </body>
