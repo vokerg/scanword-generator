@@ -20,12 +20,17 @@ const runCount = 40;
 
 for (let index = 0; index < runCount; index += 1) {
   const seed = `regression-${index}`;
-  const result = window.ScanwordSolver.generateBest(seed, poolSize, 17, 13, 28, 27);
+  const result = window.ScanwordSolver.generateBest(seed, poolSize, 17, 13, 30, 27);
   const validation = result.validation;
   if (!validation.valid) {
     throw new Error(`Invalid grid for seed ${seed}: ${JSON.stringify(validation)}`);
   }
-
+  if (result.placed.length < 30) {
+    throw new Error(`Target coverage missed for seed ${seed}: ${result.placed.length}/30`);
+  }
+  if (result.components !== 1) {
+    throw new Error(`Disconnected grid for seed ${seed}: ${result.components} components`);
+  }
   if (result.placed.some((entry) => !entry.hasExactClue)) {
     throw new Error(`Fallback clue used for seed ${seed}`);
   }
@@ -49,6 +54,7 @@ console.log({
   runs: samples.length,
   valid: samples.length,
   exactCluesOnly: true,
+  connectedOnly: true,
   minAnswers: Math.min(...answers),
   maxAnswers: Math.max(...answers),
   averageAnswers: +(answers.reduce((sum, value) => sum + value, 0) / answers.length).toFixed(2),
