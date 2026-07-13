@@ -8,21 +8,30 @@ global.window = global;
 require(path.join(root, "words.js"));
 require(path.join(root, "short-words.js"));
 require(path.join(root, "clues.js"));
+require(path.join(root, "extra-dictionary.js"));
 require(path.join(root, "core.js"));
+require(path.join(root, "dictionary-policy.js"));
 require(path.join(root, "solver.js"));
 
 const samples = [];
 const started = Date.now();
+const poolSize = window.RUSSIAN_WORDS.length;
+const runCount = 40;
 
-for (let index = 0; index < 20; index += 1) {
-  const result = window.ScanwordSolver.generateBest(`regression-${index}`, 500, 17, 13, 28, 27);
+for (let index = 0; index < runCount; index += 1) {
+  const seed = `regression-${index}`;
+  const result = window.ScanwordSolver.generateBest(seed, poolSize, 17, 13, 28, 27);
   const validation = result.validation;
   if (!validation.valid) {
-    throw new Error(`Invalid grid for seed regression-${index}: ${JSON.stringify(validation)}`);
+    throw new Error(`Invalid grid for seed ${seed}: ${JSON.stringify(validation)}`);
+  }
+
+  if (result.placed.some((entry) => !entry.hasExactClue)) {
+    throw new Error(`Fallback clue used for seed ${seed}`);
   }
 
   samples.push({
-    seed: `regression-${index}`,
+    seed,
     answers: result.placed.length,
     crossings: result.intersections,
     activePercent: Math.round(result.fillRatio * 100),
@@ -36,8 +45,10 @@ console.table(samples);
 const answers = samples.map((sample) => sample.answers);
 const active = samples.map((sample) => sample.activePercent);
 console.log({
+  dictionarySize: poolSize,
   runs: samples.length,
   valid: samples.length,
+  exactCluesOnly: true,
   minAnswers: Math.min(...answers),
   maxAnswers: Math.max(...answers),
   averageAnswers: +(answers.reduce((sum, value) => sum + value, 0) / answers.length).toFixed(2),
