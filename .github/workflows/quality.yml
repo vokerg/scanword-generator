@@ -26,6 +26,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Test deterministic closed-fill primitives
+        run: node tools/closed-fill-test.cjs
+
       - name: Audit dictionary
         run: node tools/dictionary-audit.cjs
 
