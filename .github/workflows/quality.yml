@@ -39,7 +39,7 @@ jobs:
         run: node tools/closed-fill-report.cjs 100 > closed-fill-report.jsonl
 
       - name: Compare legacy and structural beam construction
-        run: node tools/construction-v2-report.cjs 12 > construction-v2-report.jsonl
+        run: node tools/construction-v2-report.cjs 4 > construction-v2-report.jsonl
 
       - name: Publish construction diagnostics
         if: always()
