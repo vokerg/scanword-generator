@@ -38,15 +38,19 @@ jobs:
       - name: Run 100-seed active closed-fill diagnostic
         run: node tools/closed-fill-report.cjs 100 > closed-fill-report.jsonl
 
-      - name: Publish closed-fill diagnostics
+      - name: Compare legacy and structural beam construction
+        run: node tools/construction-v2-report.cjs 12 > construction-v2-report.jsonl
+
+      - name: Publish construction diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: closed-fill-diagnostics
+          name: construction-diagnostics
           path: |
             closed-fill-smoke.json
             closed-fill-probe.json
             closed-fill-report.jsonl
+            construction-v2-report.jsonl
           if-no-files-found: warn
 
       - name: Audit dictionary
