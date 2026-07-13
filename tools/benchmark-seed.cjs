@@ -12,9 +12,12 @@ for (const file of [
   "two-letter-words.js",
   "core.js",
   "dictionary-policy.js",
+  "lexical-policy-v2.js",
   "solver.js",
   "closed-fill.js",
   "closed-fill-rollback.js",
+  "construction-v2-runtime.js",
+  "construction-v2.js",
 ]) {
   require(path.join(root, file));
 }
@@ -48,6 +51,8 @@ console.log(JSON.stringify({
   poolEntries: result.poolEntries,
   exactCluesOnly: result.placed.every((entry) => entry.hasExactClue),
   coverageCheckpointPassed: Boolean(result.coverageCheckpoint?.passed),
+  constructionMode: result.mode || result.constructionV2?.mode || "legacy",
+  constructionV2: result.constructionV2 || null,
   closedFillMode: result.closedFill?.mode || "unavailable",
   closedFillError: result.closedFill?.error || result.closedFill?.rollbackError || null,
   closedFillRegionsAttempted: result.closedFill?.regionsAttempted || 0,
