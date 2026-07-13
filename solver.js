@@ -19,6 +19,8 @@
       placed: [],
       usedAnswers: new Set(),
       componentsStarted: 0,
+      candidateChecks: 0,
+      candidateLookups: 0,
     };
   }
 
@@ -171,7 +173,26 @@
     if (top.length > limit) top.length = limit;
   }
 
-  function findCrossingCandidates(state, pool, random, sampleLimit) {
+  function buildPoolIndex(pool) {
+    const byLetter = new Map();
+    const byLength = new Map();
+    let occurrences = 0;
+
+    for (const entry of pool) {
+      if (!byLength.has(entry.answer.length)) byLength.set(entry.answer.length, []);
+      byLength.get(entry.answer.length).push(entry);
+      for (let charIndex = 0; charIndex < entry.answer.length; charIndex += 1) {
+        const char = entry.answer[charIndex];
+        if (!byLetter.has(char)) byLetter.set(char, []);
+        byLetter.get(char).push({ entry, charIndex });
+        occurrences += 1;
+      }
+    }
+
+    return { byLetter, byLength, entries: pool.length, occurrences };
+  }
+
+  function findCrossingCandidatesLegacy(state, pool, random, sampleLimit) {
     const letterIndex = buildLetterIndex(state);
     const words = pool.filter((entry) => !state.usedAnswers.has(entry.answer));
     for (let index = words.length - 1; index > 0; index -= 1) {
@@ -187,6 +208,7 @@
         const matches = letterIndex.get(entry.answer[charIndex]) || [];
         for (const match of matches) {
           for (const direction of ["right", "down"]) {
+            state.candidateChecks += 1;
             const { dr, dc } = DIRECTIONS[direction];
             const startRow = match.row - dr * charIndex;
             const startCol = match.col - dc * charIndex;
@@ -198,6 +220,76 @@
       }
     }
     return top;
+  }
+
+  function coprimeStep(size, random) {
+    if (size <= 2) return 1;
+    const gcd = (a, b) => {
+      while (b) [a, b] = [b, a % b];
+      return a;
+    };
+    let step = 1 + Math.floor(random() * (size - 1));
+    while (gcd(step, size) !== 1) step = step % (size - 1) + 1;
+    return step;
+  }
+
+  function findCrossingCandidatesIndexed(state, poolIndex, random, sampleLimit) {
+    const anchors = [];
+    for (let row = 0; row < state.rows; row += 1) {
+      for (let col = 0; col < state.cols; col += 1) {
+        const cell = state.grid[row][col];
+        if (cell.type !== "letter" || cell.directions.length !== 1) continue;
+        const bucket = poolIndex.byLetter.get(cell.char) || [];
+        if (!bucket.length) continue;
+        const direction = cell.directions[0] === "right" ? "down" : "right";
+        anchors.push({ row, col, char: cell.char, direction, bucket, jitter: random() });
+      }
+    }
+
+    anchors.sort((a, b) => a.bucket.length - b.bucket.length || a.jitter - b.jitter);
+    const top = [];
+    const seenPlacements = new Set();
+    const maxChecks = Math.max(900, sampleLimit * 2);
+    const perAnchorLimit = Math.max(18, Math.ceil(maxChecks / Math.max(1, anchors.length)));
+    let checks = 0;
+
+    for (const anchor of anchors) {
+      if (checks >= maxChecks) break;
+      const bucket = anchor.bucket;
+      const visitLimit = Math.min(bucket.length, perAnchorLimit, maxChecks - checks);
+      const offset = Math.floor(random() * bucket.length);
+      const step = coprimeStep(bucket.length, random);
+      state.candidateLookups += 1;
+
+      for (let visit = 0; visit < visitLimit; visit += 1) {
+        const occurrence = bucket[(offset + visit * step) % bucket.length];
+        const entry = occurrence.entry;
+        if (state.usedAnswers.has(entry.answer)) continue;
+        const { dr, dc } = DIRECTIONS[anchor.direction];
+        const startRow = anchor.row - dr * occurrence.charIndex;
+        const startCol = anchor.col - dc * occurrence.charIndex;
+        const key = `${entry.id}:${startRow}:${startCol}:${anchor.direction}`;
+        if (seenPlacements.has(key)) continue;
+        seenPlacements.add(key);
+        checks += 1;
+        state.candidateChecks += 1;
+        const placement = validatePlacement(state, entry, startRow, startCol, anchor.direction, true);
+        if (!placement) continue;
+        const rarityBonus = Math.max(0, 18 - Math.log2(bucket.length + 1) * 2.2);
+        insertTopCandidate(top, { entry, placement, score: placement.score + rarityBonus + random() * 5 });
+      }
+    }
+    return top;
+  }
+
+  function candidateMode() {
+    if (typeof process !== "undefined" && process?.env?.SCANWORD_CANDIDATE_MODE) return process.env.SCANWORD_CANDIDATE_MODE;
+    return window.SCANWORD_CANDIDATE_MODE || "indexed";
+  }
+
+  function findCrossingCandidates(state, pool, poolIndex, random, sampleLimit, mode) {
+    if (mode === "legacy") return findCrossingCandidatesLegacy(state, pool, random, sampleLimit);
+    return findCrossingCandidatesIndexed(state, poolIndex, random, sampleLimit);
   }
 
   function findSeedCandidates(state, pool, random, sampleLimit) {
@@ -531,7 +623,7 @@
     return { letterCells, clueCells, clueTextCells, panelCells, intersections, doubles, components, fillRatio, validation, panelRegions: panels.regions, isolatedPanels: panels.isolated, largestPanelRegion: panels.largest, score };
   }
 
-  function buildAttempt(pool, rows, cols, targetWords, random) {
+  function buildAttempt(pool, rows, cols, targetWords, random, poolIndex = buildPoolIndex(pool), mode = candidateMode()) {
     const state = createState(rows, cols);
     const initialCandidates = pool.filter((entry) => entry.answer.length >= 5 && entry.answer.length <= 8);
     const first = initialCandidates[Math.floor(random() * initialCandidates.length)] || pool[0];
@@ -540,7 +632,7 @@
     const maxComponents = 1;
     let stalled = 0;
     while (state.placed.length < targetWords && stalled < 8) {
-      let candidates = findCrossingCandidates(state, pool, random, Math.min(700, pool.length));
+      let candidates = findCrossingCandidates(state, pool, poolIndex, random, Math.min(700, pool.length), mode);
       let seeded = false;
       if (!candidates.length && state.componentsStarted < maxComponents) {
         candidates = findSeedCandidates(state, pool, random, Math.min(320, pool.length));
@@ -564,7 +656,7 @@
       let denseStalled = 0;
       const denseLimit = 80;
       while (state.placed.length < denseLimit && denseStalled < 6) {
-        let candidates = findCrossingCandidates(state, pool, random, Math.min(700, pool.length));
+        let candidates = findCrossingCandidates(state, pool, poolIndex, random, Math.min(700, pool.length), mode);
         let seeded = false;
         if (!candidates.length && state.componentsStarted < maxComponents) {
           candidates = findSeedCandidates(state, pool, random, Math.min(320, pool.length));
@@ -587,6 +679,8 @@
   function generateBest(seed, poolSize, rows, cols, targetWords) {
     const pool = generateWordPool(poolSize, makeRandom(`${seed}:pool`));
     if (!pool.length) throw new Error("The word pool is empty.");
+    const mode = candidateMode();
+    const poolIndex = buildPoolIndex(pool);
 
     let best = null;
     let bestCheckpoint = null;
@@ -614,7 +708,7 @@
     let attemptsUsed = 0;
     for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
       attemptsUsed = attempt + 1;
-      const state = buildAttempt(pool, rows, cols, targetWords, makeRandom(`${seed}:placement:${attempt}`));
+      const state = buildAttempt(pool, rows, cols, targetWords, makeRandom(`${seed}:placement:${attempt}`), poolIndex, mode);
       const clueLayout = assignClueTextCells(state, makeRandom(`${seed}:clues:${attempt}`));
       const externalClueTexts = clueLayout.externalClueTexts;
       const metrics = resultMetrics(state);
@@ -647,6 +741,11 @@
         largestPanelRegion: metrics.largestPanelRegion,
         validation: metrics.validation,
         availableSlots: state.placed.length,
+        candidateMode: mode,
+        candidateChecks: state.candidateChecks,
+        candidateLookups: state.candidateLookups,
+        poolEntries: poolIndex.entries,
+        poolOccurrences: poolIndex.occurrences,
         mode: "strict-placement",
       };
       if (!best || candidate.score > best.score) best = candidate;
@@ -675,5 +774,5 @@
     return best;
   }
 
-  window.ScanwordSolver = { generateBest, validateGrid, buildAttempt, resultMetrics };
+  window.ScanwordSolver = { generateBest, validateGrid, buildAttempt, resultMetrics, buildPoolIndex };
 })();

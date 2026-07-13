@@ -36,6 +36,10 @@ console.log(JSON.stringify({
   externalClues: result.externalClueTexts,
   selectedAttempt: result.attempt + 1,
   attemptsUsed: result.attemptBudget,
+  candidateMode: result.candidateMode,
+  candidateChecks: result.candidateChecks,
+  candidateLookups: result.candidateLookups,
+  poolEntries: result.poolEntries,
   exactCluesOnly: result.placed.every((entry) => entry.hasExactClue),
   coverageCheckpointPassed: Boolean(result.coverageCheckpoint?.passed),
 }));
