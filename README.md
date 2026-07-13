@@ -4,7 +4,7 @@ A browser-based prototype for generating Swedish-style crosswords (arrowwords / 
 
 ## Current status
 
-The `r-and-d/valid-arrowword-generator` branch contains version 0.6, a **validation-first placement engine**.
+The `r-and-d/valid-arrowword-generator` branch contains version 0.6, a **validation-first connected placement engine**.
 
 The generator:
 
@@ -15,8 +15,9 @@ The generator:
 - supports one or two clues in the same clue cell;
 - validates every contiguous horizontal and vertical letter run;
 - rejects grids containing accidental pseudo-words;
+- requires all placed answers to belong to one connected component;
 - renders unused areas as explicit graphic panels rather than blank answer cells;
-- performs multiple seeded restarts and keeps the highest-scoring valid result;
+- performs 96 seeded restarts and keeps the highest-scoring valid result;
 - exports an A5 SVG and a JSON project file;
 - can reveal answers for validation.
 
@@ -29,13 +30,14 @@ A generated grid is accepted only when:
 3. Crossing letters agree.
 4. A clue cell contains at most one right clue and one down clue.
 5. There are no blank clue cells.
-6. Non-answer areas are represented as explicit panel cells.
+6. Every answer is connected to the same answer graph through crossings.
+7. Non-answer areas are represented as explicit panel cells.
 
 Density is scored only after all structural checks pass.
 
-## Generation strategies
+## Generation strategy
 
-Version 0.6 uses a strict word-first placement strategy as the stable baseline. Side-adjacency checks guarantee that placing one answer cannot silently create another unassigned letter run.
+Version 0.6 uses a compact word-first placement strategy as the stable baseline. Side-adjacency checks guarantee that placing one answer cannot silently create another unassigned letter run. Candidate scoring strongly favors crossings and compact placements, while the initial answer is limited to a practical 5–8-letter range.
 
 A denser closed-fill/CSP strategy is being developed separately. It is not used as the default yet because a dense topology is useful only when every resulting slot can be filled with reviewed answers.
 
@@ -57,7 +59,15 @@ Run the multi-seed structural benchmark with Node.js:
 node tools/benchmark.cjs
 ```
 
-The benchmark fails immediately if any generated grid contains an accidental run, an orphan letter, a crossing conflict, a duplicate clue direction, or a fallback placeholder clue.
+The benchmark runs 40 deterministic seeds and fails immediately if any generated grid:
+
+- contains an accidental run, orphan letter, or crossing conflict;
+- uses a duplicate clue direction;
+- uses a fallback placeholder clue;
+- contains more than one connected answer component;
+- produces fewer than 30 answers on the default 13 × 17 grid.
+
+The local checkpoint before this commit passed all 40 seeds with 30 answers each, 32–38 crossings, and 58–64% active cells.
 
 ## Dictionary quality gate
 
@@ -72,20 +82,20 @@ The audit rejects invalid characters, duplicate normalized answers, unsupported 
 ## Files
 
 ```text
-index.html                Browser interface
-styles.css                Interface styling
-words.js                  Main Russian answer dictionary
-short-words.js            Compact answers for short slots
-clues.js                  Original short clue dictionary
-extra-dictionary.js       Reviewed answer-and-clue expansion
-core.js                   Shared randomization and dictionary utilities
-dictionary-policy.js      Restricts generation to reviewed clues
-solver.js                 Multi-restart placement engine and validator
-renderer.js               A5 SVG renderer
-ui.js                     Browser UI and JSON export
-tools/benchmark.cjs       Multi-seed structural regression benchmark
+index.html                 Browser interface
+styles.css                 Interface styling
+words.js                   Main Russian answer dictionary
+short-words.js             Compact answers for short slots
+clues.js                   Original short clue dictionary
+extra-dictionary.js        Reviewed answer-and-clue expansion
+core.js                    Shared randomization and dictionary utilities
+dictionary-policy.js       Restricts generation to reviewed clues
+solver.js                  Multi-restart connected placement engine
+renderer.js                A5 SVG renderer
+ui.js                      Browser UI and JSON export
+tools/benchmark.cjs        Multi-seed structural regression benchmark
 tools/dictionary-audit.cjs Dictionary validation and length-distribution audit
-docs/                     Design notes and research summary
+docs/                      Design notes and research summary
 ```
 
 ## Why PDF is deferred
