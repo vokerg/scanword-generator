@@ -29,8 +29,9 @@
     const values = [
       [result.placed.length, "words"],
       [result.intersections, "crossings"],
-      [`${Math.round((1 - result.panelRatio) * 100)}%`, "active cells"],
-      [result.clueTextCells || 0, "split clue cells"],
+      [`${(result.fillRatio * 100).toFixed(1)}%`, "active cells"],
+      [`${(result.answerCoverage * 100).toFixed(1)}%`, "answer-space coverage"],
+      [result.clueTextCells || 0, "clue-footprint cells"],
       [result.panelCells, "residual panels"],
       [result.components, "answer groups"],
       [result.validation?.accidentalRuns?.length || 0, "accidental runs"],
@@ -63,7 +64,7 @@
 
   function exportResult(result) {
     return {
-      version: "0.8.0",
+      version: "0.9.0",
       page: { format: "A5", orientation: "portrait", widthMm: 148, heightMm: 210 },
       grid: { rows: result.rows, cols: result.cols },
       seed: els.seed.value.trim(),
@@ -76,6 +77,9 @@
         clueDirectionConflicts: result.validation?.clueDirectionConflicts || 0,
         panelCells: result.panelCells,
         panelRatio: result.panelRatio,
+        activeCoverage: result.fillRatio,
+        answerCoverage: result.answerCoverage,
+        coverageCheckpoint: result.coverageCheckpoint,
         intersections: result.intersections,
         components: result.components,
         externalClueTexts: result.externalClueTexts || 0,
@@ -89,7 +93,9 @@
         char: cell.char,
         slotIds: cell.slotIds,
         clues: cell.clues,
+        footprintId: cell.footprintId || null,
       }))),
+      clueFootprints: result.clueFootprints || [],
     };
   }
 
@@ -137,7 +143,7 @@
         rerenderSvg();
         renderStats(currentResult);
         renderWords(currentResult);
-        els.generationStatus.textContent = `attempt ${currentResult.attempt + 1}/12 · valid · ${currentResult.components} groups · active ${Math.round(currentResult.fillRatio * 100)}%`;
+        els.generationStatus.textContent = `selected attempt ${currentResult.attempt + 1} · searched ${currentResult.attemptBudget || "?"} · valid · ${currentResult.components} component · active ${(currentResult.fillRatio * 100).toFixed(1)}%`;
       } catch (error) {
         currentResult = null;
         els.preview.innerHTML = `<div class="generation-error"><strong>Generation failed.</strong><br>${escapeXml(error.message)}</div>`;

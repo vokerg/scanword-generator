@@ -330,71 +330,150 @@
     return components;
   }
 
-  function assignClueTextCells(state) {
-    const items = [];
-    const offsetsByDirection = {
-      right: [[0, -1], [-1, 0], [1, 0], [0, 1]],
-      down: [[0, -1], [0, 1], [-1, 0], [1, 0]],
-    };
+  function panelRegionSizeMap(state) {
+    const sizes = new Map();
+    const seen = new Set();
+    for (let row = 0; row < state.rows; row += 1) {
+      for (let col = 0; col < state.cols; col += 1) {
+        if (state.grid[row][col].type !== "panel") continue;
+        const startKey = `${row}:${col}`;
+        if (seen.has(startKey)) continue;
+        const stack = [[row, col]];
+        const cells = [];
+        seen.add(startKey);
+        while (stack.length) {
+          const [currentRow, currentCol] = stack.pop();
+          cells.push({ row: currentRow, col: currentCol });
+          for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+            const nextRow = currentRow + dr;
+            const nextCol = currentCol + dc;
+            if (!inBounds(state, nextRow, nextCol)) continue;
+            if (state.grid[nextRow][nextCol].type !== "panel") continue;
+            const nextKey = `${nextRow}:${nextCol}`;
+            if (seen.has(nextKey)) continue;
+            seen.add(nextKey);
+            stack.push([nextRow, nextCol]);
+          }
+        }
+        for (const cell of cells) sizes.set(`${cell.row}:${cell.col}`, cells.length);
+      }
+    }
+    return sizes;
+  }
 
+  function footprintCandidates(state, row, col, maxSize, regionSizes) {
+    const starts = [];
+    for (const [dr, dc] of [[0, -1], [-1, 0], [1, 0], [0, 1]]) {
+      const nextRow = row + dr;
+      const nextCol = col + dc;
+      if (!inBounds(state, nextRow, nextCol)) continue;
+      if (state.grid[nextRow][nextCol].type !== "panel") continue;
+      starts.push({ row: nextRow, col: nextCol });
+    }
+    const candidates = [];
+    const seenSets = new Set();
+    function addCandidate(cells) {
+      const ordered = [...cells].sort((a, b) => a.row - b.row || a.col - b.col);
+      const keys = ordered.map((cell) => `${cell.row}:${cell.col}`);
+      const signature = keys.join("|");
+      if (seenSets.has(signature)) return;
+      seenSets.add(signature);
+      const rows = ordered.map((cell) => cell.row);
+      const cols = ordered.map((cell) => cell.col);
+      const area = (Math.max(...rows) - Math.min(...rows) + 1) * (Math.max(...cols) - Math.min(...cols) + 1);
+      const regionBonus = ordered.reduce((sum, cell) => sum + 24 / Math.max(1, regionSizes.get(`${cell.row}:${cell.col}`) || 1), 0);
+      candidates.push({ cells: ordered, keys, score: ordered.length * 100 + regionBonus - (area - ordered.length) * 9 });
+    }
+    function expand(cells, keys) {
+      addCandidate(cells);
+      if (cells.length >= maxSize) return;
+      const frontier = new Map();
+      for (const cell of cells) {
+        for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+          const nextRow = cell.row + dr;
+          const nextCol = cell.col + dc;
+          const key = `${nextRow}:${nextCol}`;
+          if (!inBounds(state, nextRow, nextCol) || keys.has(key)) continue;
+          if (state.grid[nextRow][nextCol].type !== "panel") continue;
+          frontier.set(key, { row: nextRow, col: nextCol });
+        }
+      }
+      for (const [key, cell] of frontier) {
+        const nextKeys = new Set(keys);
+        nextKeys.add(key);
+        expand([...cells, cell], nextKeys);
+      }
+    }
+    for (const start of starts) expand([start], new Set([`${start.row}:${start.col}`]));
+    return candidates.sort((a, b) => b.score - a.score).slice(0, 96);
+  }
+
+  function assignClueTextCells(state, random = Math.random) {
+    const regionSizes = panelRegionSizeMap(state);
+    const items = [];
     for (let row = 0; row < state.rows; row += 1) {
       for (let col = 0; col < state.cols; col += 1) {
         const cell = state.grid[row][col];
         if (cell.type !== "clue") continue;
         for (let clueIndex = 0; clueIndex < cell.clues.length; clueIndex += 1) {
           const clue = cell.clues[clueIndex];
-          const candidates = [];
-          for (const [dr, dc] of offsetsByDirection[clue.direction] || offsetsByDirection.right) {
-            const nextRow = row + dr;
-            const nextCol = col + dc;
-            if (!inBounds(state, nextRow, nextCol)) continue;
-            if (state.grid[nextRow][nextCol].type !== "panel") continue;
-            candidates.push({ row: nextRow, col: nextCol, key: `${nextRow}:${nextCol}` });
-          }
-          items.push({ row, col, clueIndex, clue, candidates });
+          const maxSize = clue.text.length >= 38 ? 4 : 3;
+          const candidates = footprintCandidates(state, row, col, maxSize, regionSizes);
+          items.push({ row, col, clueIndex, clue, maxSize, candidates });
         }
       }
     }
 
-    items.sort((a, b) => a.candidates.length - b.candidates.length || a.clue.slotId - b.clue.slotId);
-    const ownerByCell = new Map();
-    const assignedCellByItem = new Map();
-
-    function tryAssign(itemIndex, visited) {
-      const item = items[itemIndex];
-      for (const candidate of item.candidates) {
-        if (visited.has(candidate.key)) continue;
-        visited.add(candidate.key);
-        const previous = ownerByCell.get(candidate.key);
-        if (previous === undefined || tryAssign(previous, visited)) {
-          ownerByCell.set(candidate.key, itemIndex);
-          assignedCellByItem.set(itemIndex, candidate);
-          return true;
-        }
+    let best = { score: -Infinity, covered: 0, assigned: new Map() };
+    const restarts = 160;
+    for (let restart = 0; restart < restarts; restart += 1) {
+      const occupied = new Set();
+      const assigned = new Map();
+      const order = items.map((item, index) => ({ item, index, jitter: random() }))
+        .sort((a, b) => a.item.candidates.length - b.item.candidates.length || b.item.maxSize - a.item.maxSize || a.jitter - b.jitter);
+      for (const { item, index } of order) {
+        const available = item.candidates.filter((candidate) => candidate.keys.every((key) => !occupied.has(key)));
+        if (!available.length) continue;
+        const ranked = available.map((candidate) => ({ candidate, rank: candidate.score + random() * 18 }))
+          .sort((a, b) => b.rank - a.rank);
+        const selected = ranked[Math.floor(random() * Math.min(3, ranked.length))].candidate;
+        assigned.set(index, selected);
+        for (const key of selected.keys) occupied.add(key);
       }
-      return false;
+      const covered = occupied.size;
+      const assignedCount = assigned.size;
+      const score = covered * 1000 + assignedCount * 25;
+      if (score > best.score) best = { score, covered, assigned };
     }
-
-    for (let index = 0; index < items.length; index += 1) tryAssign(index, new Set());
 
     let externalClueTexts = 0;
-    for (const [itemIndex, target] of assignedCellByItem.entries()) {
+    let clueTextCells = 0;
+    const footprints = [];
+    for (const [itemIndex, footprint] of best.assigned.entries()) {
       const item = items[itemIndex];
       const arrowCell = state.grid[item.row][item.col];
       const clue = arrowCell.clues[item.clueIndex];
-      clue.textRow = target.row;
-      clue.textCol = target.col;
+      clue.textRow = footprint.cells[0].row;
+      clue.textCol = footprint.cells[0].col;
       clue.externalText = true;
-      state.grid[target.row][target.col] = {
-        type: "clueText",
-        char: null,
-        slotIds: [clue.slotId],
-        directions: [],
-        clues: [{ ...clue, arrowRow: item.row, arrowCol: item.col }],
-      };
+      clue.textCells = footprint.cells.map((cell) => ({ ...cell }));
+      const footprintId = footprints.length + 1;
+      footprints.push({ id: footprintId, slotId: clue.slotId, arrowRow: item.row, arrowCol: item.col, cells: clue.textCells });
+      footprint.cells.forEach((target, cellIndex) => {
+        state.grid[target.row][target.col] = {
+          type: cellIndex === 0 ? "clueText" : "clueTextContinuation",
+          char: null,
+          slotIds: [clue.slotId],
+          directions: [],
+          footprintId,
+          clues: cellIndex === 0 ? [{ ...clue, arrowRow: item.row, arrowCol: item.col }] : [],
+        };
+      });
       externalClueTexts += 1;
+      clueTextCells += footprint.cells.length;
     }
-    return externalClueTexts;
+    state.clueFootprints = footprints;
+    return { externalClueTexts, clueTextCells, footprints };
   }
 
   function panelTopology(grid) {
@@ -438,7 +517,7 @@
     const total = state.rows * state.cols;
     const letterCells = state.grid.flat().filter((cell) => cell.type === "letter").length;
     const clueCells = state.grid.flat().filter((cell) => cell.type === "clue").length;
-    const clueTextCells = state.grid.flat().filter((cell) => cell.type === "clueText").length;
+    const clueTextCells = state.grid.flat().filter((cell) => cell.type === "clueText" || cell.type === "clueTextContinuation").length;
     const panelCells = total - letterCells - clueCells - clueTextCells;
     const intersections = state.grid.flat().filter((cell) => cell.type === "letter" && cell.slotIds.length === 2).length;
     const doubles = state.grid.flat().filter((cell) => cell.type === "clue" && cell.clues.length === 2).length;
@@ -446,8 +525,9 @@
     const validation = validateGrid(state.grid, state.placed);
     const fillRatio = (letterCells + clueCells + clueTextCells) / total;
     const panels = panelTopology(state.grid);
-    const score = state.placed.length * 12000 + intersections * 320 + fillRatio * 9000 + doubles * 90
-      - Math.max(0, components - 1) * 2400 - panels.regions * 180 - panels.isolated * 220;
+    const answerCoverage = letterCells / Math.max(1, total - clueCells - clueTextCells);
+    const score = fillRatio * 120000 + answerCoverage * 35000 + state.placed.length * 1200 + intersections * 220 + doubles * 90
+      - Math.max(0, components - 1) * 20000 - panels.regions * 450 - panels.isolated * 700 - panelCells * 260;
     return { letterCells, clueCells, clueTextCells, panelCells, intersections, doubles, components, fillRatio, validation, panelRegions: panels.regions, isolatedPanels: panels.isolated, largestPanelRegion: panels.largest, score };
   }
 
@@ -457,7 +537,7 @@
     const first = initialCandidates[Math.floor(random() * initialCandidates.length)] || pool[0];
     if (!first || !placeInitialWord(state, first, random)) return state;
 
-    const maxComponents = 3;
+    const maxComponents = 1;
     let stalled = 0;
     while (state.placed.length < targetWords && stalled < 8) {
       let candidates = findCrossingCandidates(state, pool, random, Math.min(700, pool.length));
@@ -482,7 +562,7 @@
 
     if (state.placed.length >= targetWords) {
       let denseStalled = 0;
-      const denseLimit = 65;
+      const denseLimit = 80;
       while (state.placed.length < denseLimit && denseStalled < 6) {
         let candidates = findCrossingCandidates(state, pool, random, Math.min(700, pool.length));
         let seeded = false;
@@ -509,10 +589,31 @@
     if (!pool.length) throw new Error("The word pool is empty.");
 
     let best = null;
-    const attempts = 12;
-    for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const preferredMinimumAttempts = 24;
+    const checkpointMinimumAttempts = 120;
+    const maximumAttempts = 240;
+    const area = rows * cols;
+    const checkpointAnswers = Math.max(targetWords, Math.min(40, Math.floor(area / 5)));
+    const checkpointPanels = Math.ceil(area * 0.09);
+    const checkpointActive = area >= 200 ? 0.90 : 0.88;
+    const passesCheckpoint = (candidate) => Boolean(candidate
+      && candidate.placed.length >= checkpointAnswers
+      && candidate.fillRatio >= checkpointActive
+      && candidate.answerCoverage >= 0.65
+      && candidate.panelCells <= checkpointPanels
+      && candidate.components === 1
+      && candidate.validation?.valid);
+    const passesPreferredCheckpoint = (candidate) => Boolean(passesCheckpoint(candidate)
+      && candidate.placed.length >= Math.max(checkpointAnswers, 42)
+      && candidate.fillRatio >= Math.max(checkpointActive, 0.92)
+      && candidate.panelCells <= Math.min(checkpointPanels, 18));
+
+    let attemptsUsed = 0;
+    for (let attempt = 0; attempt < maximumAttempts; attempt += 1) {
+      attemptsUsed = attempt + 1;
       const state = buildAttempt(pool, rows, cols, targetWords, makeRandom(`${seed}:placement:${attempt}`));
-      const externalClueTexts = assignClueTextCells(state);
+      const clueLayout = assignClueTextCells(state, makeRandom(`${seed}:clues:${attempt}`));
+      const externalClueTexts = clueLayout.externalClueTexts;
       const metrics = resultMetrics(state);
       if (!metrics.validation.valid) continue;
       const candidate = {
@@ -528,7 +629,7 @@
         intersections: metrics.intersections,
         doubles: metrics.doubles,
         fillRatio: metrics.fillRatio,
-        answerCoverage: metrics.fillRatio,
+        answerCoverage: metrics.letterCells / Math.max(1, rows * cols - metrics.clueCells - metrics.clueTextCells),
         clueUsage: 1,
         blankClues: 0,
         panelCells: metrics.panelCells,
@@ -537,6 +638,7 @@
         components: metrics.components,
         externalClueTexts,
         clueTextCells: metrics.clueTextCells,
+        clueFootprints: state.clueFootprints || [],
         panelRegions: metrics.panelRegions,
         isolatedPanels: metrics.isolatedPanels,
         largestPanelRegion: metrics.largestPanelRegion,
@@ -545,6 +647,20 @@
         mode: "strict-placement",
       };
       if (!best || candidate.score > best.score) best = candidate;
+      if (attemptsUsed >= preferredMinimumAttempts && passesPreferredCheckpoint(best)) break;
+      if (attemptsUsed >= checkpointMinimumAttempts && passesCheckpoint(best)) break;
+    }
+
+    if (best) {
+      best.attemptBudget = attemptsUsed;
+      best.coverageCheckpoint = {
+        passed: passesCheckpoint(best),
+        minimumAnswers: checkpointAnswers,
+        minimumActive: checkpointActive,
+        minimumAnswerCoverage: 0.65,
+        maximumPanels: checkpointPanels,
+        requiredComponents: 1,
+      };
     }
 
     if (!best) throw new Error("Unable to build a structurally valid arrowword for this seed and grid size.");
