@@ -1,0 +1,41 @@
+name: Dictionary R&D source snapshot
+
+on:
+  push:
+    branches:
+      - r-and-d/dictionary-10k
+    paths:
+      - .github/workflows/dictionary-rnd-snapshot.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: r-and-d/dictionary-10k
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dictionary-rnd-source
+          path: |
+            README.md
+            index.html
+            styles.css
+            words.js
+            short-words.js
+            clues.js
+            extra-dictionary.js
+            dictionary-policy.js
+            two-letter-words.js
+            core.js
+            solver.js
+            renderer.js
+            ui.js
+            tools/*.cjs
+            docs/*.md
+          if-no-files-found: error
+          retention-days: 1
