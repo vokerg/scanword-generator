@@ -29,8 +29,11 @@
     const values = [
       [result.placed.length, "words"],
       [result.intersections, "crossings"],
-      [`${Math.round((1 - result.panelRatio) * 100)}%`, "active cells"],
-      [result.panelCells, "panel cells"],
+      [`${(result.fillRatio * 100).toFixed(1)}%`, "active cells"],
+      [`${(result.answerCoverage * 100).toFixed(1)}%`, "answer-space coverage"],
+      [result.clueTextCells || 0, "clue-footprint cells"],
+      [result.panelCells, "residual panels"],
+      [result.components, "answer groups"],
       [result.validation?.accidentalRuns?.length || 0, "accidental runs"],
       [validity, "structurally valid"],
     ];
@@ -61,7 +64,7 @@
 
   function exportResult(result) {
     return {
-      version: "0.4.0",
+      version: "0.9.0",
       page: { format: "A5", orientation: "portrait", widthMm: 148, heightMm: 210 },
       grid: { rows: result.rows, cols: result.cols },
       seed: els.seed.value.trim(),
@@ -74,7 +77,15 @@
         clueDirectionConflicts: result.validation?.clueDirectionConflicts || 0,
         panelCells: result.panelCells,
         panelRatio: result.panelRatio,
+        activeCoverage: result.fillRatio,
+        answerCoverage: result.answerCoverage,
+        coverageCheckpoint: result.coverageCheckpoint,
         intersections: result.intersections,
+        components: result.components,
+        externalClueTexts: result.externalClueTexts || 0,
+        clueTextCells: result.clueTextCells || 0,
+        panelRegions: result.panelRegions || 0,
+        isolatedPanels: result.isolatedPanels || 0,
       },
       placedWords: result.placed,
       cells: result.grid.map((row) => row.map((cell) => ({
@@ -82,7 +93,9 @@
         char: cell.char,
         slotIds: cell.slotIds,
         clues: cell.clues,
+        footprintId: cell.footprintId || null,
       }))),
+      clueFootprints: result.clueFootprints || [],
     };
   }
 
@@ -98,11 +111,11 @@
 
   function readSettings() {
     return {
-      seed: els.seed.value.trim() || "scanword",
+      seed: els.seed.value.trim() || "arrowword",
       cols: Math.max(11, Math.min(19, Number(els.cols.value) || 13)),
       rows: Math.max(13, Math.min(27, Number(els.rows.value) || 17)),
-      poolSize: Math.max(100, Math.min(window.RUSSIAN_WORDS?.length || 500, Number(els.poolSize.value) || 500)),
-      targetWords: Math.max(12, Math.min(60, Number(els.targetWords.value) || 42)),
+      poolSize: Math.max(100, Math.min(window.RUSSIAN_WORDS?.length || 800, Number(els.poolSize.value) || window.RUSSIAN_WORDS?.length || 800)),
+      targetWords: Math.max(12, Math.min(60, Number(els.targetWords.value) || 30)),
       clueDensity: Math.max(16, Math.min(38, Number(els.clueDensity.value) || 27)),
     };
   }
@@ -130,7 +143,7 @@
         rerenderSvg();
         renderStats(currentResult);
         renderWords(currentResult);
-        els.generationStatus.textContent = `template ${currentResult.attempt + 1}/32 · valid · panels ${Math.round(currentResult.panelRatio * 100)}%`;
+        els.generationStatus.textContent = `selected attempt ${currentResult.attempt + 1} · searched ${currentResult.attemptBudget || "?"} · valid · ${currentResult.components} component · active ${(currentResult.fillRatio * 100).toFixed(1)}%`;
       } catch (error) {
         currentResult = null;
         els.preview.innerHTML = `<div class="generation-error"><strong>Generation failed.</strong><br>${escapeXml(error.message)}</div>`;

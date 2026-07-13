@@ -10,11 +10,11 @@
   <main class="app-shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">ARROWORD GENERATOR · MVP 0.4</p>
-        <h1>Structurally valid arrowword grids</h1>
+        <p class="eyebrow">ARROWORD GENERATOR · R&amp;D 0.9</p>
+        <h1>Dense, structurally valid arrowword grids</h1>
         <p class="lead">
-          Generates in-grid clues and arrows, fills them with real Russian answers,
-          rejects accidental letter runs, and exports an exact A5 SVG or JSON project.
+          Builds one connected answer graph, expands real clues into compact multi-cell footprints,
+          and rejects every accidental letter run before a result can be selected.
         </p>
       </div>
       <div class="badge">A5<br />SVG + JSON</div>
@@ -26,7 +26,7 @@
 
         <label>
           Seed
-          <input id="seed" type="text" value="arrowword-004" />
+          <input id="seed" type="text" value="arrowword-rnd-009" />
         </label>
 
         <div class="field-row">
@@ -43,17 +43,17 @@
         <div class="field-row">
           <label>
             Word pool
-            <input id="poolSize" type="number" min="100" max="500" value="500" />
+            <input id="poolSize" type="number" min="100" max="1000" value="1000" />
           </label>
           <label>
             Minimum answers
-            <input id="targetWords" type="number" min="12" max="60" value="28" />
+            <input id="targetWords" type="number" min="12" max="60" value="30" />
           </label>
         </div>
 
         <label>
           Clue-cell density, %
-          <input id="clueDensity" type="number" min="16" max="38" value="27" />
+          <input id="clueDensity" type="number" min="16" max="38" value="27" disabled />
         </label>
 
         <label class="check-row">
@@ -71,8 +71,9 @@
         <div id="stats" class="stats" aria-live="polite"></div>
 
         <div class="note">
-          <strong>Validation-first mode:</strong> density is optimized only after the grid passes
-          the accidental-run, crossing-letter, orphan-letter, and clue-direction checks.
+          <strong>90% coverage checkpoint:</strong> the solver searches adaptively from 24 to 240 seeded
+          attempts. A result must keep one connected answer component, at least 90% active cells,
+          at most 20 residual panels, and zero accidental letter runs.
         </div>
       </aside>
 
@@ -100,7 +101,10 @@
   <script src="words.js"></script>
   <script src="short-words.js"></script>
   <script src="clues.js"></script>
+  <script src="extra-dictionary.js"></script>
+  <script src="two-letter-words.js"></script>
   <script src="core.js"></script>
+  <script src="dictionary-policy.js"></script>
   <script src="solver.js"></script>
   <script src="renderer.js"></script>
   <script src="ui.js"></script>
