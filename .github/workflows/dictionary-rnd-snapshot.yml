@@ -39,3 +39,5 @@ jobs:
             docs/*.md
           if-no-files-found: error
           retention-days: 1
+
+# Trigger commit after workflow creation.
