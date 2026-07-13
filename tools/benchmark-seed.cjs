@@ -13,6 +13,7 @@ for (const file of [
   "core.js",
   "dictionary-policy.js",
   "solver.js",
+  "closed-fill.js",
 ]) {
   require(path.join(root, file));
 }
@@ -26,11 +27,15 @@ console.log(JSON.stringify({
   seed,
   elapsedMs: Date.now() - started,
   validation: result.validation,
+  validationReport: result.validationReport,
   answers: result.placed.length,
   crossings: result.intersections,
   activePercent: +(result.fillRatio * 100).toFixed(1),
   answerPercent: +(result.answerCoverage * 100).toFixed(1),
+  rawLetterPercent: +(result.rawLetterCoverage * 100).toFixed(1),
+  letterCells: result.letterCells,
   panelCells: result.panelCells,
+  residualRegions: result.residualRegions?.length || 0,
   components: result.components,
   clueTextCells: result.clueTextCells,
   externalClues: result.externalClueTexts,
@@ -42,4 +47,8 @@ console.log(JSON.stringify({
   poolEntries: result.poolEntries,
   exactCluesOnly: result.placed.every((entry) => entry.hasExactClue),
   coverageCheckpointPassed: Boolean(result.coverageCheckpoint?.passed),
+  closedFillMode: result.closedFill?.mode || "unavailable",
+  closedFillRegionsSolved: result.closedFill?.regionsSolved || 0,
+  panelsBeforeClosedFill: result.closedFill?.panelsBefore ?? result.panelCells,
+  panelsAfterClosedFill: result.closedFill?.panelsAfter ?? result.panelCells,
 }));
