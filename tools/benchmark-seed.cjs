@@ -14,6 +14,7 @@ for (const file of [
   "dictionary-policy.js",
   "solver.js",
   "closed-fill.js",
+  "closed-fill-rollback.js",
 ]) {
   require(path.join(root, file));
 }
@@ -48,7 +49,7 @@ console.log(JSON.stringify({
   exactCluesOnly: result.placed.every((entry) => entry.hasExactClue),
   coverageCheckpointPassed: Boolean(result.coverageCheckpoint?.passed),
   closedFillMode: result.closedFill?.mode || "unavailable",
-  closedFillError: result.closedFill?.error || null,
+  closedFillError: result.closedFill?.error || result.closedFill?.rollbackError || null,
   closedFillRegionsAttempted: result.closedFill?.regionsAttempted || 0,
   closedFillRegionsSolved: result.closedFill?.regionsSolved || 0,
   closedFillSlotsEnumerated: result.closedFill?.slotsEnumerated || 0,
@@ -56,6 +57,13 @@ console.log(JSON.stringify({
   closedFillCspNodes: result.closedFill?.cspNodes || 0,
   closedFillForwardPrunes: result.closedFill?.forwardPrunes || 0,
   closedFillPatternChecks: result.closedFill?.patternChecks || 0,
+  rollbackDepthUsed: result.closedFill?.rollbackDepthUsed || 0,
+  rollbackWordsTried: result.closedFill?.rollbackWordsTried || 0,
+  rollbackCandidatesAccepted: result.closedFill?.rollbackCandidatesAccepted || 0,
+  rollbackSlotsEnumerated: result.closedFill?.rollbackSlotsEnumerated || 0,
+  rollbackTopologiesTried: result.closedFill?.rollbackTopologiesTried || 0,
+  rollbackCspNodes: result.closedFill?.rollbackCspNodes || 0,
+  rollbackPatternChecks: result.closedFill?.rollbackPatternChecks || 0,
   panelsBeforeClosedFill: result.closedFill?.panelsBefore ?? result.panelCells,
   panelsAfterClosedFill: result.closedFill?.panelsAfter ?? result.panelCells,
 }));
