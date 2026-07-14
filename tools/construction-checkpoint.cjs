@@ -30,6 +30,12 @@ function runSeed(index) {
       SCANWORD_VICTIM_SECONDARY_WORDS: process.env.SCANWORD_VICTIM_SECONDARY_WORDS || "3",
       SCANWORD_VICTIM_SECONDARY_VARIANTS: process.env.SCANWORD_VICTIM_SECONDARY_VARIANTS || "4",
       SCANWORD_VICTIM_SECONDARY_FINALISTS: process.env.SCANWORD_VICTIM_SECONDARY_FINALISTS || "6",
+      SCANWORD_TARGETED_VICTIM_REGIONS: process.env.SCANWORD_TARGETED_VICTIM_REGIONS || "3",
+      SCANWORD_TARGETED_VICTIM_WORDS: process.env.SCANWORD_TARGETED_VICTIM_WORDS || "4",
+      SCANWORD_TARGETED_VICTIM_DEPTH: process.env.SCANWORD_TARGETED_VICTIM_DEPTH || "2",
+      SCANWORD_TARGETED_VICTIM_BEAM: process.env.SCANWORD_TARGETED_VICTIM_BEAM || "5",
+      SCANWORD_TARGETED_VICTIM_BRANCHING: process.env.SCANWORD_TARGETED_VICTIM_BRANCHING || "18",
+      SCANWORD_TARGETED_VICTIM_VARIANTS: process.env.SCANWORD_TARGETED_VICTIM_VARIANTS || "8",
       SCANWORD_REPACK_NODES: process.env.SCANWORD_REPACK_NODES || "600000",
       SCANWORD_REPACK_CANDIDATES: process.env.SCANWORD_REPACK_CANDIDATES || "24",
       SCANWORD_REPACK_BRANCH: process.env.SCANWORD_REPACK_BRANCH || "24",
@@ -64,6 +70,8 @@ function runSeed(index) {
         if (sample.components !== 1) throw new Error("disconnected answer graph");
         if (!sample.exactCluesOnly) throw new Error("fallback clue detected");
         if (!sample.coverageCheckpointPassed) throw new Error("preserved production checkpoint failed");
+        const guardSelected = sample.constructionV2?.baselineGuard?.selected || "portfolio";
+        const targeted = sample.constructionV2?.targetedVictim || null;
         samples[index] = {
           type: "seed",
           index,
@@ -75,6 +83,15 @@ function runSeed(index) {
           externalClues: sample.externalClues,
           elapsedMs: sample.elapsedMs,
           victimDepth: Number(sample.constructionV2?.selectedVictimReplacement?.depth || 0),
+          targetedVictimAttempted: Boolean(targeted?.attempted && guardSelected !== "legacy"),
+          targetedVictimAccepted: Boolean(targeted?.accepted && guardSelected !== "legacy"),
+          targetedVictimGain: Number(targeted?.panelsBefore != null && targeted?.panelsAfter != null
+            ? targeted.panelsBefore - targeted.panelsAfter
+            : 0),
+          targetedVictimsRolledBack: Number(targeted?.search?.victimsRolledBack || 0),
+          targetedStatesAccepted: Number(targeted?.search?.statesAccepted || 0),
+          targetedFinalistsEvaluated: Number(targeted?.finalistsEvaluated || 0),
+          targetedSelectedVictim: targeted?.selected?.victimAnswer || null,
           clueRepackAccepted: Boolean(sample.constructionV2?.clueRepack?.accepted),
           adaptiveClueRepackAccepted: Boolean(sample.constructionV2?.adaptiveClueRepack?.accepted),
           clueTailAccepted: Boolean(sample.constructionV2?.clueTailAbsorption?.accepted),
@@ -120,6 +137,12 @@ async function workerLoop() {
       averageAnswers: average(samples.map((sample) => sample.answers)),
       averageElapsedMs: average(samples.map((sample) => sample.elapsedMs)),
       victimSelectedSeeds: samples.filter((sample) => sample.victimDepth > 0).length,
+      targetedVictimAttemptedSeeds: samples.filter((sample) => sample.targetedVictimAttempted).length,
+      targetedVictimAcceptedSeeds: samples.filter((sample) => sample.targetedVictimAccepted).length,
+      averageTargetedVictimGain: average(samples.map((sample) => sample.targetedVictimGain)),
+      averageTargetedVictimsRolledBack: average(samples.map((sample) => sample.targetedVictimsRolledBack)),
+      averageTargetedStatesAccepted: average(samples.map((sample) => sample.targetedStatesAccepted)),
+      averageTargetedFinalistsEvaluated: average(samples.map((sample) => sample.targetedFinalistsEvaluated)),
       clueRepackAcceptedSeeds: samples.filter((sample) => sample.clueRepackAccepted).length,
       adaptiveClueRepackAcceptedSeeds: samples.filter((sample) => sample.adaptiveClueRepackAccepted).length,
       clueTailAcceptedSeeds: samples.filter((sample) => sample.clueTailAccepted).length,
