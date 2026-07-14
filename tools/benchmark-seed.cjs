@@ -28,6 +28,7 @@ for (const file of [
   "construction-clue-reflow.js",
   "construction-clue-pair-reflow.js",
   "construction-victim-targeted.js",
+  "construction-victim-targeted-exact.js",
   "construction-guard.js",
 ]) {
   require(path.join(root, file));
