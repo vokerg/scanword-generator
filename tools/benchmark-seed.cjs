@@ -24,6 +24,7 @@ for (const file of [
   "construction-polish.js",
   "construction-clue-repack.js",
   "construction-clue-adaptive.js",
+  "construction-clue-tail.js",
   "construction-guard.js",
 ]) {
   require(path.join(root, file));
