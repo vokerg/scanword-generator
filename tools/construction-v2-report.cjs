@@ -29,6 +29,10 @@ function run(seed, mode) {
       SCANWORD_TARGETED_VICTIM_BEAM: process.env.SCANWORD_TARGETED_VICTIM_BEAM || "5",
       SCANWORD_TARGETED_VICTIM_BRANCHING: process.env.SCANWORD_TARGETED_VICTIM_BRANCHING || "18",
       SCANWORD_TARGETED_VICTIM_VARIANTS: process.env.SCANWORD_TARGETED_VICTIM_VARIANTS || "8",
+      SCANWORD_TARGETED_EXACT_VARIANTS: process.env.SCANWORD_TARGETED_EXACT_VARIANTS || "4",
+      SCANWORD_TARGETED_EXACT_REPACK_NODES: process.env.SCANWORD_TARGETED_EXACT_REPACK_NODES || "120000",
+      SCANWORD_TARGETED_EXACT_REPACK_CANDIDATES: process.env.SCANWORD_TARGETED_EXACT_REPACK_CANDIDATES || "20",
+      SCANWORD_TARGETED_EXACT_REPACK_BRANCH: process.env.SCANWORD_TARGETED_EXACT_REPACK_BRANCH || "14",
       SCANWORD_REPACK_NODES: process.env.SCANWORD_REPACK_NODES || "60000",
       SCANWORD_REPACK_CANDIDATES: process.env.SCANWORD_REPACK_CANDIDATES || "24",
       SCANWORD_REPACK_BRANCH: process.env.SCANWORD_REPACK_BRANCH || "10",
@@ -57,6 +61,7 @@ for (let index = 0; index < runCount; index += 1) {
   const v2 = run(seed, "portfolio");
   const victim = v2.constructionV2?.victimReplacement || v2.constructionV2?.victim || null;
   const targeted = v2.constructionV2?.targetedVictim || null;
+  const exact = v2.constructionV2?.targetedExactVictim || null;
   const repack = v2.constructionV2?.clueRepack || null;
   const adaptive = v2.constructionV2?.adaptiveClueRepack || null;
   const tail = v2.constructionV2?.clueTailAbsorption || null;
@@ -98,6 +103,17 @@ for (let index = 0; index < runCount; index += 1) {
     targetedBundlesTried: Number(targeted?.search?.bundlesTried || 0),
     targetedFinalistsEvaluated: Number(targeted?.finalistsEvaluated || 0),
     targetedSelectedVictim: targeted?.selected?.victimAnswer || null,
+    targetedExactVictimAttempted: Boolean(exact?.attempted && guardSelected !== "legacy"),
+    targetedExactVictimAccepted: Boolean(exact?.accepted && guardSelected !== "legacy"),
+    targetedExactVictimGain: Number(exact?.panelsBefore != null && exact?.panelsAfter != null
+      ? exact.panelsBefore - exact.panelsAfter
+      : 0),
+    targetedExactStructuralVariants: Number(exact?.structuralVariants || 0),
+    targetedExactFinalistsEvaluated: Number(exact?.finalistsEvaluated || 0),
+    targetedExactFinalistsPassingCheckpoint: Number(exact?.finalistsPassingCheckpoint || 0),
+    targetedExactImprovingFinalists: Number(exact?.exactImprovingFinalists || 0),
+    targetedExactSelectedVictim: exact?.selected?.victimAnswer || null,
+    targetedExactStagePanelGain: exact?.stagePanelGain || {},
     clueRepackAccepted: Boolean(repack?.accepted && guardSelected !== "legacy"),
     clueRepackNodes: repack?.nodes || 0,
     clueRepackGain: Number(repack?.baselineClueTextCells != null && repack?.optimizedClueTextCells != null
@@ -138,7 +154,7 @@ const regressed = samples.filter((sample) => sample.panelDelta > 0).length;
 const fallbacks = samples.filter((sample) => sample.v2Fallback).length;
 console.log(JSON.stringify({
   type: "summary",
-  diagnostic: "identical attempt seeds; global victim replacement, targeted residual victim search, exact/adaptive clue packing, tail absorption, local clue reflow and exact legacy guard",
+  diagnostic: "identical attempt seeds; global victim replacement, monotonic targeted residual search, exact targeted postprocessing, clue packing/reflow and exact legacy guard",
   runs: samples.length,
   validLegacy: samples.length,
   validV2: samples.length,
@@ -164,6 +180,13 @@ console.log(JSON.stringify({
   averageTargetedStatesAccepted: average(samples.map((sample) => sample.targetedStatesAccepted)),
   averageTargetedBundlesTried: average(samples.map((sample) => sample.targetedBundlesTried)),
   averageTargetedFinalistsEvaluated: average(samples.map((sample) => sample.targetedFinalistsEvaluated)),
+  targetedExactVictimAttemptedSeeds: samples.filter((sample) => sample.targetedExactVictimAttempted).length,
+  targetedExactVictimAcceptedSeeds: samples.filter((sample) => sample.targetedExactVictimAccepted).length,
+  averageTargetedExactVictimGain: average(samples.map((sample) => sample.targetedExactVictimGain)),
+  averageTargetedExactStructuralVariants: average(samples.map((sample) => sample.targetedExactStructuralVariants)),
+  averageTargetedExactFinalistsEvaluated: average(samples.map((sample) => sample.targetedExactFinalistsEvaluated)),
+  averageTargetedExactFinalistsPassingCheckpoint: average(samples.map((sample) => sample.targetedExactFinalistsPassingCheckpoint)),
+  averageTargetedExactImprovingFinalists: average(samples.map((sample) => sample.targetedExactImprovingFinalists)),
   clueRepackAcceptedSeeds: samples.filter((sample) => sample.clueRepackAccepted).length,
   averageClueRepackGain: average(samples.map((sample) => sample.clueRepackGain)),
   averageClueRepackNodes: average(samples.map((sample) => sample.clueRepackNodes)),
