@@ -18,6 +18,13 @@
         solver.__constructionClueReflowLoadError = String(error?.stack || error);
       }
     }
+    if (!solver.__constructionCluePairReflowInstalled) {
+      try {
+        require("./construction-clue-pair-reflow.js");
+      } catch (error) {
+        solver.__constructionCluePairReflowLoadError = String(error?.stack || error);
+      }
+    }
   }
   const previousGenerateBest = solver.generateBest.bind(solver);
 
