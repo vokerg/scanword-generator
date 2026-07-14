@@ -89,7 +89,7 @@
         supplementalShortFillEntries: supplemental.length,
         supplementalShortFillStates: supplementalStates,
         weakFillBudget: baselineWeak,
-        weakFillBudgetRejected,
+        weakFillBudgetRejected: weakBudgetRejected,
         statesAcceptedBeforeWeakBudget: (searched.states || []).length,
         statesAccepted: states.length,
       },
