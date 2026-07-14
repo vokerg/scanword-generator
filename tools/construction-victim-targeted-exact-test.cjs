@@ -108,6 +108,9 @@ window.ScanwordSolver = {
   absorbResidualPanels(result) { return result; },
   reflowClueFootprints(result) { return result; },
   pairReflowClueFootprints(result) { return result; },
+  // This fixture isolates exact postprocessing. The supplemental wrapper has
+  // its own deterministic test and is exercised again by the full CI pipeline.
+  __constructionTargetedDemandInstalled: true,
 };
 
 require(path.resolve(__dirname, "..", "construction-victim-targeted-exact.js"));
