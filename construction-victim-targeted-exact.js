@@ -35,6 +35,17 @@
     return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
   }
 
+  function nonNegativeOption(name, fallback) {
+    const raw = typeof process !== "undefined" ? process?.env?.[name] : undefined;
+    const value = Number(raw);
+    return Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback;
+  }
+
+  function flagOption(name) {
+    const raw = typeof process !== "undefined" ? process?.env?.[name] : window[name];
+    return raw === true || raw === "1" || raw === "on" || raw === "true";
+  }
+
   function cloneCell(cell) {
     return {
       ...cell,
@@ -164,10 +175,31 @@
     });
   }
 
+  function applySmallTailBudgets(options) {
+    options.maxRegions = Math.min(options.maxRegions, numericOption("SCANWORD_ZERO_PANEL_REGIONS", 1));
+    options.maxVictimsPerRegion = Math.min(options.maxVictimsPerRegion, numericOption("SCANWORD_ZERO_PANEL_WORDS", 2));
+    options.depth = Math.min(options.depth, numericOption("SCANWORD_ZERO_PANEL_DEPTH", 1));
+    options.beamWidth = Math.min(options.beamWidth, numericOption("SCANWORD_ZERO_PANEL_BEAM", 3));
+    options.branching = Math.min(options.branching, numericOption("SCANWORD_ZERO_PANEL_BRANCHING", 8));
+    options.maxVariants = Math.min(options.maxVariants, numericOption("SCANWORD_ZERO_PANEL_VARIANTS", 2));
+    options.maxSlotCandidates = Math.min(options.maxSlotCandidates, numericOption("SCANWORD_ZERO_PANEL_SLOT_CANDIDATES", 120));
+    options.maxDomainSize = Math.min(options.maxDomainSize, numericOption("SCANWORD_ZERO_PANEL_DOMAIN", 64));
+    options.maxSlots = Math.min(options.maxSlots, numericOption("SCANWORD_ZERO_PANEL_SLOTS", 20));
+    options.valuesPerSlot = Math.min(options.valuesPerSlot, numericOption("SCANWORD_ZERO_PANEL_VALUES", 2));
+    options.maxMoves = Math.min(options.maxMoves, numericOption("SCANWORD_ZERO_PANEL_MOVES", 18));
+    options.clueRestarts = Math.min(options.clueRestarts, numericOption("SCANWORD_ZERO_PANEL_CLUE_RESTARTS", 60));
+    options.repackNodes = Math.min(options.repackNodes, numericOption("SCANWORD_ZERO_PANEL_REPACK_NODES", 30000));
+    options.repackCandidates = Math.min(options.repackCandidates, numericOption("SCANWORD_ZERO_PANEL_REPACK_CANDIDATES", 12));
+    options.repackBranch = Math.min(options.repackBranch, numericOption("SCANWORD_ZERO_PANEL_REPACK_BRANCH", 8));
+    return options;
+  }
+
   solver.generateBest = (...args) => {
     const generated = previousGenerateBest(...args);
     if (modeFromEnvironment() !== "portfolio") return generated;
-    const threshold = numericOption("SCANWORD_TARGETED_EXACT_PANELS", 8);
+    const zeroPanelPass = flagOption("SCANWORD_ZERO_PANEL_PASS");
+    const threshold = nonNegativeOption("SCANWORD_TARGETED_EXACT_PANELS", zeroPanelPass ? 0 : 8);
+    const smallTail = zeroPanelPass && generated.panelCells > 0 && generated.panelCells <= 8;
     const options = {
       maxRegions: numericOption("SCANWORD_TARGETED_EXACT_REGIONS", 3),
       maxVictimsPerRegion: numericOption("SCANWORD_TARGETED_EXACT_WORDS", 4),
@@ -187,8 +219,11 @@
       repackCandidates: numericOption("SCANWORD_TARGETED_EXACT_REPACK_CANDIDATES", 20),
       repackBranch: numericOption("SCANWORD_TARGETED_EXACT_REPACK_BRANCH", 14),
     };
+    if (smallTail) applySmallTailBudgets(options);
     const telemetry = {
-      mode: "targeted-residual-victim-exact-v1",
+      mode: "targeted-residual-victim-exact-v2",
+      profile: smallTail ? "zero-panel-small-tail" : "checkpoint-tail",
+      zeroPanelPass,
       thresholdPanels: threshold,
       panelsBefore: generated.panelCells,
       panelsAfter: generated.panelCells,
@@ -203,7 +238,11 @@
       stageRuns: {},
       stagePanelGain: {},
       budgets: {
+        regions: options.maxRegions,
+        victimsPerRegion: options.maxVictimsPerRegion,
+        depth: options.depth,
         variants: options.maxVariants,
+        clueRestarts: options.clueRestarts,
         repackNodes: options.repackNodes,
         repackCandidates: options.repackCandidates,
         repackBranch: options.repackBranch,
