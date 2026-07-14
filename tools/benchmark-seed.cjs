@@ -21,6 +21,7 @@ for (const file of [
   "construction-victim.js",
   "construction-victim-depth2.js",
   "construction-portfolio.js",
+  "construction-victim-targeted.js",
   "construction-polish.js",
   "construction-clue-repack.js",
   "construction-clue-adaptive.js",
