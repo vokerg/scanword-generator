@@ -52,6 +52,7 @@ for (let index = 0; index < runCount; index += 1) {
   const victim = v2.constructionV2?.victimReplacement || v2.constructionV2?.victim || null;
   const repack = v2.constructionV2?.clueRepack || null;
   const adaptive = v2.constructionV2?.adaptiveClueRepack || null;
+  const tail = v2.constructionV2?.clueTailAbsorption || null;
   const guardSelected = v2.constructionV2?.baselineGuard?.selected || "portfolio";
   const selectedVictim = guardSelected !== "legacy" ? v2.constructionV2?.selectedVictimReplacement : null;
   const row = {
@@ -90,6 +91,13 @@ for (let index = 0; index < runCount; index += 1) {
       ? adaptive.panelsBefore - adaptive.panelsAfter
       : 0),
     adaptiveNodes: adaptive?.inner?.nodes || 0,
+    clueTailAttempted: Boolean(tail?.attempted && guardSelected !== "legacy"),
+    clueTailAccepted: Boolean(tail?.accepted && guardSelected !== "legacy"),
+    clueTailGain: Number(tail?.panelsBefore != null && tail?.panelsAfter != null
+      ? tail.panelsBefore - tail.panelsAfter
+      : 0),
+    clueTailNodes: tail?.nodes || 0,
+    clueTailExpandedFootprints: tail?.expandedFootprints || 0,
     v2Telemetry: v2.constructionV2,
     legacyMs: legacy.elapsedMs,
     v2Ms: v2.elapsedMs,
@@ -104,7 +112,7 @@ const regressed = samples.filter((sample) => sample.panelDelta > 0).length;
 const fallbacks = samples.filter((sample) => sample.v2Fallback).length;
 console.log(JSON.stringify({
   type: "summary",
-  diagnostic: "identical attempt seeds; victim replacement, exact component clue packing, adaptive four-cell footprint pass and exact legacy guard",
+  diagnostic: "identical attempt seeds; victim replacement, exact component clue packing, adaptive four-cell footprint pass, rectangular clue-tail absorption and exact legacy guard",
   runs: samples.length,
   validLegacy: samples.length,
   validV2: samples.length,
@@ -129,6 +137,11 @@ console.log(JSON.stringify({
   adaptiveClueRepackAcceptedSeeds: samples.filter((sample) => sample.adaptiveClueRepackAccepted).length,
   averageAdaptivePanelGain: average(samples.map((sample) => sample.adaptivePanelGain)),
   averageAdaptiveNodes: average(samples.map((sample) => sample.adaptiveNodes)),
+  clueTailAttemptedSeeds: samples.filter((sample) => sample.clueTailAttempted).length,
+  clueTailAcceptedSeeds: samples.filter((sample) => sample.clueTailAccepted).length,
+  averageClueTailGain: average(samples.map((sample) => sample.clueTailGain)),
+  averageClueTailNodes: average(samples.map((sample) => sample.clueTailNodes)),
+  averageClueTailExpandedFootprints: average(samples.map((sample) => sample.clueTailExpandedFootprints)),
   averageVictimBasesExpanded: average(samples.map((sample) => sample.victimBasesExpanded)),
   averageVictimStatesAccepted: average(samples.map((sample) => sample.victimStatesAccepted)),
   averageVictimFinalists: average(samples.map((sample) => sample.victimFinalists)),
