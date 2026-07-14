@@ -126,10 +126,24 @@ jobs:
           SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
         run: node tools/construction-checkpoint.cjs 100 > construction-checkpoint.jsonl
 
+      - name: Render enforced checkpoint scanword
+        env:
+          SCANWORD_PORTFOLIO_ATTEMPTS: 240
+          SCANWORD_REPACK_NODES: 600000
+          SCANWORD_REPACK_BRANCH: 24
+          SCANWORD_TARGETED_VICTIM_REGIONS: 3
+          SCANWORD_TARGETED_VICTIM_WORDS: 4
+          SCANWORD_TARGETED_VICTIM_DEPTH: 2
+          SCANWORD_TARGETED_EXACT_VARIANTS: 4
+          SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
+        run: node tools/construction-checkpoint-visual.cjs construction-checkpoint.jsonl construction-checkpoint-visual
+
       - name: Publish 100-seed checkpoint
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: construction-checkpoint-100
-          path: construction-checkpoint.jsonl
+          path: |
+            construction-checkpoint.jsonl
+            construction-checkpoint-visual/
           if-no-files-found: warn
