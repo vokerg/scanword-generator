@@ -23,6 +23,9 @@ function run(seed, mode) {
       SCANWORD_VICTIM_SECONDARY_WORDS: process.env.SCANWORD_VICTIM_SECONDARY_WORDS || "3",
       SCANWORD_VICTIM_SECONDARY_VARIANTS: process.env.SCANWORD_VICTIM_SECONDARY_VARIANTS || "4",
       SCANWORD_VICTIM_SECONDARY_FINALISTS: process.env.SCANWORD_VICTIM_SECONDARY_FINALISTS || "6",
+      SCANWORD_REPACK_NODES: process.env.SCANWORD_REPACK_NODES || "60000",
+      SCANWORD_REPACK_CANDIDATES: process.env.SCANWORD_REPACK_CANDIDATES || "24",
+      SCANWORD_REPACK_BRANCH: process.env.SCANWORD_REPACK_BRANCH || "10",
     });
   }
   const child = spawnSync(process.execPath, [worker, seed], {
@@ -47,6 +50,7 @@ for (let index = 0; index < runCount; index += 1) {
   const legacy = run(seed, "legacy");
   const v2 = run(seed, "portfolio");
   const victim = v2.constructionV2?.victimReplacement || v2.constructionV2?.victim || null;
+  const repack = v2.constructionV2?.clueRepack || null;
   const guardSelected = v2.constructionV2?.baselineGuard?.selected || "portfolio";
   const selectedVictim = guardSelected !== "legacy" ? v2.constructionV2?.selectedVictimReplacement : null;
   const row = {
@@ -59,6 +63,8 @@ for (let index = 0; index < runCount; index += 1) {
     rawDelta: +(v2.rawLetterPercent - legacy.rawLetterPercent).toFixed(1),
     legacyAnswers: legacy.answers,
     v2Answers: v2.answers,
+    legacyClueTextCells: legacy.clueTextCells,
+    v2ClueTextCells: v2.clueTextCells,
     v2Mode: v2.constructionMode,
     v2Fallback: v2.constructionV2?.mode === "portfolio-fallback",
     victimSelected: Boolean(selectedVictim),
@@ -71,6 +77,11 @@ for (let index = 0; index < runCount; index += 1) {
     secondaryVictimsRemoved: victim?.secondaryVictimsRemoved || 0,
     secondaryStatesAccepted: victim?.secondaryStatesAccepted || 0,
     secondaryFinalists: victim?.secondaryFinalists || 0,
+    clueRepackAccepted: Boolean(repack?.accepted && guardSelected !== "legacy"),
+    clueRepackNodes: repack?.nodes || 0,
+    clueRepackGain: Number(repack?.baselineClueTextCells != null && repack?.optimizedClueTextCells != null
+      ? repack.optimizedClueTextCells - repack.baselineClueTextCells
+      : 0),
     v2Telemetry: v2.constructionV2,
     legacyMs: legacy.elapsedMs,
     v2Ms: v2.elapsedMs,
@@ -85,7 +96,7 @@ const regressed = samples.filter((sample) => sample.panelDelta > 0).length;
 const fallbacks = samples.filter((sample) => sample.v2Fallback).length;
 console.log(JSON.stringify({
   type: "summary",
-  diagnostic: "identical attempt seeds; primary victim finalists preserved, bounded secondary finalists added before clue packing; exact legacy baseline guard",
+  diagnostic: "identical attempt seeds; primary victim finalists preserved, bounded secondary finalists and exact clue-footprint repacking; exact legacy baseline guard",
   runs: samples.length,
   validLegacy: samples.length,
   validV2: samples.length,
@@ -95,12 +106,17 @@ console.log(JSON.stringify({
   maximumV2Panels: Math.max(...samples.map((sample) => sample.v2Panels)),
   averageLegacyRaw: average(samples.map((sample) => sample.legacyRaw)),
   averageV2Raw: average(samples.map((sample) => sample.v2Raw)),
+  averageLegacyClueTextCells: average(samples.map((sample) => sample.legacyClueTextCells)),
+  averageV2ClueTextCells: average(samples.map((sample) => sample.v2ClueTextCells)),
   improvedSeeds: improved,
   regressedSeeds: regressed,
   unchangedSeeds: samples.length - improved - regressed,
   v2Fallbacks: fallbacks,
   victimSelectedSeeds: samples.filter((sample) => sample.victimSelected).length,
   depthTwoSelectedSeeds: samples.filter((sample) => sample.selectedVictimDepth === 2).length,
+  clueRepackAcceptedSeeds: samples.filter((sample) => sample.clueRepackAccepted).length,
+  averageClueRepackGain: average(samples.map((sample) => sample.clueRepackGain)),
+  averageClueRepackNodes: average(samples.map((sample) => sample.clueRepackNodes)),
   averageVictimBasesExpanded: average(samples.map((sample) => sample.victimBasesExpanded)),
   averageVictimStatesAccepted: average(samples.map((sample) => sample.victimStatesAccepted)),
   averageVictimFinalists: average(samples.map((sample) => sample.victimFinalists)),
