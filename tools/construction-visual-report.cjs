@@ -17,8 +17,8 @@ for (const file of [
   "construction-polish.js", "construction-clue-repack.js", "construction-clue-adaptive.js",
   "construction-clue-tail.js", "construction-clue-reflow.js", "construction-clue-pair-reflow.js",
   "targeted-short-fill.js", "construction-victim-targeted.js", "construction-victim-targeted-demand.js",
-  "construction-victim-targeted-pair.js", "construction-victim-targeted-disconnected.js",
-  "construction-victim-targeted-exact.js", "construction-guard.js", "renderer.js",
+  "construction-victim-targeted-pair.js", "construction-victim-targeted-exact.js",
+  "construction-guard.js", "renderer.js",
 ]) require(path.join(root, file));
 
 const rows = fs.readFileSync(reportPath, "utf8").split(/\r?\n/).filter(Boolean).map(JSON.parse);
