@@ -3,6 +3,7 @@
 const assert = require("node:assert/strict");
 const path = require("node:path");
 global.window = global;
+process.env.SCANWORD_REFLOW_ADD = "1";
 
 function coverage(grid) {
   const totalCells = grid.length * grid[0].length;
