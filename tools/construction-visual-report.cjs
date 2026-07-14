@@ -30,6 +30,7 @@ for (const file of [
   "construction-portfolio.js",
   "construction-polish.js",
   "construction-clue-repack.js",
+  "construction-clue-adaptive.js",
   "construction-guard.js",
   "renderer.js",
 ]) require(path.join(root, file));
@@ -105,7 +106,7 @@ function renderComparisonChart() {
   });
 
   parts.push(`<rect x="${margin.left}" y="${height - 25}" width="12" height="12" rx="2" fill="#98a2b3"/><text x="${margin.left + 18}" y="${height - 15}" font-family="Arial, sans-serif" font-size="12" fill="#475467">legacy</text>`);
-  parts.push(`<rect x="${margin.left + 88}" y="${height - 25}" width="12" height="12" rx="2" fill="#12b76a"/><text x="${margin.left + 106}" y="${height - 15}" font-family="Arial, sans-serif" font-size="12" fill="#475467">portfolio + victim + exact repack</text>`);
+  parts.push(`<rect x="${margin.left + 88}" y="${height - 25}" width="12" height="12" rx="2" fill="#12b76a"/><text x="${margin.left + 106}" y="${height - 15}" font-family="Arial, sans-serif" font-size="12" fill="#475467">portfolio + victim + exact/adaptive repack</text>`);
   parts.push("</svg>");
   return parts.join("");
 }
@@ -153,6 +154,7 @@ for (const sample of selectedSamples()) {
     legacyLetters: legacy.letterCells,
     portfolioLetters: portfolio.letterCells,
     repackAccepted: Boolean(portfolio.constructionV2?.clueRepack?.accepted),
+    adaptiveRepackAccepted: Boolean(portfolio.constructionV2?.adaptiveClueRepack?.accepted),
     victimDepth: Number(portfolio.constructionV2?.selectedVictimReplacement?.depth || 0),
   });
 }
@@ -176,7 +178,7 @@ const html = `<!doctype html>
 <div class="stat"><strong>${summary.improvedSeeds}/${summary.runs}</strong><span>seed улучшены</span></div>
 </div></section>
 <section class="chart"><img src="${chartName}" alt="Сравнение числа остаточных панелей по seed"/></section>
-<section class="grid">${cards.map((card) => `<article class="card"><h2>${escapeHtml(card.seed)}</h2><div class="meta">Панели ${card.legacyPanels} → ${card.portfolioPanels}; буквы ${card.legacyLetters} → ${card.portfolioLetters}; victim depth ${card.victimDepth}; repack ${card.repackAccepted ? "принят" : "не понадобился"}.</div><div class="pair"><div class="panel"><h3>Legacy</h3><img src="${card.legacyName}" alt="Legacy grid ${escapeHtml(card.seed)}"/></div><div class="panel"><h3>Portfolio / exact repack</h3><img src="${card.portfolioName}" alt="Portfolio grid ${escapeHtml(card.seed)}"/></div></div></article>`).join("")}</section>
+<section class="grid">${cards.map((card) => `<article class="card"><h2>${escapeHtml(card.seed)}</h2><div class="meta">Панели ${card.legacyPanels} → ${card.portfolioPanels}; буквы ${card.legacyLetters} → ${card.portfolioLetters}; victim depth ${card.victimDepth}; exact repack ${card.repackAccepted ? "принят" : "не понадобился"}; adaptive repack ${card.adaptiveRepackAccepted ? "принят" : "не понадобился"}.</div><div class="pair"><div class="panel"><h3>Legacy</h3><img src="${card.legacyName}" alt="Legacy grid ${escapeHtml(card.seed)}"/></div><div class="panel"><h3>Portfolio / exact repack</h3><img src="${card.portfolioName}" alt="Portfolio grid ${escapeHtml(card.seed)}"/></div></div></article>`).join("")}</section>
 </main></body></html>`;
 
 fs.writeFileSync(path.join(outputDir, "index.html"), html);
