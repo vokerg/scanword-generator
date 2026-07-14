@@ -23,6 +23,12 @@ function run(seed, mode) {
       SCANWORD_VICTIM_SECONDARY_WORDS: process.env.SCANWORD_VICTIM_SECONDARY_WORDS || "3",
       SCANWORD_VICTIM_SECONDARY_VARIANTS: process.env.SCANWORD_VICTIM_SECONDARY_VARIANTS || "4",
       SCANWORD_VICTIM_SECONDARY_FINALISTS: process.env.SCANWORD_VICTIM_SECONDARY_FINALISTS || "6",
+      SCANWORD_TARGETED_VICTIM_REGIONS: process.env.SCANWORD_TARGETED_VICTIM_REGIONS || "3",
+      SCANWORD_TARGETED_VICTIM_WORDS: process.env.SCANWORD_TARGETED_VICTIM_WORDS || "4",
+      SCANWORD_TARGETED_VICTIM_DEPTH: process.env.SCANWORD_TARGETED_VICTIM_DEPTH || "2",
+      SCANWORD_TARGETED_VICTIM_BEAM: process.env.SCANWORD_TARGETED_VICTIM_BEAM || "5",
+      SCANWORD_TARGETED_VICTIM_BRANCHING: process.env.SCANWORD_TARGETED_VICTIM_BRANCHING || "18",
+      SCANWORD_TARGETED_VICTIM_VARIANTS: process.env.SCANWORD_TARGETED_VICTIM_VARIANTS || "8",
       SCANWORD_REPACK_NODES: process.env.SCANWORD_REPACK_NODES || "60000",
       SCANWORD_REPACK_CANDIDATES: process.env.SCANWORD_REPACK_CANDIDATES || "24",
       SCANWORD_REPACK_BRANCH: process.env.SCANWORD_REPACK_BRANCH || "10",
@@ -50,6 +56,7 @@ for (let index = 0; index < runCount; index += 1) {
   const legacy = run(seed, "legacy");
   const v2 = run(seed, "portfolio");
   const victim = v2.constructionV2?.victimReplacement || v2.constructionV2?.victim || null;
+  const targeted = v2.constructionV2?.targetedVictim || null;
   const repack = v2.constructionV2?.clueRepack || null;
   const adaptive = v2.constructionV2?.adaptiveClueRepack || null;
   const tail = v2.constructionV2?.clueTailAbsorption || null;
@@ -80,6 +87,17 @@ for (let index = 0; index < runCount; index += 1) {
     secondaryVictimsRemoved: victim?.secondaryVictimsRemoved || 0,
     secondaryStatesAccepted: victim?.secondaryStatesAccepted || 0,
     secondaryFinalists: victim?.secondaryFinalists || 0,
+    targetedVictimAttempted: Boolean(targeted?.attempted && guardSelected !== "legacy"),
+    targetedVictimAccepted: Boolean(targeted?.accepted && guardSelected !== "legacy"),
+    targetedVictimGain: Number(targeted?.panelsBefore != null && targeted?.panelsAfter != null
+      ? targeted.panelsBefore - targeted.panelsAfter
+      : 0),
+    targetedVictimRegions: Number(targeted?.search?.regionsConsidered || 0),
+    targetedVictimsRolledBack: Number(targeted?.search?.victimsRolledBack || 0),
+    targetedStatesAccepted: Number(targeted?.search?.statesAccepted || 0),
+    targetedBundlesTried: Number(targeted?.search?.bundlesTried || 0),
+    targetedFinalistsEvaluated: Number(targeted?.finalistsEvaluated || 0),
+    targetedSelectedVictim: targeted?.selected?.victimAnswer || null,
     clueRepackAccepted: Boolean(repack?.accepted && guardSelected !== "legacy"),
     clueRepackNodes: repack?.nodes || 0,
     clueRepackGain: Number(repack?.baselineClueTextCells != null && repack?.optimizedClueTextCells != null
@@ -120,7 +138,7 @@ const regressed = samples.filter((sample) => sample.panelDelta > 0).length;
 const fallbacks = samples.filter((sample) => sample.v2Fallback).length;
 console.log(JSON.stringify({
   type: "summary",
-  diagnostic: "identical attempt seeds; victim replacement, exact component clue packing, adaptive four-cell pass, rectangular tail absorption, local clue reflow and exact legacy guard",
+  diagnostic: "identical attempt seeds; global victim replacement, targeted residual victim search, exact/adaptive clue packing, tail absorption, local clue reflow and exact legacy guard",
   runs: samples.length,
   validLegacy: samples.length,
   validV2: samples.length,
@@ -138,6 +156,14 @@ console.log(JSON.stringify({
   v2Fallbacks: fallbacks,
   victimSelectedSeeds: samples.filter((sample) => sample.victimSelected).length,
   depthTwoSelectedSeeds: samples.filter((sample) => sample.selectedVictimDepth === 2).length,
+  targetedVictimAttemptedSeeds: samples.filter((sample) => sample.targetedVictimAttempted).length,
+  targetedVictimAcceptedSeeds: samples.filter((sample) => sample.targetedVictimAccepted).length,
+  averageTargetedVictimGain: average(samples.map((sample) => sample.targetedVictimGain)),
+  averageTargetedVictimRegions: average(samples.map((sample) => sample.targetedVictimRegions)),
+  averageTargetedVictimsRolledBack: average(samples.map((sample) => sample.targetedVictimsRolledBack)),
+  averageTargetedStatesAccepted: average(samples.map((sample) => sample.targetedStatesAccepted)),
+  averageTargetedBundlesTried: average(samples.map((sample) => sample.targetedBundlesTried)),
+  averageTargetedFinalistsEvaluated: average(samples.map((sample) => sample.targetedFinalistsEvaluated)),
   clueRepackAcceptedSeeds: samples.filter((sample) => sample.clueRepackAccepted).length,
   averageClueRepackGain: average(samples.map((sample) => sample.clueRepackGain)),
   averageClueRepackNodes: average(samples.map((sample) => sample.clueRepackNodes)),
