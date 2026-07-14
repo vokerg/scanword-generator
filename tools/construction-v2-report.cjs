@@ -18,8 +18,10 @@ function run(seed, mode) {
     Object.assign(env, {
       SCANWORD_PORTFOLIO_ATTEMPTS: process.env.SCANWORD_PORTFOLIO_ATTEMPTS || "120",
       SCANWORD_PORTFOLIO_CLUE_RESTARTS: process.env.SCANWORD_PORTFOLIO_CLUE_RESTARTS || "160",
-      SCANWORD_VICTIM_BASES: process.env.SCANWORD_VICTIM_BASES || "8",
-      SCANWORD_VICTIM_VARIANTS: process.env.SCANWORD_VICTIM_VARIANTS || "6",
+      SCANWORD_VICTIM_BASES: process.env.SCANWORD_VICTIM_BASES || "12",
+      SCANWORD_VICTIM_VARIANTS: process.env.SCANWORD_VICTIM_VARIANTS || "8",
+      SCANWORD_VICTIM_SECONDARY_WORDS: process.env.SCANWORD_VICTIM_SECONDARY_WORDS || "3",
+      SCANWORD_VICTIM_SECONDARY_VARIANTS: process.env.SCANWORD_VICTIM_SECONDARY_VARIANTS || "4",
     });
   }
   const child = spawnSync(process.execPath, [worker, seed], {
@@ -44,6 +46,7 @@ for (let index = 0; index < runCount; index += 1) {
   const legacy = run(seed, "legacy");
   const v2 = run(seed, "portfolio");
   const victim = v2.constructionV2?.victimReplacement || v2.constructionV2?.victim || null;
+  const guardSelected = v2.constructionV2?.baselineGuard?.selected || "portfolio";
   const row = {
     seed,
     legacyPanels: legacy.panelCells,
@@ -56,12 +59,14 @@ for (let index = 0; index < runCount; index += 1) {
     v2Answers: v2.answers,
     v2Mode: v2.constructionMode,
     v2Fallback: v2.constructionV2?.mode === "portfolio-fallback",
-    victimSelected: Boolean(v2.constructionV2?.selectedVictimReplacement),
+    victimSelected: guardSelected !== "legacy" && Boolean(v2.constructionV2?.selectedVictimReplacement),
     victimBasesExpanded: victim?.basesExpanded || victim?.baseCandidatesTried || 0,
     victimStatesAccepted: victim?.statesAccepted || 0,
     victimFinalists: victim?.finalistsEvaluated || victim?.variantsFinalized || 0,
     victimCheckpointValid: victim?.finalistsPassingCheckpoint || victim?.variantsCheckpointValid || 0,
     victimBundlesTried: victim?.bundlesTried || 0,
+    secondaryVictimsRemoved: victim?.secondaryVictimsRemoved || 0,
+    secondaryStatesAccepted: victim?.secondaryStatesAccepted || 0,
     v2Telemetry: v2.constructionV2,
     legacyMs: legacy.elapsedMs,
     v2Ms: v2.elapsedMs,
@@ -76,7 +81,7 @@ const regressed = samples.filter((sample) => sample.panelDelta > 0).length;
 const fallbacks = samples.filter((sample) => sample.v2Fallback).length;
 console.log(JSON.stringify({
   type: "summary",
-  diagnostic: "identical attempt seeds; panel-first portfolio plus bounded pre-layout victim replacement; exact legacy baseline guard",
+  diagnostic: "identical attempt seeds; panel-first portfolio plus bounded one- and two-victim pre-layout replacement; exact legacy baseline guard",
   runs: samples.length,
   validLegacy: samples.length,
   validV2: samples.length,
@@ -96,6 +101,8 @@ console.log(JSON.stringify({
   averageVictimFinalists: average(samples.map((sample) => sample.victimFinalists)),
   averageVictimCheckpointValid: average(samples.map((sample) => sample.victimCheckpointValid)),
   averageVictimBundlesTried: average(samples.map((sample) => sample.victimBundlesTried)),
+  averageSecondaryVictimsRemoved: average(samples.map((sample) => sample.secondaryVictimsRemoved)),
+  averageSecondaryStatesAccepted: average(samples.map((sample) => sample.secondaryStatesAccepted)),
   averageLegacyMs: average(samples.map((sample) => sample.legacyMs)),
   averageV2Ms: average(samples.map((sample) => sample.v2Ms)),
 }));
