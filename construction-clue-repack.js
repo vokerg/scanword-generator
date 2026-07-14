@@ -252,7 +252,7 @@
       component.sort((a, b) => a - b);
       components.push(component);
     }
-    components.sort((a, b) => b.length - a.length || a[0] - b[0]);
+    components.sort((a, b) => a.length - b.length || a[0] - b[0]);
     return components;
   }
 
