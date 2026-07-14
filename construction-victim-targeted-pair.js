@@ -255,10 +255,11 @@
         rolled.usedAnswers = new Set(rolled.placed.map((word) => word.answer));
         rolled.clueFootprints = [];
         const rolledMetrics = solver.resultMetrics(rolled);
-        if (!rolledMetrics.validation.valid || rolledMetrics.components !== 1) {
+        if (!rolledMetrics.validation.valid) {
           telemetry.rollbackInvalid += 1;
           continue;
         }
+        if (rolledMetrics.components !== 1) telemetry.disconnectedRollbackRelaxed += 1;
         telemetry.victimsRolledBack += 1;
         const focus = buildFocusRegion(rolled, region, victim, options.focusRadius, options.maxFocusCells);
         if (!focus.cells.length) {
@@ -383,12 +384,13 @@
       ...suppliedOptions,
     };
     const telemetry = {
-      mode: "targeted-atomic-pair-v1",
+      mode: "targeted-atomic-pair-v2",
       regionsConsidered: 0,
       victimsConsidered: 0,
       victimsRolledBack: 0,
       rollbackRejected: 0,
       rollbackInvalid: 0,
+      disconnectedRollbackRelaxed: 0,
       emptyFocus: 0,
       slotsEnumerated: 0,
       slotPairsConsidered: 0,
@@ -415,6 +417,7 @@
       telemetry: {
         ...(previous.telemetry || {}),
         atomicPair: telemetry,
+        disconnectedRollbackRelaxed: telemetry.disconnectedRollbackRelaxed,
         statesAccepted: states.length,
       },
     };
