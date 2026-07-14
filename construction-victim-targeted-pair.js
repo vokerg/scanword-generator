@@ -130,20 +130,27 @@
     return [...byAnswer.values()];
   }
 
-  function sharedCrossing(a, b) {
-    if (a.direction === b.direction) return null;
+  function slotPairRelation(a, b) {
     if (a.clueKey === b.clueKey && a.direction === b.direction) return null;
-    if (a.regionLetterKeySet?.has(b.clueKey) || b.regionLetterKeySet?.has(a.clueKey)) return null;
-    if ((a.forbiddenLetterKeys || []).some((key) => b.regionLetterKeySet?.has(key))) return null;
-    if ((b.forbiddenLetterKeys || []).some((key) => a.regionLetterKeySet?.has(key))) return null;
 
     const aPositions = new Map(a.cells.map((cell, index) => [cellKey(cell.row, cell.col), index]));
+    const bPositions = new Map(b.cells.map((cell, index) => [cellKey(cell.row, cell.col), index]));
+    if (aPositions.has(b.clueKey) || bPositions.has(a.clueKey)) return null;
+    if ((a.forbiddenLetterKeys || []).some((key) => bPositions.has(key))) return null;
+    if ((b.forbiddenLetterKeys || []).some((key) => aPositions.has(key))) return null;
+
     const shared = [];
-    b.cells.forEach((cell, bPosition) => {
-      const key = cellKey(cell.row, cell.col);
-      if (aPositions.has(key)) shared.push({ key, aPosition: aPositions.get(key), bPosition });
-    });
-    return shared.length === 1 ? shared[0] : null;
+    for (const [key, aPosition] of aPositions) {
+      if (bPositions.has(key)) shared.push({ key, aPosition, bPosition: bPositions.get(key) });
+    }
+    if (shared.length > 1) return null;
+    if (shared.length === 1) {
+      if (a.direction === b.direction) return null;
+      if (a.existingIntersections <= 0 && b.existingIntersections <= 0) return null;
+      return { type: "crossing", ...shared[0] };
+    }
+    if (a.existingIntersections <= 0 || b.existingIntersections <= 0) return null;
+    return { type: "disjoint" };
   }
 
   function applySlotRaw(state, slot, entry) {
@@ -292,10 +299,12 @@
             telemetry.slotPairsConsidered += 1;
             const a = rankedSlots[aIndex];
             const b = rankedSlots[bIndex];
-            const crossing = sharedCrossing(a.slot, b.slot);
-            if (!crossing || (a.slot.existingIntersections <= 0 && b.slot.existingIntersections <= 0)) continue;
+            const relation = slotPairRelation(a.slot, b.slot);
+            if (!relation) continue;
             if (a.targetHits + b.targetHits <= 0) continue;
             telemetry.compatibleSlotPairs += 1;
+            if (relation.type === "crossing") telemetry.crossingSlotPairs += 1;
+            else telemetry.disjointSlotPairs += 1;
 
             const valuesA = [...a.slot.baseDomain]
               .filter((entry) => entry.answer !== victim.answer && entry.hasExactClue && !rolled.usedAnswers.has(entry.answer))
@@ -310,7 +319,8 @@
               for (const entryB of valuesB) {
                 telemetry.entryPairsConsidered += 1;
                 if (entryA.answer === entryB.answer) continue;
-                if (entryA.answer[crossing.aPosition] !== entryB.answer[crossing.bPosition]) continue;
+                if (relation.type === "crossing"
+                  && entryA.answer[relation.aPosition] !== entryB.answer[relation.bPosition]) continue;
                 const candidate = cloneState(rolled);
                 if (!applySlotRaw(candidate, a.slot, entryA) || !applySlotRaw(candidate, b.slot, entryB)) {
                   telemetry.applyRejected += 1;
@@ -343,6 +353,7 @@
                   unresolvedTargetCells: unresolved,
                   depth: 2,
                   atomicPair: true,
+                  atomicPairRelation: relation.type,
                   pairAnswers: [entryA.answer, entryB.answer].sort(),
                   supplementalShortFill: [entryA, entryB]
                     .filter((entry) => (window.SCANWORD_TARGETED_SHORT_FILL || []).some((item) => item.answer === entry.answer))
@@ -385,7 +396,7 @@
       ...suppliedOptions,
     };
     const telemetry = {
-      mode: "targeted-atomic-pair-v2",
+      mode: "targeted-atomic-pair-v3",
       regionsConsidered: 0,
       victimsConsidered: 0,
       victimsRolledBack: 0,
@@ -396,6 +407,8 @@
       slotsEnumerated: 0,
       slotPairsConsidered: 0,
       compatibleSlotPairs: 0,
+      crossingSlotPairs: 0,
+      disjointSlotPairs: 0,
       entryPairsConsidered: 0,
       applyRejected: 0,
       validationRejected: 0,
