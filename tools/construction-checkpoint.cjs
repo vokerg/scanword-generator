@@ -36,6 +36,10 @@ function runSeed(index) {
       SCANWORD_TARGETED_VICTIM_BEAM: process.env.SCANWORD_TARGETED_VICTIM_BEAM || "5",
       SCANWORD_TARGETED_VICTIM_BRANCHING: process.env.SCANWORD_TARGETED_VICTIM_BRANCHING || "18",
       SCANWORD_TARGETED_VICTIM_VARIANTS: process.env.SCANWORD_TARGETED_VICTIM_VARIANTS || "8",
+      SCANWORD_TARGETED_EXACT_VARIANTS: process.env.SCANWORD_TARGETED_EXACT_VARIANTS || "4",
+      SCANWORD_TARGETED_EXACT_REPACK_NODES: process.env.SCANWORD_TARGETED_EXACT_REPACK_NODES || "120000",
+      SCANWORD_TARGETED_EXACT_REPACK_CANDIDATES: process.env.SCANWORD_TARGETED_EXACT_REPACK_CANDIDATES || "20",
+      SCANWORD_TARGETED_EXACT_REPACK_BRANCH: process.env.SCANWORD_TARGETED_EXACT_REPACK_BRANCH || "14",
       SCANWORD_REPACK_NODES: process.env.SCANWORD_REPACK_NODES || "600000",
       SCANWORD_REPACK_CANDIDATES: process.env.SCANWORD_REPACK_CANDIDATES || "24",
       SCANWORD_REPACK_BRANCH: process.env.SCANWORD_REPACK_BRANCH || "24",
@@ -72,6 +76,7 @@ function runSeed(index) {
         if (!sample.coverageCheckpointPassed) throw new Error("preserved production checkpoint failed");
         const guardSelected = sample.constructionV2?.baselineGuard?.selected || "portfolio";
         const targeted = sample.constructionV2?.targetedVictim || null;
+        const exact = sample.constructionV2?.targetedExactVictim || null;
         samples[index] = {
           type: "seed",
           index,
@@ -92,6 +97,17 @@ function runSeed(index) {
           targetedStatesAccepted: Number(targeted?.search?.statesAccepted || 0),
           targetedFinalistsEvaluated: Number(targeted?.finalistsEvaluated || 0),
           targetedSelectedVictim: targeted?.selected?.victimAnswer || null,
+          targetedExactVictimAttempted: Boolean(exact?.attempted && guardSelected !== "legacy"),
+          targetedExactVictimAccepted: Boolean(exact?.accepted && guardSelected !== "legacy"),
+          targetedExactVictimGain: Number(exact?.panelsBefore != null && exact?.panelsAfter != null
+            ? exact.panelsBefore - exact.panelsAfter
+            : 0),
+          targetedExactStructuralVariants: Number(exact?.structuralVariants || 0),
+          targetedExactFinalistsEvaluated: Number(exact?.finalistsEvaluated || 0),
+          targetedExactFinalistsPassingCheckpoint: Number(exact?.finalistsPassingCheckpoint || 0),
+          targetedExactImprovingFinalists: Number(exact?.exactImprovingFinalists || 0),
+          targetedExactSelectedVictim: exact?.selected?.victimAnswer || null,
+          targetedExactStagePanelGain: exact?.stagePanelGain || {},
           clueRepackAccepted: Boolean(sample.constructionV2?.clueRepack?.accepted),
           adaptiveClueRepackAccepted: Boolean(sample.constructionV2?.adaptiveClueRepack?.accepted),
           clueTailAccepted: Boolean(sample.constructionV2?.clueTailAbsorption?.accepted),
@@ -143,6 +159,13 @@ async function workerLoop() {
       averageTargetedVictimsRolledBack: average(samples.map((sample) => sample.targetedVictimsRolledBack)),
       averageTargetedStatesAccepted: average(samples.map((sample) => sample.targetedStatesAccepted)),
       averageTargetedFinalistsEvaluated: average(samples.map((sample) => sample.targetedFinalistsEvaluated)),
+      targetedExactVictimAttemptedSeeds: samples.filter((sample) => sample.targetedExactVictimAttempted).length,
+      targetedExactVictimAcceptedSeeds: samples.filter((sample) => sample.targetedExactVictimAccepted).length,
+      averageTargetedExactVictimGain: average(samples.map((sample) => sample.targetedExactVictimGain)),
+      averageTargetedExactStructuralVariants: average(samples.map((sample) => sample.targetedExactStructuralVariants)),
+      averageTargetedExactFinalistsEvaluated: average(samples.map((sample) => sample.targetedExactFinalistsEvaluated)),
+      averageTargetedExactFinalistsPassingCheckpoint: average(samples.map((sample) => sample.targetedExactFinalistsPassingCheckpoint)),
+      averageTargetedExactImprovingFinalists: average(samples.map((sample) => sample.targetedExactImprovingFinalists)),
       clueRepackAcceptedSeeds: samples.filter((sample) => sample.clueRepackAccepted).length,
       adaptiveClueRepackAcceptedSeeds: samples.filter((sample) => sample.adaptiveClueRepackAccepted).length,
       clueTailAcceptedSeeds: samples.filter((sample) => sample.clueTailAccepted).length,
