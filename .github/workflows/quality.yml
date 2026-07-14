@@ -74,3 +74,32 @@ jobs:
 
       - name: Run 40-seed coverage benchmark
         run: node tools/benchmark.cjs
+
+  portfolio-checkpoint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run enforced 100-seed portfolio checkpoint
+        env:
+          SCANWORD_CHECKPOINT_ENFORCE: 1
+          SCANWORD_CHECKPOINT_CONCURRENCY: 2
+          SCANWORD_PORTFOLIO_ATTEMPTS: 240
+          SCANWORD_REPACK_NODES: 600000
+          SCANWORD_REPACK_BRANCH: 24
+        run: node tools/construction-checkpoint.cjs 100 > construction-checkpoint.jsonl
+
+      - name: Publish 100-seed checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: construction-checkpoint-100
+          path: construction-checkpoint.jsonl
+          if-no-files-found: warn
