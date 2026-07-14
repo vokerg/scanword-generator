@@ -108,6 +108,12 @@
     return ranked.slice(0, limit);
   }
 
+  function taggedClone(state, depth) {
+    const clone = solver.cloneVictimState ? solver.cloneVictimState(state) : state;
+    clone.victimReplacementDepth = depth;
+    return clone;
+  }
+
   solver.generateVictimReplacementVariants = (baseState, pool, suppliedOptions = {}) => {
     const primary = originalGenerate(baseState, pool, suppliedOptions);
     const poolByAnswer = new Map(pool.map((entry) => [entry.answer, entry]));
@@ -115,6 +121,7 @@
     const baselineWeak = weakFillCount(baseState, poolByAnswer);
     const secondaryLimit = numericOption("SCANWORD_VICTIM_SECONDARY_WORDS", 3);
     const secondaryVariants = numericOption("SCANWORD_VICTIM_SECONDARY_VARIANTS", 4);
+    const secondaryFinalists = numericOption("SCANWORD_VICTIM_SECONDARY_FINALISTS", 6);
     const combinedTelemetry = {
       mode: "prelayout-victim-bundles-v2",
       victimsConsidered: 0,
@@ -126,13 +133,18 @@
       depthReached: 0,
       patternLookups: 0,
       patternChecks: 0,
+      primaryStatesPreserved: primary.states.length,
       secondaryVictimsConsidered: 0,
       secondaryVictimsRemoved: 0,
       secondaryStatesAccepted: 0,
+      secondaryFinalists: 0,
     };
     mergeTelemetry(combinedTelemetry, primary.telemetry);
 
-    const collected = new Map(primary.states.map((state) => [signature(state), state]));
+    const primaryStates = primary.states.map((state) => taggedClone(state, 1));
+    const primarySignatures = new Set(primaryStates.map(signature));
+    const secondaryCollected = new Map();
+
     for (const victim of rankSecondaryVictims(baseState, poolByAnswer, secondaryLimit)) {
       combinedTelemetry.secondaryVictimsConsidered += 1;
       const rolled = solver.rollbackInlineWord(baseState, victim.word.id);
@@ -152,16 +164,19 @@
         if (state.placed.length < baselineAnswers) continue;
         if (weakFillCount(state, poolByAnswer) > baselineWeak) continue;
         const key = signature(state);
-        const existing = collected.get(key);
-        if (!existing || compareStates(state, existing, poolByAnswer) < 0) collected.set(key, state);
+        if (primarySignatures.has(key)) continue;
+        const tagged = taggedClone(state, 2);
+        const existing = secondaryCollected.get(key);
+        if (!existing || compareStates(tagged, existing, poolByAnswer) < 0) secondaryCollected.set(key, tagged);
         combinedTelemetry.secondaryStatesAccepted += 1;
       }
     }
 
-    const maxVariants = Number(suppliedOptions.maxVariants || 8);
-    const states = [...collected.values()]
+    const secondaryStates = [...secondaryCollected.values()]
       .sort((a, b) => compareStates(a, b, poolByAnswer))
-      .slice(0, maxVariants);
+      .slice(0, secondaryFinalists);
+    combinedTelemetry.secondaryFinalists = secondaryStates.length;
+    const states = [...primaryStates, ...secondaryStates];
     combinedTelemetry.statesAccepted = states.length;
     return { states, telemetry: combinedTelemetry };
   };
