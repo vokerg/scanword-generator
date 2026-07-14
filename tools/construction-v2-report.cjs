@@ -31,7 +31,7 @@ function run(seed, mode) {
   const child = spawnSync(process.execPath, [worker, seed], {
     cwd: root,
     encoding: "utf8",
-    timeout: 240_000,
+    timeout: 300_000,
     maxBuffer: 4 * 1024 * 1024,
     env,
   });
@@ -51,6 +51,7 @@ for (let index = 0; index < runCount; index += 1) {
   const v2 = run(seed, "portfolio");
   const victim = v2.constructionV2?.victimReplacement || v2.constructionV2?.victim || null;
   const repack = v2.constructionV2?.clueRepack || null;
+  const adaptive = v2.constructionV2?.adaptiveClueRepack || null;
   const guardSelected = v2.constructionV2?.baselineGuard?.selected || "portfolio";
   const selectedVictim = guardSelected !== "legacy" ? v2.constructionV2?.selectedVictimReplacement : null;
   const row = {
@@ -82,6 +83,13 @@ for (let index = 0; index < runCount; index += 1) {
     clueRepackGain: Number(repack?.baselineClueTextCells != null && repack?.optimizedClueTextCells != null
       ? repack.optimizedClueTextCells - repack.baselineClueTextCells
       : 0),
+    adaptiveClueRepackAttempted: Boolean(adaptive?.attempted && guardSelected !== "legacy"),
+    adaptiveClueRepackAccepted: Boolean(adaptive?.accepted && guardSelected !== "legacy"),
+    adaptiveEligibleClues: adaptive?.eligibleClues || 0,
+    adaptivePanelGain: Number(adaptive?.panelsBefore != null && adaptive?.panelsAfter != null
+      ? adaptive.panelsBefore - adaptive.panelsAfter
+      : 0),
+    adaptiveNodes: adaptive?.inner?.nodes || 0,
     v2Telemetry: v2.constructionV2,
     legacyMs: legacy.elapsedMs,
     v2Ms: v2.elapsedMs,
@@ -96,7 +104,7 @@ const regressed = samples.filter((sample) => sample.panelDelta > 0).length;
 const fallbacks = samples.filter((sample) => sample.v2Fallback).length;
 console.log(JSON.stringify({
   type: "summary",
-  diagnostic: "identical attempt seeds; primary victim finalists preserved, bounded secondary finalists and exact clue-footprint repacking; exact legacy baseline guard",
+  diagnostic: "identical attempt seeds; victim replacement, exact component clue packing, adaptive four-cell footprint pass and exact legacy guard",
   runs: samples.length,
   validLegacy: samples.length,
   validV2: samples.length,
@@ -117,6 +125,10 @@ console.log(JSON.stringify({
   clueRepackAcceptedSeeds: samples.filter((sample) => sample.clueRepackAccepted).length,
   averageClueRepackGain: average(samples.map((sample) => sample.clueRepackGain)),
   averageClueRepackNodes: average(samples.map((sample) => sample.clueRepackNodes)),
+  adaptiveClueRepackAttemptedSeeds: samples.filter((sample) => sample.adaptiveClueRepackAttempted).length,
+  adaptiveClueRepackAcceptedSeeds: samples.filter((sample) => sample.adaptiveClueRepackAccepted).length,
+  averageAdaptivePanelGain: average(samples.map((sample) => sample.adaptivePanelGain)),
+  averageAdaptiveNodes: average(samples.map((sample) => sample.adaptiveNodes)),
   averageVictimBasesExpanded: average(samples.map((sample) => sample.victimBasesExpanded)),
   averageVictimStatesAccepted: average(samples.map((sample) => sample.victimStatesAccepted)),
   averageVictimFinalists: average(samples.map((sample) => sample.victimFinalists)),
