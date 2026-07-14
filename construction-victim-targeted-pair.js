@@ -153,6 +153,88 @@
     return { type: "disjoint" };
   }
 
+  function buildWordComponentIndex(state) {
+    const ids = (state.placed || []).map((word) => word.id);
+    const parent = new Map(ids.map((id) => [id, id]));
+    const find = (id) => {
+      let root = parent.get(id);
+      if (root == null) return null;
+      while (root !== parent.get(root)) root = parent.get(root);
+      let current = id;
+      while (current !== root) {
+        const next = parent.get(current);
+        parent.set(current, root);
+        current = next;
+      }
+      return root;
+    };
+    const union = (left, right) => {
+      const a = find(left);
+      const b = find(right);
+      if (a == null || b == null || a === b) return;
+      parent.set(b, a);
+    };
+    for (const row of state.grid) {
+      for (const cell of row) {
+        const slotIds = (cell.type === "letter" ? cell.slotIds : null) || [];
+        for (let index = 1; index < slotIds.length; index += 1) union(slotIds[0], slotIds[index]);
+      }
+    }
+    const rootToComponent = new Map();
+    const byWordId = new Map();
+    for (const id of ids) {
+      const root = find(id);
+      if (!rootToComponent.has(root)) rootToComponent.set(root, rootToComponent.size);
+      byWordId.set(id, rootToComponent.get(root));
+    }
+    return { count: rootToComponent.size, byWordId };
+  }
+
+  function slotTouchedComponents(state, slot, componentIndex) {
+    const touched = new Set();
+    for (const target of slot.cells) {
+      const cell = state.grid[target.row]?.[target.col];
+      if (cell?.type !== "letter") continue;
+      for (const slotId of cell.slotIds || []) {
+        const component = componentIndex.byWordId.get(slotId);
+        if (component != null) touched.add(component);
+      }
+    }
+    return touched;
+  }
+
+  function pairCanReconnect(state, relation, a, b, componentIndex) {
+    const touchedA = slotTouchedComponents(state, a, componentIndex);
+    const touchedB = slotTouchedComponents(state, b, componentIndex);
+    if (componentIndex.count <= 1) {
+      if (relation.type === "crossing") return touchedA.size + touchedB.size > 0;
+      return touchedA.size > 0 && touchedB.size > 0;
+    }
+    if (relation.type === "crossing") {
+      return new Set([...touchedA, ...touchedB]).size === componentIndex.count;
+    }
+
+    const parent = Array.from({ length: componentIndex.count }, (_, index) => index);
+    const find = (value) => {
+      while (parent[value] !== value) {
+        parent[value] = parent[parent[value]];
+        value = parent[value];
+      }
+      return value;
+    };
+    const unionSet = (values) => {
+      const list = [...values];
+      for (let index = 1; index < list.length; index += 1) {
+        const left = find(list[0]);
+        const right = find(list[index]);
+        if (left !== right) parent[right] = left;
+      }
+    };
+    unionSet(touchedA);
+    unionSet(touchedB);
+    return new Set(parent.map((_, index) => find(index))).size === 1;
+  }
+
   function applySlotRaw(state, slot, entry) {
     const id = state.placed.reduce((maximum, word) => Math.max(maximum, Number(word.id || 0)), 0) + 1;
     const clueCell = state.grid[slot.clueRow]?.[slot.clueCol];
@@ -273,6 +355,8 @@
           telemetry.emptyFocus += 1;
           continue;
         }
+        const componentIndex = buildWordComponentIndex(rolled);
+        telemetry.maximumRollbackComponents = Math.max(telemetry.maximumRollbackComponents, componentIndex.count);
         const queryStats = { lookups: 0, checks: 0 };
         const slots = closedFill.enumerateRegionSlots(rolled, focus, patternIndex, rolled.usedAnswers, {
           maxSlotCandidates: options.maxSlotCandidates,
@@ -301,6 +385,10 @@
             const b = rankedSlots[bIndex];
             const relation = slotPairRelation(a.slot, b.slot);
             if (!relation) continue;
+            if (!pairCanReconnect(rolled, relation, a.slot, b.slot, componentIndex)) {
+              telemetry.componentPrunedPairs += 1;
+              continue;
+            }
             if (a.targetHits + b.targetHits <= 0) continue;
             telemetry.compatibleSlotPairs += 1;
             if (relation.type === "crossing") telemetry.crossingSlotPairs += 1;
@@ -396,13 +484,15 @@
       ...suppliedOptions,
     };
     const telemetry = {
-      mode: "targeted-atomic-pair-v3",
+      mode: "targeted-atomic-pair-v4",
       regionsConsidered: 0,
       victimsConsidered: 0,
       victimsRolledBack: 0,
       rollbackRejected: 0,
       rollbackInvalid: 0,
       disconnectedRollbackRelaxed: 0,
+      maximumRollbackComponents: 0,
+      componentPrunedPairs: 0,
       emptyFocus: 0,
       slotsEnumerated: 0,
       slotPairsConsidered: 0,
