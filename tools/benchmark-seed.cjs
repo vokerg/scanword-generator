@@ -22,6 +22,7 @@ for (const file of [
   "construction-victim-depth2.js",
   "construction-portfolio.js",
   "construction-polish.js",
+  "construction-clue-repack.js",
   "construction-guard.js",
 ]) {
   require(path.join(root, file));
