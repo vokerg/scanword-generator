@@ -101,7 +101,12 @@ window.ScanwordSolver = {
   generateTargetedVictimVariants: () => ({ states: [], telemetry: { statesAccepted: 0 } }),
   stripClueLayoutForTargetedVictim: () => structural,
   rollbackInlineWord: () => rolled,
-  resultMetrics: () => ({ validation: { valid: true }, components: 1 }),
+  resultMetrics(state) {
+    return {
+      validation: { valid: true },
+      components: state.placed.length === 1 ? 2 : 1,
+    };
+  },
 };
 window.SCANWORD_TARGETED_SHORT_FILL = [];
 
@@ -122,9 +127,12 @@ assert.equal(result.states.length, 1);
 assert.equal(result.states[0].targetedVictimMeta.atomicPair, true);
 assert.deepEqual(result.states[0].targetedVictimMeta.pairAnswers, ["АД", "ДОМ"]);
 assert.equal(result.states[0].grid[2][2].type, "letter");
+assert.equal(result.telemetry.atomicPair.disconnectedRollbackRelaxed, 1);
 assert.equal(result.telemetry.atomicPair.statesAccepted, 1);
+assert.equal(window.ScanwordSolver.resultMetrics(rolled).components, 2);
 console.log(JSON.stringify({
   atomicPair: true,
+  temporaryDisconnectRepaired: true,
   panelsAfter: coverage(result.states[0].grid).panelCells,
   telemetry: result.telemetry.atomicPair,
 }));
