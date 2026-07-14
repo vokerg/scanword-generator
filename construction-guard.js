@@ -3,11 +3,20 @@
 
   const solver = window.ScanwordSolver;
   if (!solver || solver.__constructionGuardInstalled) return;
-  if (typeof require === "function" && typeof module !== "undefined" && !solver.__constructionClueTailInstalled) {
-    try {
-      require("./construction-clue-tail.js");
-    } catch (error) {
-      solver.__constructionClueTailLoadError = String(error?.stack || error);
+  if (typeof require === "function" && typeof module !== "undefined") {
+    if (!solver.__constructionClueTailInstalled) {
+      try {
+        require("./construction-clue-tail.js");
+      } catch (error) {
+        solver.__constructionClueTailLoadError = String(error?.stack || error);
+      }
+    }
+    if (!solver.__constructionClueReflowInstalled) {
+      try {
+        require("./construction-clue-reflow.js");
+      } catch (error) {
+        solver.__constructionClueReflowLoadError = String(error?.stack || error);
+      }
     }
   }
   const previousGenerateBest = solver.generateBest.bind(solver);
