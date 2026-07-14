@@ -16,7 +16,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -45,6 +45,13 @@ jobs:
           SCANWORD_REPACK_BRANCH: 24
         run: node tools/construction-v2-report.cjs 20 > construction-v2-report.jsonl
 
+      - name: Render visual construction checkpoint
+        env:
+          SCANWORD_PORTFOLIO_ATTEMPTS: 240
+          SCANWORD_REPACK_NODES: 600000
+          SCANWORD_REPACK_BRANCH: 24
+        run: node tools/construction-visual-report.cjs construction-v2-report.jsonl construction-visuals
+
       - name: Mine scarce dictionary patterns
         run: RUN_COUNT=30 SEED_PREFIX=dictionary-demand node tools/pattern-demand.cjs > pattern-demand.txt
 
@@ -58,6 +65,7 @@ jobs:
             closed-fill-probe.json
             closed-fill-report.jsonl
             construction-v2-report.jsonl
+            construction-visuals/
             pattern-demand.txt
           if-no-files-found: warn
 
