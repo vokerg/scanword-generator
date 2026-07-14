@@ -19,6 +19,7 @@ for (const file of [
   "construction-v2-runtime.js",
   "construction-v2.js",
   "construction-victim.js",
+  "construction-victim-depth2.js",
   "construction-portfolio.js",
   "construction-polish.js",
   "construction-guard.js",
