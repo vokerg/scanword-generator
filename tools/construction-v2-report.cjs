@@ -18,10 +18,11 @@ function run(seed, mode) {
     Object.assign(env, {
       SCANWORD_PORTFOLIO_ATTEMPTS: process.env.SCANWORD_PORTFOLIO_ATTEMPTS || "120",
       SCANWORD_PORTFOLIO_CLUE_RESTARTS: process.env.SCANWORD_PORTFOLIO_CLUE_RESTARTS || "160",
-      SCANWORD_VICTIM_BASES: process.env.SCANWORD_VICTIM_BASES || "12",
-      SCANWORD_VICTIM_VARIANTS: process.env.SCANWORD_VICTIM_VARIANTS || "8",
+      SCANWORD_VICTIM_BASES: process.env.SCANWORD_VICTIM_BASES || "8",
+      SCANWORD_VICTIM_VARIANTS: process.env.SCANWORD_VICTIM_VARIANTS || "6",
       SCANWORD_VICTIM_SECONDARY_WORDS: process.env.SCANWORD_VICTIM_SECONDARY_WORDS || "3",
       SCANWORD_VICTIM_SECONDARY_VARIANTS: process.env.SCANWORD_VICTIM_SECONDARY_VARIANTS || "4",
+      SCANWORD_VICTIM_SECONDARY_FINALISTS: process.env.SCANWORD_VICTIM_SECONDARY_FINALISTS || "6",
     });
   }
   const child = spawnSync(process.execPath, [worker, seed], {
@@ -47,6 +48,7 @@ for (let index = 0; index < runCount; index += 1) {
   const v2 = run(seed, "portfolio");
   const victim = v2.constructionV2?.victimReplacement || v2.constructionV2?.victim || null;
   const guardSelected = v2.constructionV2?.baselineGuard?.selected || "portfolio";
+  const selectedVictim = guardSelected !== "legacy" ? v2.constructionV2?.selectedVictimReplacement : null;
   const row = {
     seed,
     legacyPanels: legacy.panelCells,
@@ -59,7 +61,8 @@ for (let index = 0; index < runCount; index += 1) {
     v2Answers: v2.answers,
     v2Mode: v2.constructionMode,
     v2Fallback: v2.constructionV2?.mode === "portfolio-fallback",
-    victimSelected: guardSelected !== "legacy" && Boolean(v2.constructionV2?.selectedVictimReplacement),
+    victimSelected: Boolean(selectedVictim),
+    selectedVictimDepth: Number(selectedVictim?.depth || 0),
     victimBasesExpanded: victim?.basesExpanded || victim?.baseCandidatesTried || 0,
     victimStatesAccepted: victim?.statesAccepted || 0,
     victimFinalists: victim?.finalistsEvaluated || victim?.variantsFinalized || 0,
@@ -67,6 +70,7 @@ for (let index = 0; index < runCount; index += 1) {
     victimBundlesTried: victim?.bundlesTried || 0,
     secondaryVictimsRemoved: victim?.secondaryVictimsRemoved || 0,
     secondaryStatesAccepted: victim?.secondaryStatesAccepted || 0,
+    secondaryFinalists: victim?.secondaryFinalists || 0,
     v2Telemetry: v2.constructionV2,
     legacyMs: legacy.elapsedMs,
     v2Ms: v2.elapsedMs,
@@ -81,7 +85,7 @@ const regressed = samples.filter((sample) => sample.panelDelta > 0).length;
 const fallbacks = samples.filter((sample) => sample.v2Fallback).length;
 console.log(JSON.stringify({
   type: "summary",
-  diagnostic: "identical attempt seeds; panel-first portfolio plus bounded one- and two-victim pre-layout replacement; exact legacy baseline guard",
+  diagnostic: "identical attempt seeds; primary victim finalists preserved, bounded secondary finalists added before clue packing; exact legacy baseline guard",
   runs: samples.length,
   validLegacy: samples.length,
   validV2: samples.length,
@@ -96,6 +100,7 @@ console.log(JSON.stringify({
   unchangedSeeds: samples.length - improved - regressed,
   v2Fallbacks: fallbacks,
   victimSelectedSeeds: samples.filter((sample) => sample.victimSelected).length,
+  depthTwoSelectedSeeds: samples.filter((sample) => sample.selectedVictimDepth === 2).length,
   averageVictimBasesExpanded: average(samples.map((sample) => sample.victimBasesExpanded)),
   averageVictimStatesAccepted: average(samples.map((sample) => sample.victimStatesAccepted)),
   averageVictimFinalists: average(samples.map((sample) => sample.victimFinalists)),
@@ -103,6 +108,7 @@ console.log(JSON.stringify({
   averageVictimBundlesTried: average(samples.map((sample) => sample.victimBundlesTried)),
   averageSecondaryVictimsRemoved: average(samples.map((sample) => sample.secondaryVictimsRemoved)),
   averageSecondaryStatesAccepted: average(samples.map((sample) => sample.secondaryStatesAccepted)),
+  averageSecondaryFinalists: average(samples.map((sample) => sample.secondaryFinalists)),
   averageLegacyMs: average(samples.map((sample) => sample.legacyMs)),
   averageV2Ms: average(samples.map((sample) => sample.v2Ms)),
 }));
