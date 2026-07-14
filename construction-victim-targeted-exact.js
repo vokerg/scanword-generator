@@ -2,6 +2,22 @@
   "use strict";
 
   const solver = window.ScanwordSolver;
+  if (typeof require === "function" && typeof module !== "undefined" && solver?.generateTargetedVictimVariants) {
+    if (!window.SCANWORD_TARGETED_SHORT_FILL) {
+      try {
+        require("./targeted-short-fill.js");
+      } catch (error) {
+        solver.__targetedShortFillLoadError = String(error?.stack || error);
+      }
+    }
+    if (!solver.__constructionTargetedDemandInstalled) {
+      try {
+        require("./construction-victim-targeted-demand.js");
+      } catch (error) {
+        solver.__constructionTargetedDemandLoadError = String(error?.stack || error);
+      }
+    }
+  }
   const closedFill = window.ScanwordClosedFill;
   const core = window.ScanwordCore;
   if (!solver?.generateTargetedVictimVariants || !solver?.assignClueTextCellsV2 || !closedFill || !core || solver.__constructionTargetedExactInstalled) return;
@@ -48,7 +64,7 @@
   }
 
   function weakFillCount(result, poolByAnswer) {
-    return result.placed.reduce((sum, word) => sum + Number(Boolean(poolByAnswer.get(word.answer)?.weakFill)), 0);
+    return result.placed.reduce((sum, word) => sum + Number(Boolean(word.weakFill || poolByAnswer.get(word.answer)?.weakFill)), 0);
   }
 
   function makeCandidate(base, state, clueLayout) {
@@ -204,6 +220,7 @@
       telemetry.search = searched.telemetry;
       telemetry.structuralVariants = searched.states.length;
       const poolByAnswer = new Map((generated.pool || []).map((entry) => [entry.answer, entry]));
+      for (const entry of window.SCANWORD_TARGETED_SHORT_FILL || []) poolByAnswer.set(entry.answer, entry);
       let best = generated;
       for (let index = 0; index < searched.states.length; index += 1) {
         const state = cloneState(searched.states[index]);
