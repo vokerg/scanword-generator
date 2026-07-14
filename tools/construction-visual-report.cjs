@@ -16,7 +16,8 @@ for (const file of [
   "construction-victim.js", "construction-victim-depth2.js", "construction-portfolio.js",
   "construction-polish.js", "construction-clue-repack.js", "construction-clue-adaptive.js",
   "construction-clue-tail.js", "construction-clue-reflow.js", "construction-clue-pair-reflow.js",
-  "construction-victim-targeted.js", "construction-guard.js", "renderer.js",
+  "construction-victim-targeted.js", "construction-victim-targeted-exact.js",
+  "construction-guard.js", "renderer.js",
 ]) require(path.join(root, file));
 
 const rows = fs.readFileSync(reportPath, "utf8").split(/\r?\n/).filter(Boolean).map(JSON.parse);
@@ -30,9 +31,12 @@ const escapeXml = (value) => String(value)
 const compactSeed = (seed) => seed.replace(/^construction-portfolio-/, "#");
 
 function selectedSamples() {
+  const exact = samples.filter((sample) => sample.targetedExactVictimAccepted)
+    .sort((a, b) => b.targetedExactVictimGain - a.targetedExactVictimGain || a.v2Panels - b.v2Panels || a.seed.localeCompare(b.seed))[0];
   const targeted = samples.filter((sample) => sample.targetedVictimAccepted)
     .sort((a, b) => b.targetedVictimGain - a.targetedVictimGain || a.v2Panels - b.v2Panels || a.seed.localeCompare(b.seed))[0];
   const picks = [
+    exact,
     targeted,
     [...samples].sort((a, b) => a.panelDelta - b.panelDelta || a.seed.localeCompare(b.seed))[0],
     [...samples].sort((a, b) => b.v2Panels - a.v2Panels || a.panelDelta - b.panelDelta || a.seed.localeCompare(b.seed))[0],
@@ -112,11 +116,13 @@ for (const sample of selectedSamples()) {
     portfolioLetters: portfolio.letterCells,
     targetedAccepted: Boolean(portfolio.constructionV2?.targetedVictim?.accepted),
     targetedVictim: portfolio.constructionV2?.targetedVictim?.selected?.victimAnswer || null,
+    targetedExactAccepted: Boolean(portfolio.constructionV2?.targetedExactVictim?.accepted),
+    targetedExactVictim: portfolio.constructionV2?.targetedExactVictim?.selected?.victimAnswer || null,
     victimDepth: Number(portfolio.constructionV2?.selectedVictimReplacement?.depth || 0),
   });
 }
 
-const cardHtml = cards.map((card) => `<article class="card"><h2>${escapeXml(card.seed)}</h2><p>Панели ${card.legacyPanels} → ${card.portfolioPanels}; буквы ${card.legacyLetters} → ${card.portfolioLetters}; targeted victim ${card.targetedAccepted ? `принят (${escapeXml(card.targetedVictim || "—")})` : "не принят"}; victim depth ${card.victimDepth}.</p><div class="pair"><div><h3>Legacy</h3><img src="${card.legacyName}"/></div><div><h3>Portfolio</h3><img src="${card.portfolioName}"/></div></div></article>`).join("");
+const cardHtml = cards.map((card) => `<article class="card"><h2>${escapeXml(card.seed)}</h2><p>Панели ${card.legacyPanels} → ${card.portfolioPanels}; буквы ${card.legacyLetters} → ${card.portfolioLetters}; targeted ${card.targetedAccepted ? `принят (${escapeXml(card.targetedVictim || "—")})` : "не принят"}; targeted exact ${card.targetedExactAccepted ? `принят (${escapeXml(card.targetedExactVictim || "—")})` : "не принят"}; victim depth ${card.victimDepth}.</p><div class="pair"><div><h3>Legacy</h3><img src="${card.legacyName}"/></div><div><h3>Portfolio</h3><img src="${card.portfolioName}"/></div></div></article>`).join("");
 const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Scanword construction visual checkpoint</title><style>body{font-family:Arial,sans-serif;background:#f2f4f7;margin:0;padding:24px;color:#172033}.shell{max-width:1320px;margin:auto}.hero,.card,.chart{background:white;border:1px solid #e4e7ec;border-radius:16px;padding:18px;margin-bottom:18px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.stat{background:#f8fafc;padding:12px;border-radius:10px}.stat strong{display:block;font-size:24px}.chart img,.pair img{width:100%;height:auto}.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:800px){.stats,.pair{grid-template-columns:1fr}}</style></head><body><main class="shell"><section class="hero"><h1>Визуальный checkpoint генератора</h1><p>${escapeXml(summary.diagnostic)}</p><div class="stats"><div class="stat"><strong>${summary.averageLegacyPanels}</strong>legacy avg</div><div class="stat"><strong>${summary.averageV2Panels}</strong>portfolio avg</div><div class="stat"><strong>${summary.maximumV2Panels}</strong>portfolio max</div><div class="stat"><strong>${summary.improvedSeeds}/${summary.runs}</strong>improved</div></div></section><section class="chart"><img src="${chartName}"/></section>${cardHtml}</main></body></html>`;
 fs.writeFileSync(path.join(outputDir, "index.html"), html);
 fs.writeFileSync(path.join(outputDir, "summary.json"), JSON.stringify({ summary, cards }, null, 2));
