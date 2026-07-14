@@ -381,6 +381,7 @@
       atomicMaxSlots: 28,
       atomicValuesPerSlot: 4,
       atomicMaxVariants: 6,
+      atomicFinalists: 2,
       ...suppliedOptions,
     };
     const telemetry = {
@@ -404,14 +405,21 @@
       patternLookups: 0,
       patternChecks: 0,
       statesAccepted: 0,
+      finalistsReserved: 0,
     };
     const atomicStates = generateAtomicPairVariants(result, pool, options, telemetry);
     const merged = new Map();
-    for (const state of [...(previous.states || []), ...atomicStates]) {
+    for (const state of previous.states || []) {
       const signature = stateSignature(state);
       if (!merged.has(signature)) merged.set(signature, state);
     }
-    const states = [...merged.values()].slice(0, options.maxVariants);
+    const reserved = atomicStates.slice(0, options.atomicFinalists);
+    telemetry.finalistsReserved = reserved.length;
+    for (const state of reserved) {
+      const signature = stateSignature(state);
+      if (!merged.has(signature)) merged.set(signature, state);
+    }
+    const states = [...merged.values()];
     return {
       states,
       telemetry: {
