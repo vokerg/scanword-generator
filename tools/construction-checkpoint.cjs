@@ -77,6 +77,7 @@ function runSeed(index) {
         const guardSelected = sample.constructionV2?.baselineGuard?.selected || "portfolio";
         const targeted = sample.constructionV2?.targetedVictim || null;
         const exact = sample.constructionV2?.targetedExactVictim || null;
+        const atomic = exact?.search?.atomicPair || null;
         samples[index] = {
           type: "seed",
           index,
@@ -108,11 +109,20 @@ function runSeed(index) {
           targetedExactImprovingFinalists: Number(exact?.exactImprovingFinalists || 0),
           targetedExactSelectedVictim: exact?.selected?.victimAnswer || null,
           targetedExactSelectedShortFill: exact?.selected?.supplementalShortFill || [],
+          targetedExactSelectedAtomicPair: Boolean(exact?.selected?.atomicPair),
+          targetedExactSelectedPairAnswers: exact?.selected?.pairAnswers || [],
           targetedExactSupplementalEntries: Number(exact?.search?.supplementalShortFillEntries || 0),
           targetedExactSupplementalStates: Number(exact?.search?.supplementalShortFillStates || 0),
           targetedExactWeakFillBudget: Number(exact?.search?.weakFillBudget || 0),
           targetedExactWeakFillRejected: Number(exact?.search?.weakFillBudgetRejected || 0),
           targetedExactStatesBeforeWeakBudget: Number(exact?.search?.statesAcceptedBeforeWeakBudget || 0),
+          targetedExactDisconnectedRollbackRelaxed: Number(exact?.search?.disconnectedRollbackRelaxed
+            || atomic?.disconnectedRollbackRelaxed
+            || 0),
+          targetedExactAtomicStates: Number(atomic?.statesAccepted || 0),
+          targetedExactAtomicCompatiblePairs: Number(atomic?.compatibleSlotPairs || 0),
+          targetedExactAtomicEntryPairs: Number(atomic?.entryPairsConsidered || 0),
+          targetedExactAtomicRollbackInvalid: Number(atomic?.rollbackInvalid || 0),
           targetedExactStagePanelGain: exact?.stagePanelGain || {},
           clueRepackAccepted: Boolean(sample.constructionV2?.clueRepack?.accepted),
           adaptiveClueRepackAccepted: Boolean(sample.constructionV2?.adaptiveClueRepack?.accepted),
@@ -176,6 +186,14 @@ async function workerLoop() {
       targetedExactSupplementalAcceptedSeeds: samples.filter((sample) => sample.targetedExactSelectedShortFill.length > 0).length,
       averageTargetedExactSupplementalStates: average(samples.map((sample) => sample.targetedExactSupplementalStates)),
       totalTargetedExactWeakFillRejected: samples.reduce((sum, sample) => sum + sample.targetedExactWeakFillRejected, 0),
+      targetedExactDisconnectedRollbackSeeds: samples.filter((sample) => sample.targetedExactDisconnectedRollbackRelaxed > 0).length,
+      totalTargetedExactDisconnectedRollbacks: samples.reduce((sum, sample) => sum + sample.targetedExactDisconnectedRollbackRelaxed, 0),
+      targetedExactAtomicStateSeeds: samples.filter((sample) => sample.targetedExactAtomicStates > 0).length,
+      targetedExactAtomicSelectedSeeds: samples.filter((sample) => sample.targetedExactSelectedAtomicPair).length,
+      totalTargetedExactAtomicStates: samples.reduce((sum, sample) => sum + sample.targetedExactAtomicStates, 0),
+      totalTargetedExactAtomicCompatiblePairs: samples.reduce((sum, sample) => sum + sample.targetedExactAtomicCompatiblePairs, 0),
+      totalTargetedExactAtomicEntryPairs: samples.reduce((sum, sample) => sum + sample.targetedExactAtomicEntryPairs, 0),
+      totalTargetedExactAtomicRollbackInvalid: samples.reduce((sum, sample) => sum + sample.targetedExactAtomicRollbackInvalid, 0),
       clueRepackAcceptedSeeds: samples.filter((sample) => sample.clueRepackAccepted).length,
       adaptiveClueRepackAcceptedSeeds: samples.filter((sample) => sample.adaptiveClueRepackAccepted).length,
       clueTailAcceptedSeeds: samples.filter((sample) => sample.clueTailAccepted).length,
