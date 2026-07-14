@@ -14,9 +14,9 @@ for (const file of [
   "core.js", "dictionary-policy.js", "lexical-policy-v2.js", "solver.js", "closed-fill.js",
   "closed-fill-rollback.js", "construction-v2-runtime.js", "construction-v2.js",
   "construction-victim.js", "construction-victim-depth2.js", "construction-portfolio.js",
-  "construction-victim-targeted.js", "construction-polish.js", "construction-clue-repack.js",
-  "construction-clue-adaptive.js", "construction-clue-tail.js", "construction-clue-reflow.js",
-  "construction-clue-pair-reflow.js", "construction-guard.js", "renderer.js",
+  "construction-polish.js", "construction-clue-repack.js", "construction-clue-adaptive.js",
+  "construction-clue-tail.js", "construction-clue-reflow.js", "construction-clue-pair-reflow.js",
+  "construction-victim-targeted.js", "construction-guard.js", "renderer.js",
 ]) require(path.join(root, file));
 
 const rows = fs.readFileSync(reportPath, "utf8").split(/\r?\n/).filter(Boolean).map(JSON.parse);
@@ -30,11 +30,14 @@ const escapeXml = (value) => String(value)
 const compactSeed = (seed) => seed.replace(/^construction-portfolio-/, "#");
 
 function selectedSamples() {
+  const targeted = samples.filter((sample) => sample.targetedVictimAccepted)
+    .sort((a, b) => b.targetedVictimGain - a.targetedVictimGain || a.v2Panels - b.v2Panels || a.seed.localeCompare(b.seed))[0];
   const picks = [
+    targeted,
     [...samples].sort((a, b) => a.panelDelta - b.panelDelta || a.seed.localeCompare(b.seed))[0],
-    [...samples].sort((a, b) => b.v2Panels - a.v2Panels || a.seed.localeCompare(b.seed))[0],
+    [...samples].sort((a, b) => b.v2Panels - a.v2Panels || a.panelDelta - b.panelDelta || a.seed.localeCompare(b.seed))[0],
     [...samples].sort((a, b) => a.v2Panels - b.v2Panels || a.seed.localeCompare(b.seed))[Math.floor(samples.length / 2)],
-  ];
+  ].filter(Boolean);
   return [...new Map(picks.map((sample) => [sample.seed, sample])).values()];
 }
 
