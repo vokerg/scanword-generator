@@ -82,6 +82,11 @@ function runSeed(index) {
             && sample.constructionV2?.clueTailAbsorption?.panelsAfter != null
             ? sample.constructionV2.clueTailAbsorption.panelsBefore - sample.constructionV2.clueTailAbsorption.panelsAfter
             : 0),
+          clueReflowAccepted: Boolean(sample.constructionV2?.clueReflow?.accepted),
+          clueReflowGain: Number(sample.constructionV2?.clueReflow?.panelsBefore != null
+            && sample.constructionV2?.clueReflow?.panelsAfter != null
+            ? sample.constructionV2.clueReflow.panelsBefore - sample.constructionV2.clueReflow.panelsAfter
+            : 0),
         };
         resolve();
       } catch (error) {
@@ -119,6 +124,8 @@ async function workerLoop() {
       adaptiveClueRepackAcceptedSeeds: samples.filter((sample) => sample.adaptiveClueRepackAccepted).length,
       clueTailAcceptedSeeds: samples.filter((sample) => sample.clueTailAccepted).length,
       averageClueTailGain: average(samples.map((sample) => sample.clueTailGain)),
+      clueReflowAcceptedSeeds: samples.filter((sample) => sample.clueReflowAccepted).length,
+      averageClueReflowGain: average(samples.map((sample) => sample.clueReflowGain)),
     };
     summary.checkpointPassed = summary.averagePanels <= 8 && summary.maximumPanels <= 12;
     summary.requirement = { averagePanelsAtMost: 8, maximumPanelsAtMost: 12 };
