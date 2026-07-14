@@ -91,6 +91,11 @@
       "statesAccepted",
       "patternLookups",
       "patternChecks",
+      "primaryStatesPreserved",
+      "secondaryVictimsConsidered",
+      "secondaryVictimsRemoved",
+      "secondaryStatesAccepted",
+      "secondaryFinalists",
     ]) target[key] += Number(source?.[key] || 0);
     target.depthReached = Math.max(target.depthReached, Number(source?.depthReached || 0));
   }
@@ -170,7 +175,7 @@
     candidates.sort((a, b) => compareCandidates(a, b, poolByAnswer));
 
     const victimTelemetry = {
-      mode: "prelayout-victim-bundles-v1",
+      mode: "prelayout-victim-bundles-v2",
       basesExpanded: 0,
       victimsConsidered: 0,
       victimsRemoved: 0,
@@ -183,6 +188,11 @@
       depthReached: 0,
       patternLookups: 0,
       patternChecks: 0,
+      primaryStatesPreserved: 0,
+      secondaryVictimsConsidered: 0,
+      secondaryVictimsRemoved: 0,
+      secondaryStatesAccepted: 0,
+      secondaryFinalists: 0,
     };
 
     if (solver.generateVictimReplacementVariants) {
@@ -207,6 +217,7 @@
           candidate.victimReplacement = {
             baseAttempt: base.attempt + 1,
             variant: variantIndex + 1,
+            depth: Number(state.victimReplacementDepth || 1),
           };
           candidates.push(candidate);
         }
@@ -242,7 +253,7 @@
     };
     return solver.attachValidationReport(best, seed, {
       mode: "portfolio-panel-first-v2",
-      rollbackDepthUsed: best.victimReplacement ? 1 : 0,
+      rollbackDepthUsed: best.victimReplacement?.depth || 0,
       regionsBefore: closedFill.extractResidualRegions(best).length,
       regionsAfter: closedFill.extractResidualRegions(best).length,
       panelsBefore: best.panelCells,
