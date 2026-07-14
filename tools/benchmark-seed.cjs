@@ -42,6 +42,22 @@ if (!seed) throw new Error("A seed argument is required.");
 
 const started = Date.now();
 const result = window.ScanwordSolver.generateBest(seed, window.RUSSIAN_WORDS.length, 17, 13, 30, 27);
+const placedById = new Map(result.placed.map((word) => [word.id, word]));
+const extractedRegions = window.ScanwordClosedFill?.extractResidualRegions?.(result) || [];
+const residualRegionDetails = extractedRegions.map((region) => ({
+  id: region.id,
+  size: region.size,
+  cells: (region.cells || []).map((cell) => [cell.row, cell.col]),
+  boundingBox: region.boundingBox || null,
+  perimeter: Number(region.perimeter || 0),
+  touchesEdge: Boolean(region.touchesEdge),
+  boundaryWordIds: [...(region.boundaryWords || [])],
+  boundaryAnswers: (region.boundaryWords || [])
+    .map((id) => placedById.get(id)?.answer)
+    .filter(Boolean),
+  neighboringClues: [...(region.neighboringClues || [])],
+}));
+
 console.log(JSON.stringify({
   seed,
   elapsedMs: Date.now() - started,
@@ -54,7 +70,8 @@ console.log(JSON.stringify({
   rawLetterPercent: +(result.rawLetterCoverage * 100).toFixed(1),
   letterCells: result.letterCells,
   panelCells: result.panelCells,
-  residualRegions: result.residualRegions?.length || 0,
+  residualRegions: residualRegionDetails.length,
+  residualRegionDetails,
   components: result.components,
   clueTextCells: result.clueTextCells,
   externalClues: result.externalClueTexts,
