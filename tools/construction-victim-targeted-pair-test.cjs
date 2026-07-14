@@ -91,6 +91,18 @@ const slotB = {
   baseDomain: [{ answer: "ДОМ", clue: "Жилище", hasExactClue: true, weakFill: false, lexicalQuality: 90 }],
 };
 
+const previousStates = ["АА", "ББ", "ВВ", "ГГ"].map((answer, index) => ({
+  grid: structural.grid,
+  placed: [{
+    id: 10 + index,
+    answer,
+    direction: "right",
+    clueRow: index,
+    clueCol: 0,
+    cells: [],
+  }],
+}));
+
 window.ScanwordClosedFill = {
   extractResidualRegions: () => [{ id: 1, size: 1, cells: [{ row: 2, col: 2 }], boundaryWords: [1] }],
   buildPatternIndex: () => ({}),
@@ -98,7 +110,7 @@ window.ScanwordClosedFill = {
   measureCoverage: coverage,
 };
 window.ScanwordSolver = {
-  generateTargetedVictimVariants: () => ({ states: [], telemetry: { statesAccepted: 0 } }),
+  generateTargetedVictimVariants: () => ({ states: previousStates, telemetry: { statesAccepted: previousStates.length } }),
   stripClueLayoutForTargetedVictim: () => structural,
   rollbackInlineWord: () => rolled,
   resultMetrics(state) {
@@ -120,19 +132,24 @@ const result = window.ScanwordSolver.generateTargetedVictimVariants(structural, 
   atomicMaxSlots: 4,
   atomicValuesPerSlot: 2,
   atomicMaxVariants: 2,
-  maxVariants: 2,
+  atomicFinalists: 2,
+  maxVariants: 4,
 });
 
-assert.equal(result.states.length, 1);
-assert.equal(result.states[0].targetedVictimMeta.atomicPair, true);
-assert.deepEqual(result.states[0].targetedVictimMeta.pairAnswers, ["АД", "ДОМ"]);
-assert.equal(result.states[0].grid[2][2].type, "letter");
+const atomic = result.states.find((state) => state.targetedVictimMeta?.atomicPair);
+assert.equal(result.states.length, 5, "four sequential finalists plus the reserved atomic finalist must survive");
+assert.ok(atomic, "atomic finalist must not be truncated by sequential finalists");
+assert.deepEqual(atomic.targetedVictimMeta.pairAnswers, ["АД", "ДОМ"]);
+assert.equal(atomic.grid[2][2].type, "letter");
 assert.equal(result.telemetry.atomicPair.disconnectedRollbackRelaxed, 1);
 assert.equal(result.telemetry.atomicPair.statesAccepted, 1);
+assert.equal(result.telemetry.atomicPair.finalistsReserved, 1);
 assert.equal(window.ScanwordSolver.resultMetrics(rolled).components, 2);
 console.log(JSON.stringify({
   atomicPair: true,
   temporaryDisconnectRepaired: true,
-  panelsAfter: coverage(result.states[0].grid).panelCells,
+  previousFinalistsPreserved: previousStates.length,
+  atomicFinalistsReserved: result.telemetry.atomicPair.finalistsReserved,
+  panelsAfter: coverage(atomic.grid).panelCells,
   telemetry: result.telemetry.atomicPair,
 }));
