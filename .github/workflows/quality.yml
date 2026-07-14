@@ -41,6 +41,7 @@ jobs:
       - name: Compare legacy and polished panel-first portfolio
         env:
           SCANWORD_PORTFOLIO_ATTEMPTS: 240
+          SCANWORD_REPACK_NODES: 180000
         run: node tools/construction-v2-report.cjs 20 > construction-v2-report.jsonl
 
       - name: Mine scarce dictionary patterns
