@@ -32,6 +32,9 @@ jobs:
       - name: Test deterministic clue-tail absorption
         run: node tools/construction-clue-tail-test.cjs
 
+      - name: Test deterministic clue-footprint reflow
+        run: node tools/construction-clue-reflow-test.cjs
+
       - name: Smoke-test active closed-fill integration
         run: node tools/closed-fill-smoke.cjs | tee closed-fill-smoke.json
 
