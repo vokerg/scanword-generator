@@ -62,6 +62,7 @@ for (let index = 0; index < runCount; index += 1) {
   const victim = v2.constructionV2?.victimReplacement || v2.constructionV2?.victim || null;
   const targeted = v2.constructionV2?.targetedVictim || null;
   const exact = v2.constructionV2?.targetedExactVictim || null;
+  const atomic = exact?.search?.atomicPair || null;
   const repack = v2.constructionV2?.clueRepack || null;
   const adaptive = v2.constructionV2?.adaptiveClueRepack || null;
   const tail = v2.constructionV2?.clueTailAbsorption || null;
@@ -113,6 +114,16 @@ for (let index = 0; index < runCount; index += 1) {
     targetedExactFinalistsPassingCheckpoint: Number(exact?.finalistsPassingCheckpoint || 0),
     targetedExactImprovingFinalists: Number(exact?.exactImprovingFinalists || 0),
     targetedExactSelectedVictim: exact?.selected?.victimAnswer || null,
+    targetedExactSelectedAtomicPair: Boolean(exact?.selected?.atomicPair),
+    targetedExactSelectedPairAnswers: exact?.selected?.pairAnswers || [],
+    targetedExactDisconnectedRollbackRelaxed: Number(exact?.search?.disconnectedRollbackRelaxed
+      || atomic?.disconnectedRollbackRelaxed
+      || 0),
+    targetedExactAtomicStates: Number(atomic?.statesAccepted || 0),
+    targetedExactAtomicCompatiblePairs: Number(atomic?.compatibleSlotPairs || 0),
+    targetedExactAtomicEntryPairs: Number(atomic?.entryPairsConsidered || 0),
+    targetedExactAtomicValidationRejected: Number(atomic?.validationRejected || 0),
+    targetedExactAtomicWeakRejected: Number(atomic?.weakBudgetRejected || 0),
     targetedExactStagePanelGain: exact?.stagePanelGain || {},
     clueRepackAccepted: Boolean(repack?.accepted && guardSelected !== "legacy"),
     clueRepackNodes: repack?.nodes || 0,
@@ -154,7 +165,7 @@ const regressed = samples.filter((sample) => sample.panelDelta > 0).length;
 const fallbacks = samples.filter((sample) => sample.v2Fallback).length;
 console.log(JSON.stringify({
   type: "summary",
-  diagnostic: "identical attempt seeds; global victim replacement, monotonic targeted residual search, exact targeted postprocessing, clue packing/reflow and exact legacy guard",
+  diagnostic: "identical attempt seeds; global victim replacement, monotonic targeted residual search, atomic two-slot repair, exact targeted postprocessing, clue packing/reflow and exact legacy guard",
   runs: samples.length,
   validLegacy: samples.length,
   validV2: samples.length,
@@ -187,6 +198,15 @@ console.log(JSON.stringify({
   averageTargetedExactFinalistsEvaluated: average(samples.map((sample) => sample.targetedExactFinalistsEvaluated)),
   averageTargetedExactFinalistsPassingCheckpoint: average(samples.map((sample) => sample.targetedExactFinalistsPassingCheckpoint)),
   averageTargetedExactImprovingFinalists: average(samples.map((sample) => sample.targetedExactImprovingFinalists)),
+  targetedExactDisconnectedRollbackSeeds: samples.filter((sample) => sample.targetedExactDisconnectedRollbackRelaxed > 0).length,
+  totalTargetedExactDisconnectedRollbacks: samples.reduce((sum, sample) => sum + sample.targetedExactDisconnectedRollbackRelaxed, 0),
+  targetedExactAtomicStateSeeds: samples.filter((sample) => sample.targetedExactAtomicStates > 0).length,
+  targetedExactAtomicSelectedSeeds: samples.filter((sample) => sample.targetedExactSelectedAtomicPair).length,
+  totalTargetedExactAtomicStates: samples.reduce((sum, sample) => sum + sample.targetedExactAtomicStates, 0),
+  totalTargetedExactAtomicCompatiblePairs: samples.reduce((sum, sample) => sum + sample.targetedExactAtomicCompatiblePairs, 0),
+  totalTargetedExactAtomicEntryPairs: samples.reduce((sum, sample) => sum + sample.targetedExactAtomicEntryPairs, 0),
+  totalTargetedExactAtomicValidationRejected: samples.reduce((sum, sample) => sum + sample.targetedExactAtomicValidationRejected, 0),
+  totalTargetedExactAtomicWeakRejected: samples.reduce((sum, sample) => sum + sample.targetedExactAtomicWeakRejected, 0),
   clueRepackAcceptedSeeds: samples.filter((sample) => sample.clueRepackAccepted).length,
   averageClueRepackGain: average(samples.map((sample) => sample.clueRepackGain)),
   averageClueRepackNodes: average(samples.map((sample) => sample.clueRepackNodes)),
