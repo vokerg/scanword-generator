@@ -25,6 +25,13 @@
         solver.__constructionCluePairReflowLoadError = String(error?.stack || error);
       }
     }
+    if (!solver.__constructionTargetedCrossInstalled) {
+      try {
+        require("./construction-victim-targeted-cross.js");
+      } catch (error) {
+        solver.__constructionTargetedCrossLoadError = String(error?.stack || error);
+      }
+    }
   }
   const previousGenerateBest = solver.generateBest.bind(solver);
 
