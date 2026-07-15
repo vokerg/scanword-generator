@@ -25,13 +25,6 @@
         solver.__constructionCluePairReflowLoadError = String(error?.stack || error);
       }
     }
-    if (!solver.__constructionTargetedTripleInstalled) {
-      try {
-        require("./construction-victim-targeted-triple.js");
-      } catch (error) {
-        solver.__constructionTargetedTripleLoadError = String(error?.stack || error);
-      }
-    }
   }
   const previousGenerateBest = solver.generateBest.bind(solver);
 
