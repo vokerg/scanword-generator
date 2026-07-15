@@ -44,19 +44,59 @@ const started = Date.now();
 const result = window.ScanwordSolver.generateBest(seed, window.RUSSIAN_WORDS.length, 17, 13, 30, 27);
 const placedById = new Map(result.placed.map((word) => [word.id, word]));
 const extractedRegions = window.ScanwordClosedFill?.extractResidualRegions?.(result) || [];
-const residualRegionDetails = extractedRegions.map((region) => ({
-  id: region.id,
-  size: region.size,
-  cells: (region.cells || []).map((cell) => [cell.row, cell.col]),
-  boundingBox: region.boundingBox || null,
-  perimeter: Number(region.perimeter || 0),
-  touchesEdge: Boolean(region.touchesEdge),
-  boundaryWordIds: [...(region.boundaryWords || [])],
-  boundaryAnswers: (region.boundaryWords || [])
-    .map((id) => placedById.get(id)?.answer)
-    .filter(Boolean),
-  neighboringClues: [...(region.neighboringClues || [])],
-}));
+const OFFSETS = [
+  [-1, -1], [-1, 0], [-1, 1],
+  [0, -1], [0, 1],
+  [1, -1], [1, 0], [1, 1],
+];
+
+function describeCell(row, col) {
+  const cell = result.grid[row]?.[col];
+  if (!cell) return { row, col, type: "edge" };
+  return {
+    row,
+    col,
+    type: cell.type,
+    char: cell.char || null,
+    slotIds: [...(cell.slotIds || [])],
+    directions: [...(cell.directions || [])],
+    clueDirections: (cell.clues || []).map((clue) => clue.direction).sort(),
+  };
+}
+
+const residualRegionDetails = extractedRegions.map((region) => {
+  const cells = (region.cells || []).map((cell) => [cell.row, cell.col]);
+  const neighborhoods = (region.cells || []).map((cell) => ({
+    row: cell.row,
+    col: cell.col,
+    neighbors: OFFSETS.map(([dr, dc]) => ({
+      dr,
+      dc,
+      ...describeCell(cell.row + dr, cell.col + dc),
+    })),
+  }));
+  const adjacentTypeCounts = {};
+  for (const neighborhood of neighborhoods) {
+    for (const neighbor of neighborhood.neighbors) {
+      adjacentTypeCounts[neighbor.type] = (adjacentTypeCounts[neighbor.type] || 0) + 1;
+    }
+  }
+  return {
+    id: region.id,
+    size: region.size,
+    cells,
+    boundingBox: region.boundingBox || null,
+    perimeter: Number(region.perimeter || 0),
+    touchesEdge: Boolean(region.touchesEdge),
+    boundaryWordIds: [...(region.boundaryWords || [])],
+    boundaryAnswers: (region.boundaryWords || [])
+      .map((id) => placedById.get(id)?.answer)
+      .filter(Boolean),
+    neighboringClues: [...(region.neighboringClues || [])],
+    adjacentTypeCounts,
+    neighborhoods,
+  };
+});
 
 console.log(JSON.stringify({
   seed,
