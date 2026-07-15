@@ -55,6 +55,7 @@ for (const index of indices) {
   const sample = run(seed);
   const exact = sample.constructionV2?.targetedExactVictim || null;
   const atomic = exact?.search?.atomicPair || null;
+  const direct = exact?.search?.directCross || null;
   const row = {
     type: "seed",
     index,
@@ -68,10 +69,23 @@ for (const index of indices) {
     structuralVariants: Number(exact?.structuralVariants || 0),
     selectedVictim: exact?.selected?.victimAnswer || null,
     selectedAtomicPair: Boolean(exact?.selected?.atomicPair),
+    selectedDirectCross: Boolean(exact?.selected?.directCross),
     atomicStates: Number(atomic?.statesAccepted || 0),
     atomicCompatiblePairs: Number(atomic?.compatibleSlotPairs || 0),
     atomicComponentPrunedPairs: Number(atomic?.componentPrunedPairs || 0),
     maximumRollbackComponents: Number(atomic?.maximumRollbackComponents || 0),
+    directRegions: Number(direct?.regionsConsidered || 0),
+    directJunctions: Number(direct?.junctionRegions || 0),
+    directHorizontalUnavailable: Number(direct?.horizontalUnavailable || 0),
+    directVerticalUnavailable: Number(direct?.verticalUnavailable || 0),
+    directSlotPairs: Number(direct?.slotPairsBuilt || 0),
+    directEntryPairs: Number(direct?.entryPairsConsidered || 0),
+    directCharacterPairs: Number(direct?.characterPairsMatched || 0),
+    directApplyRejected: Number(direct?.applyRejected || 0),
+    directValidationRejected: Number(direct?.validationRejected || 0),
+    directWeakRejected: Number(direct?.weakBudgetRejected || 0),
+    directStates: Number(direct?.statesAccepted || 0),
+    directEmptyPatterns: direct?.emptyPatterns || [],
   };
   rows.push(row);
   console.log(JSON.stringify(row));
@@ -96,4 +110,16 @@ console.log(JSON.stringify({
   regionSizeDistribution: Object.fromEntries([...new Set(regionSizes)].sort((a, b) => a - b).map((size) => [size, regionSizes.filter((value) => value === size).length])),
   edgeRegions: rows.flatMap((row) => row.regions).filter((region) => region.touchesEdge).length,
   commonBoundaryAnswers: [...boundaryFrequency.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ru")).slice(0, 20),
+  directStateSeeds: rows.filter((row) => row.directStates > 0).length,
+  directSelectedSeeds: rows.filter((row) => row.selectedDirectCross).length,
+  totalDirectJunctions: rows.reduce((sum, row) => sum + row.directJunctions, 0),
+  totalDirectHorizontalUnavailable: rows.reduce((sum, row) => sum + row.directHorizontalUnavailable, 0),
+  totalDirectVerticalUnavailable: rows.reduce((sum, row) => sum + row.directVerticalUnavailable, 0),
+  totalDirectSlotPairs: rows.reduce((sum, row) => sum + row.directSlotPairs, 0),
+  totalDirectEntryPairs: rows.reduce((sum, row) => sum + row.directEntryPairs, 0),
+  totalDirectCharacterPairs: rows.reduce((sum, row) => sum + row.directCharacterPairs, 0),
+  totalDirectApplyRejected: rows.reduce((sum, row) => sum + row.directApplyRejected, 0),
+  totalDirectValidationRejected: rows.reduce((sum, row) => sum + row.directValidationRejected, 0),
+  totalDirectWeakRejected: rows.reduce((sum, row) => sum + row.directWeakRejected, 0),
+  directEmptyPatterns: [...new Set(rows.flatMap((row) => row.directEmptyPatterns))].sort(),
 }));
