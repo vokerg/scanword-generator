@@ -53,6 +53,9 @@ jobs:
       - name: Test disjoint atomic targeted repair
         run: node tools/construction-victim-targeted-pair-disjoint-test.cjs
 
+      - name: Test direct isolated cross-junction fill
+        run: node tools/construction-victim-targeted-cross-test.cjs
+
       - name: Test bounded zero-panel pass
         run: node tools/construction-zero-panel-pass-test.cjs
 
