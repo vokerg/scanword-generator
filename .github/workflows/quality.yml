@@ -89,9 +89,6 @@ jobs:
           SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
         run: node tools/construction-zero-panel-report.cjs 12 > construction-zero-panel-report.jsonl
 
-      - name: Probe remaining high-panel tail
-        run: node tools/construction-tail-probe.cjs > construction-tail-probe.jsonl
-
       - name: Render visual construction checkpoint
         env:
           SCANWORD_PORTFOLIO_ATTEMPTS: 240
@@ -118,7 +115,6 @@ jobs:
             closed-fill-report.jsonl
             construction-v2-report.jsonl
             construction-zero-panel-report.jsonl
-            construction-tail-probe.jsonl
             construction-visuals/
             pattern-demand.txt
           if-no-files-found: warn
@@ -128,6 +124,29 @@ jobs:
 
       - name: Run 40-seed coverage benchmark
         run: node tools/benchmark.cjs
+
+  tail-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Probe remaining high-panel tail
+        run: node tools/construction-tail-probe.cjs > construction-tail-probe.jsonl
+
+      - name: Publish tail probe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: construction-tail-probe
+          path: construction-tail-probe.jsonl
+          if-no-files-found: warn
 
   portfolio-checkpoint:
     runs-on: ubuntu-latest
