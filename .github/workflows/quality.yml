@@ -77,6 +77,18 @@ jobs:
           SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
         run: node tools/construction-v2-report.cjs 20 > construction-v2-report.jsonl
 
+      - name: Compare bounded zero-panel pass
+        env:
+          SCANWORD_PORTFOLIO_ATTEMPTS: 240
+          SCANWORD_REPACK_NODES: 600000
+          SCANWORD_REPACK_BRANCH: 24
+          SCANWORD_TARGETED_VICTIM_REGIONS: 3
+          SCANWORD_TARGETED_VICTIM_WORDS: 4
+          SCANWORD_TARGETED_VICTIM_DEPTH: 2
+          SCANWORD_TARGETED_EXACT_VARIANTS: 4
+          SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
+        run: node tools/construction-zero-panel-report.cjs 12 > construction-zero-panel-report.jsonl
+
       - name: Render visual construction checkpoint
         env:
           SCANWORD_PORTFOLIO_ATTEMPTS: 240
@@ -102,6 +114,7 @@ jobs:
             closed-fill-probe.json
             closed-fill-report.jsonl
             construction-v2-report.jsonl
+            construction-zero-panel-report.jsonl
             construction-visuals/
             pattern-demand.txt
           if-no-files-found: warn
