@@ -31,6 +31,8 @@ for (const file of [
   "construction-victim-targeted.js",
   "construction-victim-targeted-demand.js",
   "construction-victim-targeted-pair.js",
+  "construction-victim-targeted-cross.js",
+  "construction-victim-targeted-cross-rollback.js",
   "construction-victim-targeted-exact.js",
   "construction-guard.js",
 ]) {
