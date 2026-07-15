@@ -55,7 +55,6 @@ for (const index of indices) {
   const sample = run(seed);
   const exact = sample.constructionV2?.targetedExactVictim || null;
   const atomic = exact?.search?.atomicPair || null;
-  const triple = exact?.search?.atomicTriple || null;
   const row = {
     type: "seed",
     index,
@@ -69,25 +68,10 @@ for (const index of indices) {
     structuralVariants: Number(exact?.structuralVariants || 0),
     selectedVictim: exact?.selected?.victimAnswer || null,
     selectedAtomicPair: Boolean(exact?.selected?.atomicPair),
-    selectedAtomicTriple: Boolean(exact?.selected?.atomicTriple),
     atomicStates: Number(atomic?.statesAccepted || 0),
     atomicCompatiblePairs: Number(atomic?.compatibleSlotPairs || 0),
     atomicComponentPrunedPairs: Number(atomic?.componentPrunedPairs || 0),
     maximumRollbackComponents: Number(atomic?.maximumRollbackComponents || 0),
-    tripleRegions: Number(triple?.regionsConsidered || 0),
-    tripleVictimPairs: Number(triple?.victimPairsConsidered || 0),
-    tripleVictimPairsRolledBack: Number(triple?.victimPairsRolledBack || 0),
-    tripleRollbackRejected: Number(triple?.rollbackRejected || 0),
-    tripleRollbackInvalid: Number(triple?.rollbackInvalid || 0),
-    tripleSlots: Number(triple?.slotsEnumerated || 0),
-    tripleSlotTriples: Number(triple?.slotTriplesConsidered || 0),
-    tripleComponentPruned: Number(triple?.componentPrunedTriples || 0),
-    tripleCompatible: Number(triple?.compatibleSlotTriples || 0),
-    tripleEntryTriples: Number(triple?.entryTriplesConsidered || 0),
-    tripleApplyRejected: Number(triple?.applyRejected || 0),
-    tripleValidationRejected: Number(triple?.validationRejected || 0),
-    tripleWeakRejected: Number(triple?.weakBudgetRejected || 0),
-    tripleStates: Number(triple?.statesAccepted || 0),
   };
   rows.push(row);
   console.log(JSON.stringify(row));
@@ -112,16 +96,4 @@ console.log(JSON.stringify({
   regionSizeDistribution: Object.fromEntries([...new Set(regionSizes)].sort((a, b) => a - b).map((size) => [size, regionSizes.filter((value) => value === size).length])),
   edgeRegions: rows.flatMap((row) => row.regions).filter((region) => region.touchesEdge).length,
   commonBoundaryAnswers: [...boundaryFrequency.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ru")).slice(0, 20),
-  tripleStateSeeds: rows.filter((row) => row.tripleStates > 0).length,
-  totalTripleVictimPairs: rows.reduce((sum, row) => sum + row.tripleVictimPairs, 0),
-  totalTripleVictimPairsRolledBack: rows.reduce((sum, row) => sum + row.tripleVictimPairsRolledBack, 0),
-  totalTripleRollbackRejected: rows.reduce((sum, row) => sum + row.tripleRollbackRejected, 0),
-  totalTripleSlots: rows.reduce((sum, row) => sum + row.tripleSlots, 0),
-  totalTripleSlotTriples: rows.reduce((sum, row) => sum + row.tripleSlotTriples, 0),
-  totalTripleComponentPruned: rows.reduce((sum, row) => sum + row.tripleComponentPruned, 0),
-  totalTripleCompatible: rows.reduce((sum, row) => sum + row.tripleCompatible, 0),
-  totalTripleEntryTriples: rows.reduce((sum, row) => sum + row.tripleEntryTriples, 0),
-  totalTripleApplyRejected: rows.reduce((sum, row) => sum + row.tripleApplyRejected, 0),
-  totalTripleValidationRejected: rows.reduce((sum, row) => sum + row.tripleValidationRejected, 0),
-  totalTripleWeakRejected: rows.reduce((sum, row) => sum + row.tripleWeakRejected, 0),
 }));
