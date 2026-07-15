@@ -141,6 +141,7 @@ jobs:
         env:
           SCANWORD_CHECKPOINT_ENFORCE: 1
           SCANWORD_CHECKPOINT_CONCURRENCY: 2
+          SCANWORD_ZERO_PANEL_PASS: 1
           SCANWORD_PORTFOLIO_ATTEMPTS: 240
           SCANWORD_REPACK_NODES: 600000
           SCANWORD_REPACK_BRANCH: 24
@@ -153,6 +154,7 @@ jobs:
 
       - name: Render enforced checkpoint scanword
         env:
+          SCANWORD_ZERO_PANEL_PASS: 1
           SCANWORD_PORTFOLIO_ATTEMPTS: 240
           SCANWORD_REPACK_NODES: 600000
           SCANWORD_REPACK_BRANCH: 24
