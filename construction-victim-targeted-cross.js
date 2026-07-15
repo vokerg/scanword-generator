@@ -75,8 +75,8 @@
 
   function directionSpec(direction) {
     return direction === "right"
-      ? { dr: 0, dc: 1, perpendicular: "down" }
-      : { dr: 1, dc: 0, perpendicular: "right" };
+      ? { dr: 0, dc: 1, perpendicular: "down", sides: [[-1, 0], [1, 0]] }
+      : { dr: 1, dc: 0, perpendicular: "right", sides: [[0, -1], [0, 1]] };
   }
 
   function usableExistingLetter(cell, direction, perpendicular) {
@@ -87,86 +87,135 @@
       && !(cell.directions || []).includes(direction));
   }
 
-  function buildDirectSlot(state, target, direction, patternIndex, usedAnswers, options, telemetry) {
-    const { dr, dc, perpendicular } = directionSpec(direction);
-    let beforeRow = target.row - dr;
-    let beforeCol = target.col - dc;
-    while (usableExistingLetter(state.grid[beforeRow]?.[beforeCol], direction, perpendicular)) {
-      beforeRow -= dr;
-      beforeCol -= dc;
-    }
-    const clueCell = state.grid[beforeRow]?.[beforeCol];
-    if (!clueCell || (clueCell.type !== "panel" && clueCell.type !== "clue")) return null;
-    if ((clueCell.clues || []).some((clue) => clue.direction === direction)) return null;
-    if ((clueCell.clues || []).length >= 2) return null;
+  function availableClueCell(cell, direction) {
+    return Boolean(cell
+      && (cell.type === "panel" || cell.type === "clue")
+      && !(cell.clues || []).some((clue) => clue.direction === direction)
+      && (cell.clues || []).length < 2);
+  }
 
-    const startRow = beforeRow + dr;
-    const startCol = beforeCol + dc;
-    let endRow = target.row + dr;
-    let endCol = target.col + dc;
-    while (usableExistingLetter(state.grid[endRow]?.[endCol], direction, perpendicular)) {
-      endRow += dr;
-      endCol += dc;
+  function safeNewPanel(state, row, col, target, sides) {
+    if (row === target.row && col === target.col) return true;
+    for (const [dr, dc] of sides) {
+      if (state.grid[row + dr]?.[col + dc]?.type === "letter") return false;
     }
-    const after = state.grid[endRow]?.[endCol];
-    if (after?.type === "letter") return null;
-    endRow -= dr;
-    endCol -= dc;
+    return true;
+  }
 
-    const cells = [];
-    const pattern = [];
-    let row = startRow;
-    let col = startCol;
-    let targetPosition = -1;
-    while (true) {
-      const cell = state.grid[row]?.[col];
-      if (row === target.row && col === target.col) {
-        if (cell?.type !== "panel") return null;
-        targetPosition = pattern.length;
-        pattern.push(null);
-      } else {
-        if (!usableExistingLetter(cell, direction, perpendicular)) return null;
-        pattern.push(cell.char);
+  function validateWordCell(state, row, col, target, direction, spec) {
+    const cell = state.grid[row]?.[col];
+    if (row === target.row && col === target.col) {
+      return cell?.type === "panel" ? { char: null, panel: true } : null;
+    }
+    if (usableExistingLetter(cell, direction, spec.perpendicular)) return { char: cell.char, panel: false };
+    if (cell?.type === "panel" && safeNewPanel(state, row, col, target, spec.sides)) return { char: null, panel: true };
+    return null;
+  }
+
+  function enumerateDirectSlots(state, target, direction, patternIndex, usedAnswers, options, telemetry) {
+    const spec = directionSpec(direction);
+    const slots = new Map();
+    const maxLength = options.directCrossMaxLength;
+    const maxNewPanels = options.directCrossMaxNewPanels;
+
+    for (let clueDistance = 1; clueDistance <= maxLength; clueDistance += 1) {
+      const clueRow = target.row - spec.dr * clueDistance;
+      const clueCol = target.col - spec.dc * clueDistance;
+      const clueCell = state.grid[clueRow]?.[clueCol];
+      if (!clueCell) break;
+      if (!availableClueCell(clueCell, direction)) {
+        if (clueCell.type === "clue" || clueCell.type === "clueText" || clueCell.type === "clueTextContinuation") break;
+        continue;
       }
-      cells.push({ row, col });
-      if (row === endRow && col === endCol) break;
-      row += dr;
-      col += dc;
+
+      const startRow = clueRow + spec.dr;
+      const startCol = clueCol + spec.dc;
+      const prefix = [];
+      let panelCount = 0;
+      let prefixValid = true;
+      for (let position = 0; position < clueDistance; position += 1) {
+        const row = startRow + spec.dr * position;
+        const col = startCol + spec.dc * position;
+        const validated = validateWordCell(state, row, col, target, direction, spec);
+        if (!validated) {
+          prefixValid = false;
+          break;
+        }
+        panelCount += Number(validated.panel);
+        if (panelCount > maxNewPanels) {
+          prefixValid = false;
+          break;
+        }
+        prefix.push({ row, col, char: validated.char, panel: validated.panel });
+      }
+      if (!prefixValid || !prefix.some((cell) => cell.row === target.row && cell.col === target.col)) continue;
+
+      let cells = [...prefix];
+      let currentRow = target.row;
+      let currentCol = target.col;
+      while (cells.length <= maxLength) {
+        const nextRow = currentRow + spec.dr;
+        const nextCol = currentCol + spec.dc;
+        const nextCell = state.grid[nextRow]?.[nextCol];
+        const nextUsableLetter = usableExistingLetter(nextCell, direction, spec.perpendicular);
+
+        if (!nextUsableLetter) {
+          const pattern = cells.map((cell) => cell.char);
+          const targetPosition = cells.findIndex((cell) => cell.row === target.row && cell.col === target.col);
+          const queryStats = { lookups: 0, checks: 0 };
+          const domain = closedFill.queryPattern(patternIndex, pattern, usedAnswers, queryStats)
+            .filter((entry) => entry.hasExactClue)
+            .sort((a, b) => entryQuality(b) - entryQuality(a) || a.answer.localeCompare(b.answer, "ru"))
+            .slice(0, options.directCrossDomain);
+          telemetry.patternLookups += queryStats.lookups;
+          telemetry.patternChecks += queryStats.checks;
+          const patternText = pattern.map((char) => char || "?").join("");
+          if (!domain.length) telemetry.emptyPatterns.push(patternText);
+          else {
+            const panelCells = cells.filter((cell) => cell.panel).length + Number(clueCell.type === "panel");
+            const slot = {
+              clueRow,
+              clueCol,
+              clueKey: cellKey(clueRow, clueCol),
+              direction,
+              startRow,
+              startCol,
+              length: cells.length,
+              cells: cells.map(({ row, col }) => ({ row, col })),
+              pattern,
+              targetPosition,
+              existingIntersections: cells.length - cells.filter((cell) => cell.panel).length,
+              panelGainUpperBound: panelCells,
+              baseDomain: domain,
+              signature: `${direction}:${clueRow},${clueCol}:${startRow},${startCol}:${cells.length}`,
+            };
+            slots.set(slot.signature, slot);
+          }
+        }
+
+        if (cells.length >= maxLength || !nextCell) break;
+        const validated = validateWordCell(state, nextRow, nextCol, target, direction, spec);
+        if (!validated) break;
+        const nextPanelCount = cells.filter((cell) => cell.panel).length + Number(validated.panel);
+        if (nextPanelCount > maxNewPanels) break;
+        cells = [...cells, { row: nextRow, col: nextCol, char: validated.char, panel: validated.panel }];
+        currentRow = nextRow;
+        currentCol = nextCol;
+      }
     }
-    if (targetPosition < 0 || cells.length < 2) return null;
 
-    const queryStats = { lookups: 0, checks: 0 };
-    const domain = closedFill.queryPattern(patternIndex, pattern, usedAnswers, queryStats)
-      .filter((entry) => entry.hasExactClue)
-      .sort((a, b) => entryQuality(b) - entryQuality(a) || a.answer.localeCompare(b.answer, "ru"))
-      .slice(0, options.directCrossDomain);
-    telemetry.patternLookups += queryStats.lookups;
-    telemetry.patternChecks += queryStats.checks;
-    if (!domain.length) return { emptyDomain: true, direction, pattern: pattern.map((char) => char || "?").join("") };
-
-    return {
-      clueRow: beforeRow,
-      clueCol: beforeCol,
-      clueKey: cellKey(beforeRow, beforeCol),
-      direction,
-      startRow,
-      startCol,
-      length: cells.length,
-      cells,
-      pattern,
-      targetPosition,
-      existingIntersections: cells.length - 1,
-      baseDomain: domain,
-      signature: `${direction}:${beforeRow},${beforeCol}:${startRow},${startCol}:${cells.length}`,
-    };
+    return [...slots.values()]
+      .sort((a, b) => b.panelGainUpperBound - a.panelGainUpperBound
+        || b.existingIntersections - a.existingIntersections
+        || a.baseDomain.length - b.baseDomain.length
+        || a.signature.localeCompare(b.signature))
+      .slice(0, options.directCrossCandidateSlots);
   }
 
   function applySlotRaw(state, slot, entry) {
     const id = state.placed.reduce((maximum, word) => Math.max(maximum, Number(word.id || 0)), 0) + 1;
     const clueCell = state.grid[slot.clueRow]?.[slot.clueCol];
-    if (!clueCell || (clueCell.type !== "panel" && clueCell.type !== "clue")) return false;
-    if ((clueCell.clues || []).some((clue) => clue.direction === slot.direction)) return false;
-    if ((clueCell.clues || []).length >= 2) return false;
+    if (!availableClueCell(clueCell, slot.direction)) return false;
     if (clueCell.type === "panel") {
       clueCell.type = "clue";
       clueCell.char = null;
@@ -174,12 +223,7 @@
       clueCell.directions = [];
       clueCell.clues = [];
     }
-    clueCell.clues.push({
-      slotId: id,
-      direction: slot.direction,
-      text: entry.clue,
-      answer: entry.answer,
-    });
+    clueCell.clues.push({ slotId: id, direction: slot.direction, text: entry.clue, answer: entry.answer });
 
     const cells = [];
     let intersections = 0;
@@ -197,9 +241,7 @@
         cell.clues = [];
         cell.slotIds = [];
         cell.directions = [];
-      } else {
-        return false;
-      }
+      } else return false;
       cell.slotIds.push(id);
       cell.directions.push(slot.direction);
       cells.push({ row: target.row, col: target.col });
@@ -263,54 +305,59 @@
       if (!orthogonal.every((cell) => cell?.type === "letter")) continue;
       telemetry.junctionRegions += 1;
 
-      const horizontal = buildDirectSlot(structural, target, "right", patternIndex, usedAnswers, options, telemetry);
-      const vertical = buildDirectSlot(structural, target, "down", patternIndex, usedAnswers, options, telemetry);
-      if (!horizontal || horizontal.emptyDomain) {
+      const horizontalSlots = enumerateDirectSlots(structural, target, "right", patternIndex, usedAnswers, options, telemetry);
+      const verticalSlots = enumerateDirectSlots(structural, target, "down", patternIndex, usedAnswers, options, telemetry);
+      telemetry.horizontalSlots += horizontalSlots.length;
+      telemetry.verticalSlots += verticalSlots.length;
+      if (!horizontalSlots.length) {
         telemetry.horizontalUnavailable += 1;
-        if (horizontal?.emptyDomain) telemetry.emptyPatterns.push(horizontal.pattern);
         continue;
       }
-      if (!vertical || vertical.emptyDomain) {
+      if (!verticalSlots.length) {
         telemetry.verticalUnavailable += 1;
-        if (vertical?.emptyDomain) telemetry.emptyPatterns.push(vertical.pattern);
         continue;
       }
-      telemetry.slotPairsBuilt += 1;
 
-      for (const horizontalEntry of horizontal.baseDomain) {
-        for (const verticalEntry of vertical.baseDomain) {
-          telemetry.entryPairsConsidered += 1;
-          if (horizontalEntry.answer === verticalEntry.answer) continue;
-          if (horizontalEntry.answer[horizontal.targetPosition] !== verticalEntry.answer[vertical.targetPosition]) continue;
-          telemetry.characterPairsMatched += 1;
-          const candidate = cloneState(structural);
-          if (!applySlotRaw(candidate, horizontal, horizontalEntry) || !applySlotRaw(candidate, vertical, verticalEntry)) {
-            telemetry.applyRejected += 1;
-            continue;
+      for (const horizontal of horizontalSlots) {
+        for (const vertical of verticalSlots) {
+          telemetry.slotPairsBuilt += 1;
+          for (const horizontalEntry of horizontal.baseDomain) {
+            for (const verticalEntry of vertical.baseDomain) {
+              telemetry.entryPairsConsidered += 1;
+              if (horizontalEntry.answer === verticalEntry.answer) continue;
+              if (horizontalEntry.answer[horizontal.targetPosition] !== verticalEntry.answer[vertical.targetPosition]) continue;
+              telemetry.characterPairsMatched += 1;
+              const candidate = cloneState(structural);
+              if (!applySlotRaw(candidate, horizontal, horizontalEntry) || !applySlotRaw(candidate, vertical, verticalEntry)) {
+                telemetry.applyRejected += 1;
+                continue;
+              }
+              const metrics = solver.resultMetrics(candidate);
+              if (!metrics.validation.valid || metrics.components !== 1 || candidate.placed.some((word) => !word.hasExactClue)) {
+                telemetry.validationRejected += 1;
+                continue;
+              }
+              if (weakCount(candidate, poolByAnswer) > baselineWeak) {
+                telemetry.weakBudgetRejected += 1;
+                continue;
+              }
+              candidate.targetedVictimMeta = {
+                regionId: region.id,
+                regionSize: 1,
+                directCross: true,
+                targetCell: { row: target.row, col: target.col },
+                horizontalPattern: horizontal.pattern.map((char) => char || "?").join(""),
+                verticalPattern: vertical.pattern.map((char) => char || "?").join(""),
+                pairAnswers: [horizontalEntry.answer, verticalEntry.answer].sort(),
+                structuralPanelGain: horizontal.panelGainUpperBound + vertical.panelGainUpperBound - 1,
+                baselineWeakFill: baselineWeak,
+                candidateWeakFill: weakCount(candidate, poolByAnswer),
+              };
+              const signature = stateSignature(candidate);
+              const existing = collected.get(signature);
+              if (!existing || compareStates(candidate, existing, poolByAnswer) < 0) collected.set(signature, candidate);
+            }
           }
-          const metrics = solver.resultMetrics(candidate);
-          if (!metrics.validation.valid || metrics.components !== 1 || candidate.placed.some((word) => !word.hasExactClue)) {
-            telemetry.validationRejected += 1;
-            continue;
-          }
-          if (weakCount(candidate, poolByAnswer) > baselineWeak) {
-            telemetry.weakBudgetRejected += 1;
-            continue;
-          }
-          candidate.targetedVictimMeta = {
-            regionId: region.id,
-            regionSize: 1,
-            directCross: true,
-            targetCell: { row: target.row, col: target.col },
-            horizontalPattern: horizontal.pattern.map((char) => char || "?").join(""),
-            verticalPattern: vertical.pattern.map((char) => char || "?").join(""),
-            pairAnswers: [horizontalEntry.answer, verticalEntry.answer].sort(),
-            baselineWeakFill: baselineWeak,
-            candidateWeakFill: weakCount(candidate, poolByAnswer),
-          };
-          const signature = stateSignature(candidate);
-          const existing = collected.get(signature);
-          if (!existing || compareStates(candidate, existing, poolByAnswer) < 0) collected.set(signature, candidate);
         }
       }
     }
@@ -328,17 +375,22 @@
     const previous = previousGenerateVariants(result, pool, suppliedOptions);
     const options = {
       directCrossRegions: 12,
-      directCrossDomain: 12,
+      directCrossDomain: 10,
+      directCrossCandidateSlots: 8,
+      directCrossMaxLength: 8,
+      directCrossMaxNewPanels: 3,
       directCrossMaxVariants: 6,
       directCrossFinalists: 2,
       ...suppliedOptions,
     };
     const telemetry = {
-      mode: "isolated-direct-cross-v1",
+      mode: "isolated-direct-cross-v2",
       regionsConsidered: 0,
       junctionRegions: 0,
       horizontalUnavailable: 0,
       verticalUnavailable: 0,
+      horizontalSlots: 0,
+      verticalSlots: 0,
       slotPairsBuilt: 0,
       entryPairsConsidered: 0,
       characterPairsMatched: 0,
