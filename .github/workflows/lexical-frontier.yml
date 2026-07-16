@@ -58,17 +58,19 @@ jobs:
           node tools/construction-lexical-placement-v3-test.cjs
 
       - name: Run final-selection Pareto A/B
+        if: github.event_name == 'workflow_dispatch'
         env:
-          SEED_COUNT: ${{ inputs.seeds || '20' }}
+          SEED_COUNT: ${{ inputs.seeds }}
         run: |
           mkdir -p research-output
           node tools/lexical-frontier-checkpoint.cjs "${SEED_COUNT}" \
             | tee research-output/lexical-frontier-${SEED_COUNT}.jsonl
 
-      - name: Run structural lexical-placement A/B
+      - name: Trace structural lexical-placement A/B
         env:
-          SEED_COUNT: ${{ inputs.seeds || '20' }}
+          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '6' }}
         run: |
+          mkdir -p research-output
           node tools/lexical-placement-checkpoint.cjs "${SEED_COUNT}" \
             | tee research-output/lexical-placement-${SEED_COUNT}.jsonl
 
