@@ -40,6 +40,7 @@ for (const file of [
   "construction-victim-targeted-exact.js",
   "construction-guard.js",
   "construction-editorial-replace-v3.js",
+  "construction-editorial-pair-refit-v3.js",
 ]) {
   require(path.join(root, file));
 }
@@ -168,6 +169,7 @@ console.log(JSON.stringify({
   constructionV2: result.constructionV2 || null,
   lexicalPlacementMode: process.env.SCANWORD_LEXICAL_PLACEMENT || "off",
   editorialReplacementMode: process.env.SCANWORD_EDITORIAL_REPLACE || "off",
+  editorialPairRefitMode: process.env.SCANWORD_EDITORIAL_PAIR_REFIT || "off",
   cumulativePlacementAdjustment: lexicalEntries.reduce((total, entry) => total + entry.placementAdjustment, 0),
   weakFillCount: weakEntries.length,
   weakAnswers: weakEntries.map((entry) => entry.answer).sort(),
