@@ -1,4 +1,4 @@
-name: Lexical Pareto frontier
+name: Lexical quality research
 
 on:
   push:
@@ -18,9 +18,9 @@ permissions:
   contents: read
 
 jobs:
-  lexical-frontier:
+  lexical-quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       SCANWORD_LEXICAL_CONCURRENCY: 2
       SCANWORD_PORTFOLIO_PANEL_SLACK: 1
@@ -47,13 +47,17 @@ jobs:
       - name: Check syntax
         run: |
           node --check construction-portfolio-v3.js
+          node --check construction-lexical-placement-v3.js
           node --check tools/benchmark-seed-v3.cjs
           node --check tools/lexical-frontier-checkpoint.cjs
+          node --check tools/lexical-placement-checkpoint.cjs
 
-      - name: Test Pareto primitives
-        run: node tools/construction-portfolio-v3-test.cjs
+      - name: Test research primitives
+        run: |
+          node tools/construction-portfolio-v3-test.cjs
+          node tools/construction-lexical-placement-v3-test.cjs
 
-      - name: Run identical-seed A/B
+      - name: Run final-selection Pareto A/B
         env:
           SEED_COUNT: ${{ inputs.seeds || '20' }}
         run: |
@@ -61,10 +65,17 @@ jobs:
           node tools/lexical-frontier-checkpoint.cjs "${SEED_COUNT}" \
             | tee research-output/lexical-frontier-${SEED_COUNT}.jsonl
 
+      - name: Run structural lexical-placement A/B
+        env:
+          SEED_COUNT: ${{ inputs.seeds || '20' }}
+        run: |
+          node tools/lexical-placement-checkpoint.cjs "${SEED_COUNT}" \
+            | tee research-output/lexical-placement-${SEED_COUNT}.jsonl
+
       - name: Publish A/B output
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lexical-frontier-${{ github.sha }}
+          name: lexical-quality-${{ github.sha }}
           path: research-output/
           if-no-files-found: error
