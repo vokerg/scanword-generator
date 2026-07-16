@@ -63,6 +63,10 @@
       statesAccepted: 0,
       statesAcceptedBeforeBudget: 0,
       weakBudgetFiltered: 0,
+      baselineWeakFill: 0,
+      weakFillLimit: 0,
+      acceptedWeakFillCounts: [],
+      rejectedWeakFillCounts: [],
       finalistsReserved: 0,
       patternLookups: 0,
       patternChecks: 0,
@@ -93,6 +97,8 @@
     const weakLimit = Math.max(baselineWeak, Number(options.relaxedCrossWeakBudget || 0));
     const permissivePool = [...poolByAnswer.values()].map((entry) => ({ ...entry, weakFill: false }));
     const telemetry = telemetryTemplate();
+    telemetry.baselineWeakFill = baselineWeak;
+    telemetry.weakFillLimit = weakLimit;
     const generated = solver.generateRelaxedRollbackCrossVariants(result, permissivePool, options, telemetry)
       .map((state) => restoreLexicalMetadata(state, poolByAnswer));
     telemetry.statesAcceptedBeforeBudget = generated.length;
@@ -102,8 +108,11 @@
       const candidateWeak = weakCount(state, poolByAnswer);
       if (candidateWeak > weakLimit) {
         telemetry.weakBudgetFiltered += 1;
+        telemetry.weakBudgetRejected += 1;
+        telemetry.rejectedWeakFillCounts.push(candidateWeak);
         continue;
       }
+      telemetry.acceptedWeakFillCounts.push(candidateWeak);
       state.targetedVictimMeta = {
         ...(state.targetedVictimMeta || {}),
         weakFillBefore: baselineWeak,
@@ -112,6 +121,8 @@
       };
       accepted.push(state);
     }
+    telemetry.acceptedWeakFillCounts.sort((a, b) => a - b);
+    telemetry.rejectedWeakFillCounts.sort((a, b) => a - b);
     telemetry.statesAccepted = accepted.length;
 
     const merged = new Map();
