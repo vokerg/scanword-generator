@@ -56,31 +56,30 @@ jobs:
           node --check tools/benchmark-seed-v3.cjs
           node --check tools/lexical-frontier-checkpoint.cjs
           node --check tools/lexical-placement-checkpoint.cjs
+          node --check tools/lexical-build-attempt-probe.cjs
 
       - name: Test research primitives
         run: |
           node tools/construction-portfolio-v3-test.cjs
           node tools/construction-lexical-placement-v3-test.cjs
 
-      - name: Run final-selection Pareto A/B
+      - name: Probe isolated build attempts
+        run: |
+          mkdir -p research-output
+          node tools/lexical-build-attempt-probe.cjs lexical-build-probe 40 \
+            | tee research-output/lexical-build-attempt-probe.jsonl
+
+      - name: Run full paired gates
         if: github.event_name == 'workflow_dispatch'
         env:
           SEED_COUNT: ${{ inputs.seeds }}
         run: |
-          mkdir -p research-output
           node tools/lexical-frontier-checkpoint.cjs "${SEED_COUNT}" \
             | tee research-output/lexical-frontier-${SEED_COUNT}.jsonl
-
-      - name: Trace structural lexical-placement A/B
-        env:
-          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '6' }}
-        run: |
-          mkdir -p research-output
           node tools/lexical-placement-checkpoint.cjs "${SEED_COUNT}" \
             | tee research-output/lexical-placement-${SEED_COUNT}.jsonl
-          echo "Fallback count: $(grep -c 'portfolio-v3-fallback' research-output/lexical-placement-${SEED_COUNT}.jsonl || true)"
 
-      - name: Publish A/B output
+      - name: Publish research output
         if: always()
         uses: actions/upload-artifact@v4
         with:
