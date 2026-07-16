@@ -21,7 +21,7 @@
     return Number.isFinite(value) && value >= 0 ? value : fallback;
   }
 
-  function lexicalPlacementAdjustment(entry, phase = "growth") {
+  function lexicalPlacementAdjustment(entry, phase = "growth", state = null) {
     const answer = String(entry?.answer || "");
     const quality = Number(entry?.lexicalQuality || (answer.length >= 4 ? 80 : 65));
     const weakPenalty = numericOption("SCANWORD_WEAK_PLACEMENT_PENALTY", 12);
@@ -31,12 +31,20 @@
     const growthMultiplier = numericOption("SCANWORD_GROWTH_LEXICAL_MULTIPLIER", 0);
     const denseMultiplier = numericOption("SCANWORD_DENSE_LEXICAL_MULTIPLIER", 0.65);
     const lengthBonusWeight = numericOption("SCANWORD_LENGTH_PLACEMENT_BONUS", 0);
+    const twoLetterBudget = numericOption("SCANWORD_TWO_LETTER_DENSE_BUDGET", 5);
+    const excessTwoLetterPenalty = numericOption("SCANWORD_TWO_LETTER_EXCESS_PENALTY", 18);
     const lengthBonus = Math.min(30, Math.max(0, answer.length - 3) * lengthBonusWeight);
 
     let penalty = Math.max(0, 80 - quality) * qualityPenaltyWeight;
     if (entry?.weakFill) penalty += weakPenalty;
-    if (answer.length === 2) penalty += twoLetterPenalty;
-    else if (answer.length === 3) penalty += threeLetterPenalty;
+    if (answer.length === 2) {
+      penalty += twoLetterPenalty;
+      const currentTwoLetter = Number(state?.lexicalPlacementV3?.twoLetterPlaced || 0);
+      const excessOrdinal = Math.max(0, currentTwoLetter - twoLetterBudget + 1);
+      penalty += excessOrdinal * excessTwoLetterPenalty;
+    } else if (answer.length === 3) {
+      penalty += threeLetterPenalty;
+    }
 
     const multiplier = phase === "dense" ? denseMultiplier : growthMultiplier;
     return lengthBonus - penalty * multiplier;
@@ -201,7 +209,7 @@
       if (placement) options.push(placement);
     }
     if (!options.length) return false;
-    commitPlacement(state, entry, options[Math.floor(random() * options.length)], lexicalPlacementAdjustment(entry, "growth"));
+    commitPlacement(state, entry, options[Math.floor(random() * options.length)], lexicalPlacementAdjustment(entry, "growth", state));
     state.componentsStarted += 1;
     return true;
   }
@@ -267,7 +275,7 @@
         const placement = validatePlacement(state, entry, startRow, startCol, anchor.direction, true);
         if (!placement) continue;
         const rarityBonus = Math.max(0, 18 - Math.log2(bucket.length + 1) * 2.2);
-        const adjustment = lexicalPlacementAdjustment(entry, phase);
+        const adjustment = lexicalPlacementAdjustment(entry, phase, state);
         insertTopCandidate(top, {
           entry,
           placement,
@@ -296,7 +304,7 @@
             const centerRow = row + (direction === "down" ? (entry.answer.length - 1) / 2 : 0);
             const centerCol = col + (direction === "right" ? (entry.answer.length - 1) / 2 : 0);
             const edgeSpread = Math.abs(centerRow - (state.rows - 1) / 2) + Math.abs(centerCol - (state.cols - 1) / 2);
-            const adjustment = lexicalPlacementAdjustment(entry, phase);
+            const adjustment = lexicalPlacementAdjustment(entry, phase, state);
             const seedScore = placement.score + placement.newCells * 14 + edgeSpread * 1.5 + adjustment + random() * 5;
             insertTopCandidate(top, { entry, placement, adjustment, score: seedScore }, 32);
           }
