@@ -6,6 +6,17 @@ A browser-based R&D prototype for generating Swedish-style crosswords (arrowword
 
 Version 0.9 raises the default 13 × 17 grid from the previous 78% quality floor to a strict **90% active-cell checkpoint** while keeping every answer in one connected component.
 
+## Research snapshots
+
+The production generator remains on the tested 0.9 path. The later closed-fill investigation is preserved separately as a documented, reproducible research checkpoint:
+
+- [Closed-fill research overview](research/closed-fill/README.md)
+- [Measured results](research/closed-fill/RESULTS.md)
+- [Architecture review](research/closed-fill/ARCHITECTURE.md)
+- [Experiment log](research/closed-fill/EXPERIMENT_LOG.md)
+
+The exact experimental implementation is pinned on `research/closed-fill-snapshot-2026-07-16` at commit `d1c12d8acca31edb3b38775db5166f4f5f59ce04`. It is not loaded by the production browser application.
+
 The generator:
 
 - uses only reviewed Russian answers and human-readable clues;
