@@ -24,19 +24,21 @@
   function lexicalPlacementAdjustment(entry, phase = "growth") {
     const answer = String(entry?.answer || "");
     const quality = Number(entry?.lexicalQuality || (answer.length >= 4 ? 80 : 65));
-    const weakPenalty = numericOption("SCANWORD_WEAK_PLACEMENT_PENALTY", 70);
-    const twoLetterPenalty = numericOption("SCANWORD_TWO_LETTER_PLACEMENT_PENALTY", 70);
-    const threeLetterPenalty = numericOption("SCANWORD_THREE_LETTER_PLACEMENT_PENALTY", 18);
-    const qualityPenaltyWeight = numericOption("SCANWORD_LEXICAL_QUALITY_PENALTY", 1);
-    const denseMultiplier = numericOption("SCANWORD_DENSE_LEXICAL_MULTIPLIER", 0.75);
-    const lengthBonus = Math.min(30, Math.max(0, answer.length - 3) * 6);
+    const weakPenalty = numericOption("SCANWORD_WEAK_PLACEMENT_PENALTY", 12);
+    const twoLetterPenalty = numericOption("SCANWORD_TWO_LETTER_PLACEMENT_PENALTY", 8);
+    const threeLetterPenalty = numericOption("SCANWORD_THREE_LETTER_PLACEMENT_PENALTY", 4);
+    const qualityPenaltyWeight = numericOption("SCANWORD_LEXICAL_QUALITY_PENALTY", 0.25);
+    const growthMultiplier = numericOption("SCANWORD_GROWTH_LEXICAL_MULTIPLIER", 0);
+    const denseMultiplier = numericOption("SCANWORD_DENSE_LEXICAL_MULTIPLIER", 0.65);
+    const lengthBonusWeight = numericOption("SCANWORD_LENGTH_PLACEMENT_BONUS", 0);
+    const lengthBonus = Math.min(30, Math.max(0, answer.length - 3) * lengthBonusWeight);
 
     let penalty = Math.max(0, 80 - quality) * qualityPenaltyWeight;
     if (entry?.weakFill) penalty += weakPenalty;
     if (answer.length === 2) penalty += twoLetterPenalty;
     else if (answer.length === 3) penalty += threeLetterPenalty;
 
-    const multiplier = phase === "dense" ? denseMultiplier : 1;
+    const multiplier = phase === "dense" ? denseMultiplier : growthMultiplier;
     return lengthBonus - penalty * multiplier;
   }
 
