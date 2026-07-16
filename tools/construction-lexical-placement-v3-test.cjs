@@ -20,30 +20,33 @@ window.ScanwordSolver = {
 
 require(path.resolve(__dirname, "..", "construction-lexical-placement-v3.js"));
 
-const strong = window.ScanwordSolver.lexicalPlacementAdjustmentV3({
-  answer: "РЕКА",
-  weakFill: false,
-  lexicalQuality: 95,
-});
-const weakTwo = window.ScanwordSolver.lexicalPlacementAdjustmentV3({
-  answer: "ИЛ",
-  weakFill: true,
-  lexicalQuality: 42,
-});
-const weakTwoDense = window.ScanwordSolver.lexicalPlacementAdjustmentV3({
-  answer: "ИЛ",
-  weakFill: true,
-  lexicalQuality: 42,
-}, "dense");
-const shortThree = window.ScanwordSolver.lexicalPlacementAdjustmentV3({
-  answer: "ЛЕС",
-  weakFill: false,
-  lexicalQuality: 75,
+Object.assign(process.env, {
+  SCANWORD_WEAK_PLACEMENT_PENALTY: "12",
+  SCANWORD_TWO_LETTER_PLACEMENT_PENALTY: "8",
+  SCANWORD_THREE_LETTER_PLACEMENT_PENALTY: "4",
+  SCANWORD_LEXICAL_QUALITY_PENALTY: "0.25",
+  SCANWORD_GROWTH_LEXICAL_MULTIPLIER: "0",
+  SCANWORD_DENSE_LEXICAL_MULTIPLIER: "0.65",
+  SCANWORD_LENGTH_PLACEMENT_BONUS: "0",
 });
 
-assert.ok(strong > shortThree, "strong common words should outrank short entries");
-assert.ok(shortThree > weakTwo, "three-letter entries should outrank weak two-letter entries");
-assert.ok(weakTwoDense > weakTwo, "dense fill should relax, but not remove, the lexical penalty");
+const strongEntry = { answer: "РЕКА", weakFill: false, lexicalQuality: 95 };
+const shortThreeEntry = { answer: "ЛЕС", weakFill: false, lexicalQuality: 75 };
+const weakTwoEntry = { answer: "ИЛ", weakFill: true, lexicalQuality: 42 };
+
+const strongGrowth = window.ScanwordSolver.lexicalPlacementAdjustmentV3(strongEntry, "growth");
+const shortThreeGrowth = window.ScanwordSolver.lexicalPlacementAdjustmentV3(shortThreeEntry, "growth");
+const weakTwoGrowth = window.ScanwordSolver.lexicalPlacementAdjustmentV3(weakTwoEntry, "growth");
+const strongDense = window.ScanwordSolver.lexicalPlacementAdjustmentV3(strongEntry, "dense");
+const shortThreeDense = window.ScanwordSolver.lexicalPlacementAdjustmentV3(shortThreeEntry, "dense");
+const weakTwoDense = window.ScanwordSolver.lexicalPlacementAdjustmentV3(weakTwoEntry, "dense");
+
+assert.equal(strongGrowth, 0, "growth scaffold must preserve original scoring");
+assert.equal(shortThreeGrowth, 0, "growth scaffold must not reject short entries");
+assert.equal(weakTwoGrowth, 0, "growth scaffold must remain reachable");
+assert.equal(strongDense, 0, "strong words need no dense-fill penalty");
+assert.ok(strongDense > shortThreeDense, "strong words should outrank short entries during dense fill");
+assert.ok(shortThreeDense > weakTwoDense, "three-letter entries should outrank weak two-letter entries");
 assert.ok(weakTwoDense < 0, "weak two-letter entries must remain penalized in dense fill");
 
 process.env.SCANWORD_LEXICAL_PLACEMENT = "off";
@@ -58,9 +61,9 @@ assert.equal(delegated, 2);
 
 console.log(JSON.stringify({
   lexicalPlacementStrategy: true,
-  strongAdjustment: strong,
-  shortThreeAdjustment: shortThree,
-  weakTwoAdjustment: weakTwo,
+  growthPreserved: true,
+  strongDenseAdjustment: strongDense,
+  shortThreeDenseAdjustment: shortThreeDense,
   weakTwoDenseAdjustment: weakTwoDense,
   baselineDelegation: true,
 }));
