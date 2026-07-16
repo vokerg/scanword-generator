@@ -49,6 +49,7 @@ jobs:
       SCANWORD_EDITORIAL_BUNDLE_DOMAIN: 100
       SCANWORD_EDITORIAL_BUNDLE_NODES: 50000
       SCANWORD_EDITORIAL_BUNDLE_SOLUTIONS: 24
+      SCANWORD_EDITORIAL_BUNDLE_VARIANTS: 24
     steps:
       - name: Check out branch
         uses: actions/checkout@v4
@@ -64,6 +65,7 @@ jobs:
           node --check construction-editorial-replace-v3.js
           node --check construction-editorial-pair-refit-v3.js
           node --check construction-editorial-bundle-refit-v3.js
+          node --check construction-editorial-repair-v3.js
           node --check construction-portfolio-v3.js
           node --check construction-lexical-placement-v3.js
           node --check tools/benchmark-seed-v3.cjs
@@ -72,6 +74,7 @@ jobs:
           node --check tools/lexical-placement-checkpoint.cjs
           node --check tools/lexical-build-attempt-probe.cjs
           node --check tools/lexical-build-sweep.cjs
+          node --check tools/construction-editorial-repair-v3-test.cjs
 
       - name: Test research primitives
         run: |
@@ -80,6 +83,7 @@ jobs:
           node tools/construction-editorial-replace-v3-test.cjs
           node tools/construction-editorial-pair-refit-v3-test.cjs
           node tools/construction-editorial-bundle-refit-v3-test.cjs
+          node tools/construction-editorial-repair-v3-test.cjs
 
       - name: Run editorial replacement A/B
         env:
