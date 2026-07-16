@@ -41,6 +41,20 @@
     return state;
   }
 
+  function candidateDetail(state, candidateWeak) {
+    const meta = state.targetedVictimMeta || {};
+    return {
+      victimAnswer: meta.victimAnswer || null,
+      pairAnswers: meta.pairAnswers || [],
+      horizontalPattern: meta.horizontalPattern || null,
+      verticalPattern: meta.verticalPattern || null,
+      panelsBefore: Number(meta.panelsBefore ?? 0),
+      panelsAfter: Number(meta.panelsAfter ?? 0),
+      panelGain: Number(meta.panelsBefore ?? 0) - Number(meta.panelsAfter ?? 0),
+      weakFillAfter: candidateWeak,
+    };
+  }
+
   function telemetryTemplate() {
     return {
       mode: "rollback-aware-cross-pair-budget-v2",
@@ -67,6 +81,8 @@
       weakFillLimit: 0,
       acceptedWeakFillCounts: [],
       rejectedWeakFillCounts: [],
+      acceptedCandidates: [],
+      rejectedCandidates: [],
       finalistsReserved: 0,
       patternLookups: 0,
       patternChecks: 0,
@@ -106,13 +122,16 @@
     const accepted = [];
     for (const state of generated) {
       const candidateWeak = weakCount(state, poolByAnswer);
+      const detail = candidateDetail(state, candidateWeak);
       if (candidateWeak > weakLimit) {
         telemetry.weakBudgetFiltered += 1;
         telemetry.weakBudgetRejected += 1;
         telemetry.rejectedWeakFillCounts.push(candidateWeak);
+        telemetry.rejectedCandidates.push(detail);
         continue;
       }
       telemetry.acceptedWeakFillCounts.push(candidateWeak);
+      telemetry.acceptedCandidates.push(detail);
       state.targetedVictimMeta = {
         ...(state.targetedVictimMeta || {}),
         weakFillBefore: baselineWeak,
@@ -123,6 +142,8 @@
     }
     telemetry.acceptedWeakFillCounts.sort((a, b) => a - b);
     telemetry.rejectedWeakFillCounts.sort((a, b) => a - b);
+    telemetry.acceptedCandidates.sort((a, b) => b.panelGain - a.panelGain || a.weakFillAfter - b.weakFillAfter);
+    telemetry.rejectedCandidates.sort((a, b) => b.panelGain - a.panelGain || a.weakFillAfter - b.weakFillAfter);
     telemetry.statesAccepted = accepted.length;
 
     const merged = new Map();
