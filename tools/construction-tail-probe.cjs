@@ -58,6 +58,7 @@ for (const index of indices) {
   const direct = exact?.search?.directCross || null;
   const rollbackCross = exact?.search?.rollbackAssistedCross || null;
   const rollbackDirect = rollbackCross?.direct || null;
+  const relaxed = exact?.search?.relaxedRollbackCross || null;
   const row = {
     type: "seed",
     index,
@@ -73,6 +74,7 @@ for (const index of indices) {
     selectedAtomicPair: Boolean(exact?.selected?.atomicPair),
     selectedDirectCross: Boolean(exact?.selected?.directCross),
     selectedRollbackCross: Boolean(exact?.selected?.rollbackAssistedCross),
+    selectedRelaxedRollbackCross: Boolean(exact?.selected?.relaxedRollbackCross),
     atomicStates: Number(atomic?.statesAccepted || 0),
     atomicCompatiblePairs: Number(atomic?.compatibleSlotPairs || 0),
     atomicComponentPrunedPairs: Number(atomic?.componentPrunedPairs || 0),
@@ -108,6 +110,23 @@ for (const index of indices) {
     rollbackDirectCharacterPairs: Number(rollbackDirect?.characterPairsMatched || 0),
     rollbackDirectStates: Number(rollbackDirect?.statesAccepted || 0),
     rollbackDirectEmptyPatterns: rollbackDirect?.emptyPatterns || [],
+    relaxedRegions: Number(relaxed?.regionsConsidered || 0),
+    relaxedVictimsConsidered: Number(relaxed?.victimsConsidered || 0),
+    relaxedVictimsRolledBack: Number(relaxed?.victimsRolledBack || 0),
+    relaxedDisconnectedRollbacks: Number(relaxed?.disconnectedRollbacks || 0),
+    relaxedHorizontalSlots: Number(relaxed?.horizontalSlots || 0),
+    relaxedVerticalSlots: Number(relaxed?.verticalSlots || 0),
+    relaxedSlotPairs: Number(relaxed?.slotPairsBuilt || 0),
+    relaxedEntryPairs: Number(relaxed?.entryPairsConsidered || 0),
+    relaxedCharacterPairs: Number(relaxed?.characterPairsMatched || 0),
+    relaxedApplyRejected: Number(relaxed?.applyRejected || 0),
+    relaxedValidationRejected: Number(relaxed?.validationRejected || 0),
+    relaxedAnswerCountRejected: Number(relaxed?.answerCountRejected || 0),
+    relaxedWeakRejected: Number(relaxed?.weakBudgetRejected || 0),
+    relaxedNonImprovingRejected: Number(relaxed?.nonImprovingRejected || 0),
+    relaxedStates: Number(relaxed?.statesAccepted || 0),
+    relaxedFinalistsReserved: Number(relaxed?.finalistsReserved || 0),
+    relaxedEmptyPatterns: relaxed?.emptyPatterns || [],
   };
   rows.push(row);
   console.log(JSON.stringify(row));
@@ -165,4 +184,23 @@ console.log(JSON.stringify({
   totalRollbackDirectCharacterPairs: rows.reduce((sum, row) => sum + row.rollbackDirectCharacterPairs, 0),
   totalRollbackDirectStates: rows.reduce((sum, row) => sum + row.rollbackDirectStates, 0),
   rollbackDirectEmptyPatterns: [...new Set(rows.flatMap((row) => row.rollbackDirectEmptyPatterns))].sort(),
+  relaxedStateSeeds: rows.filter((row) => row.relaxedStates > 0).length,
+  relaxedSelectedSeeds: rows.filter((row) => row.selectedRelaxedRollbackCross).length,
+  totalRelaxedRegions: rows.reduce((sum, row) => sum + row.relaxedRegions, 0),
+  totalRelaxedVictimsConsidered: rows.reduce((sum, row) => sum + row.relaxedVictimsConsidered, 0),
+  totalRelaxedVictimsRolledBack: rows.reduce((sum, row) => sum + row.relaxedVictimsRolledBack, 0),
+  totalRelaxedDisconnectedRollbacks: rows.reduce((sum, row) => sum + row.relaxedDisconnectedRollbacks, 0),
+  totalRelaxedHorizontalSlots: rows.reduce((sum, row) => sum + row.relaxedHorizontalSlots, 0),
+  totalRelaxedVerticalSlots: rows.reduce((sum, row) => sum + row.relaxedVerticalSlots, 0),
+  totalRelaxedSlotPairs: rows.reduce((sum, row) => sum + row.relaxedSlotPairs, 0),
+  totalRelaxedEntryPairs: rows.reduce((sum, row) => sum + row.relaxedEntryPairs, 0),
+  totalRelaxedCharacterPairs: rows.reduce((sum, row) => sum + row.relaxedCharacterPairs, 0),
+  totalRelaxedApplyRejected: rows.reduce((sum, row) => sum + row.relaxedApplyRejected, 0),
+  totalRelaxedValidationRejected: rows.reduce((sum, row) => sum + row.relaxedValidationRejected, 0),
+  totalRelaxedAnswerCountRejected: rows.reduce((sum, row) => sum + row.relaxedAnswerCountRejected, 0),
+  totalRelaxedWeakRejected: rows.reduce((sum, row) => sum + row.relaxedWeakRejected, 0),
+  totalRelaxedNonImprovingRejected: rows.reduce((sum, row) => sum + row.relaxedNonImprovingRejected, 0),
+  totalRelaxedStates: rows.reduce((sum, row) => sum + row.relaxedStates, 0),
+  totalRelaxedFinalistsReserved: rows.reduce((sum, row) => sum + row.relaxedFinalistsReserved, 0),
+  relaxedEmptyPatterns: [...new Set(rows.flatMap((row) => row.relaxedEmptyPatterns))].sort(),
 }));
