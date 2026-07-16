@@ -54,9 +54,12 @@ jobs:
 
       - name: Check syntax
         run: |
+          node --check editorial-lexical-policy-v3.js
+          node --check construction-editorial-replace-v3.js
           node --check construction-portfolio-v3.js
           node --check construction-lexical-placement-v3.js
           node --check tools/benchmark-seed-v3.cjs
+          node --check tools/editorial-replacement-checkpoint.cjs
           node --check tools/lexical-frontier-checkpoint.cjs
           node --check tools/lexical-placement-checkpoint.cjs
           node --check tools/lexical-build-attempt-probe.cjs
@@ -66,18 +69,23 @@ jobs:
         run: |
           node tools/construction-portfolio-v3-test.cjs
           node tools/construction-lexical-placement-v3-test.cjs
+          node tools/construction-editorial-replace-v3-test.cjs
 
-      - name: Sweep isolated build attempts
+      - name: Run editorial replacement A/B
+        env:
+          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '12' }}
         run: |
           mkdir -p research-output
-          node tools/lexical-build-sweep.cjs lexical-build-sweep 40 \
-            | tee research-output/lexical-build-sweep.jsonl
+          node tools/editorial-replacement-checkpoint.cjs "${SEED_COUNT}" \
+            | tee research-output/editorial-replacement-${SEED_COUNT}.jsonl
 
-      - name: Run full paired gates
+      - name: Run previous research gates
         if: github.event_name == 'workflow_dispatch'
         env:
           SEED_COUNT: ${{ inputs.seeds }}
         run: |
+          node tools/lexical-build-sweep.cjs lexical-build-sweep 40 \
+            | tee research-output/lexical-build-sweep.jsonl
           node tools/lexical-frontier-checkpoint.cjs "${SEED_COUNT}" \
             | tee research-output/lexical-frontier-${SEED_COUNT}.jsonl
           node tools/lexical-placement-checkpoint.cjs "${SEED_COUNT}" \
