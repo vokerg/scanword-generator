@@ -25,6 +25,7 @@ function runVariant(seed, replacementMode) {
       SCANWORD_PORTFOLIO_SELECTION: "panel-first",
       SCANWORD_LEXICAL_PLACEMENT: "off",
       SCANWORD_EDITORIAL_REPLACE: replacementMode,
+      SCANWORD_EDITORIAL_PAIR_REFIT: replacementMode,
       SCANWORD_PORTFOLIO_ATTEMPTS: process.env.SCANWORD_PORTFOLIO_ATTEMPTS || "240",
       SCANWORD_PORTFOLIO_CLUE_RESTARTS: process.env.SCANWORD_PORTFOLIO_CLUE_RESTARTS || "160",
       SCANWORD_VICTIM_BASES: process.env.SCANWORD_VICTIM_BASES || "8",
@@ -45,6 +46,8 @@ function runVariant(seed, replacementMode) {
       SCANWORD_REPACK_NODES: process.env.SCANWORD_REPACK_NODES || "600000",
       SCANWORD_REPACK_CANDIDATES: process.env.SCANWORD_REPACK_CANDIDATES || "24",
       SCANWORD_REPACK_BRANCH: process.env.SCANWORD_REPACK_BRANCH || "24",
+      SCANWORD_EDITORIAL_PAIR_DOMAIN: process.env.SCANWORD_EDITORIAL_PAIR_DOMAIN || "80",
+      SCANWORD_EDITORIAL_PAIR_CANDIDATES: process.env.SCANWORD_EDITORIAL_PAIR_CANDIDATES || "600",
     };
     const child = spawn(process.execPath, [workerPath, seed], {
       cwd: root,
@@ -85,7 +88,8 @@ function runVariant(seed, replacementMode) {
 }
 
 function describe(sample) {
-  const telemetry = sample.constructionV2?.editorialReplacement || null;
+  const single = sample.constructionV2?.editorialReplacement || null;
+  const pair = sample.constructionV2?.editorialPairRefit || null;
   return {
     panels: sample.panelCells,
     answers: sample.answers,
@@ -99,10 +103,21 @@ function describe(sample) {
     editorialPenalty: sample.editorialPenalty,
     formulaicAnswers: sample.formulaicAnswers,
     elapsedMs: sample.elapsedMs,
-    attempted: Number(telemetry?.attempted || 0),
-    matchedCandidates: Number(telemetry?.matchedCandidates || 0),
-    accepted: Number(telemetry?.accepted || 0),
-    replacements: telemetry?.replacements || [],
+    single: {
+      attempted: Number(single?.attempted || 0),
+      matchedCandidates: Number(single?.matchedCandidates || 0),
+      accepted: Number(single?.accepted || 0),
+      replacements: single?.replacements || [],
+    },
+    pair: {
+      targetsAttempted: Number(pair?.targetsAttempted || 0),
+      partnerSearches: Number(pair?.partnerSearches || 0),
+      domainsBuilt: Number(pair?.domainsBuilt || 0),
+      compatiblePairs: Number(pair?.compatiblePairs || 0),
+      rejectedPairs: Number(pair?.rejectedPairs || 0),
+      accepted: Number(pair?.accepted || 0),
+      replacements: pair?.replacements || [],
+    },
   };
 }
 
@@ -163,9 +178,13 @@ async function workerLoop() {
         averageFormulaicShortCount: average(samples.map((sample) => sample.replacement.formulaicShortCount)),
         maximumFormulaicShortCount: Math.max(...samples.map((sample) => sample.replacement.formulaicShortCount)),
         averageEditorialPenalty: average(samples.map((sample) => sample.replacement.editorialPenalty)),
-        totalAttempted: samples.reduce((sum, sample) => sum + sample.replacement.attempted, 0),
-        totalMatchedCandidates: samples.reduce((sum, sample) => sum + sample.replacement.matchedCandidates, 0),
-        totalAccepted: samples.reduce((sum, sample) => sum + sample.replacement.accepted, 0),
+        singleAttempted: samples.reduce((sum, sample) => sum + sample.replacement.single.attempted, 0),
+        singleMatchedCandidates: samples.reduce((sum, sample) => sum + sample.replacement.single.matchedCandidates, 0),
+        singleAccepted: samples.reduce((sum, sample) => sum + sample.replacement.single.accepted, 0),
+        pairTargetsAttempted: samples.reduce((sum, sample) => sum + sample.replacement.pair.targetsAttempted, 0),
+        pairPartnerSearches: samples.reduce((sum, sample) => sum + sample.replacement.pair.partnerSearches, 0),
+        pairCompatibleCandidates: samples.reduce((sum, sample) => sum + sample.replacement.pair.compatiblePairs, 0),
+        pairAccepted: samples.reduce((sum, sample) => sum + sample.replacement.pair.accepted, 0),
       },
       comparison: {
         improvedSeeds: samples.filter((sample) => sample.delta.formulaicShortCount < 0).length,
