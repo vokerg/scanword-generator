@@ -26,6 +26,7 @@ function runVariant(seed, replacementMode) {
       SCANWORD_LEXICAL_PLACEMENT: "off",
       SCANWORD_EDITORIAL_REPLACE: replacementMode,
       SCANWORD_EDITORIAL_PAIR_REFIT: replacementMode,
+      SCANWORD_EDITORIAL_BUNDLE_REFIT: replacementMode,
       SCANWORD_PORTFOLIO_ATTEMPTS: process.env.SCANWORD_PORTFOLIO_ATTEMPTS || "240",
       SCANWORD_PORTFOLIO_CLUE_RESTARTS: process.env.SCANWORD_PORTFOLIO_CLUE_RESTARTS || "160",
       SCANWORD_VICTIM_BASES: process.env.SCANWORD_VICTIM_BASES || "8",
@@ -48,6 +49,9 @@ function runVariant(seed, replacementMode) {
       SCANWORD_REPACK_BRANCH: process.env.SCANWORD_REPACK_BRANCH || "24",
       SCANWORD_EDITORIAL_PAIR_DOMAIN: process.env.SCANWORD_EDITORIAL_PAIR_DOMAIN || "80",
       SCANWORD_EDITORIAL_PAIR_CANDIDATES: process.env.SCANWORD_EDITORIAL_PAIR_CANDIDATES || "600",
+      SCANWORD_EDITORIAL_BUNDLE_DOMAIN: process.env.SCANWORD_EDITORIAL_BUNDLE_DOMAIN || "100",
+      SCANWORD_EDITORIAL_BUNDLE_NODES: process.env.SCANWORD_EDITORIAL_BUNDLE_NODES || "50000",
+      SCANWORD_EDITORIAL_BUNDLE_SOLUTIONS: process.env.SCANWORD_EDITORIAL_BUNDLE_SOLUTIONS || "24",
     };
     const child = spawn(process.execPath, [workerPath, seed], {
       cwd: root,
@@ -90,6 +94,7 @@ function runVariant(seed, replacementMode) {
 function describe(sample) {
   const single = sample.constructionV2?.editorialReplacement || null;
   const pair = sample.constructionV2?.editorialPairRefit || null;
+  const bundle = sample.constructionV2?.editorialBundleRefit || null;
   return {
     panels: sample.panelCells,
     answers: sample.answers,
@@ -117,6 +122,18 @@ function describe(sample) {
       rejectedPairs: Number(pair?.rejectedPairs || 0),
       accepted: Number(pair?.accepted || 0),
       replacements: pair?.replacements || [],
+    },
+    bundle: {
+      targetsAttempted: Number(bundle?.targetsAttempted || 0),
+      bundlesBuilt: Number(bundle?.bundlesBuilt || 0),
+      emptyDomainBundles: Number(bundle?.emptyDomainBundles || 0),
+      nodes: Number(bundle?.nodes || 0),
+      forwardPrunes: Number(bundle?.forwardPrunes || 0),
+      solutionsFound: Number(bundle?.solutionsFound || 0),
+      rejectedSolutions: Number(bundle?.rejectedSolutions || 0),
+      accepted: Number(bundle?.accepted || 0),
+      replacements: bundle?.replacements || [],
+      unresolved: bundle?.unresolved || [],
     },
   };
 }
@@ -185,6 +202,11 @@ async function workerLoop() {
         pairPartnerSearches: samples.reduce((sum, sample) => sum + sample.replacement.pair.partnerSearches, 0),
         pairCompatibleCandidates: samples.reduce((sum, sample) => sum + sample.replacement.pair.compatiblePairs, 0),
         pairAccepted: samples.reduce((sum, sample) => sum + sample.replacement.pair.accepted, 0),
+        bundleTargetsAttempted: samples.reduce((sum, sample) => sum + sample.replacement.bundle.targetsAttempted, 0),
+        bundlesBuilt: samples.reduce((sum, sample) => sum + sample.replacement.bundle.bundlesBuilt, 0),
+        bundleNodes: samples.reduce((sum, sample) => sum + sample.replacement.bundle.nodes, 0),
+        bundleSolutionsFound: samples.reduce((sum, sample) => sum + sample.replacement.bundle.solutionsFound, 0),
+        bundleAccepted: samples.reduce((sum, sample) => sum + sample.replacement.bundle.accepted, 0),
       },
       comparison: {
         improvedSeeds: samples.filter((sample) => sample.delta.formulaicShortCount < 0).length,
