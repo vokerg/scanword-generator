@@ -5,7 +5,7 @@ SCOPE="${1:-smoke}"
 SNAPSHOT_BRANCH="research/closed-fill-snapshot-2026-07-16"
 SNAPSHOT_SHA="d1c12d8acca31edb3b38775db5166f4f5f59ce04"
 ROOT="$(git rev-parse --show-toplevel)"
-WORKTREE="${TMPDIR:-/tmp}/scanword-closed-fill-${$}"
+WORKTREE="${TMPDIR:-/tmp}/scanword-closed-fill-$$"
 OUTPUT_DIR="${SCANWORD_RESEARCH_OUTPUT:-${ROOT}/research-output/closed-fill}"
 
 case "${SCOPE}" in
