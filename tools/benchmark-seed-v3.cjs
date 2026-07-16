@@ -42,6 +42,7 @@ for (const file of [
   "construction-editorial-replace-v3.js",
   "construction-editorial-pair-refit-v3.js",
   "construction-editorial-bundle-refit-v3.js",
+  "construction-editorial-repair-v3.js",
 ]) {
   require(path.join(root, file));
 }
@@ -169,6 +170,7 @@ console.log(JSON.stringify({
   constructionMode: result.mode || result.constructionV2?.mode || "legacy",
   constructionV2: result.constructionV2 || null,
   lexicalPlacementMode: process.env.SCANWORD_LEXICAL_PLACEMENT || "off",
+  editorialRepairMode: process.env.SCANWORD_EDITORIAL_REPAIR || "off",
   editorialReplacementMode: process.env.SCANWORD_EDITORIAL_REPLACE || "off",
   editorialPairRefitMode: process.env.SCANWORD_EDITORIAL_PAIR_REFIT || "off",
   editorialBundleRefitMode: process.env.SCANWORD_EDITORIAL_BUNDLE_REFIT || "off",
