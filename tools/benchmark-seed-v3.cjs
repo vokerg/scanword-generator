@@ -14,6 +14,7 @@ for (const file of [
   "dictionary-policy.js",
   "lexical-policy-v2.js",
   "solver.js",
+  "construction-lexical-placement-v3.js",
   "closed-fill.js",
   "closed-fill-rollback.js",
   "construction-v2-runtime.js",
@@ -114,6 +115,7 @@ const lexicalEntries = result.placed.map((word) => {
     weakFill,
     lexicalQuality,
     lexicalSource: word.lexicalSource || metadata.lexicalSource || null,
+    placementAdjustment: Number(word.lexicalPlacementAdjustment || 0),
   };
 });
 const weakEntries = lexicalEntries.filter((entry) => entry.weakFill);
@@ -152,6 +154,8 @@ console.log(JSON.stringify({
   coverageCheckpointPassed: Boolean(result.coverageCheckpoint?.passed),
   constructionMode: result.mode || result.constructionV2?.mode || "legacy",
   constructionV2: result.constructionV2 || null,
+  lexicalPlacementMode: process.env.SCANWORD_LEXICAL_PLACEMENT || "off",
+  cumulativePlacementAdjustment: lexicalEntries.reduce((total, entry) => total + entry.placementAdjustment, 0),
   weakFillCount: weakEntries.length,
   weakAnswers: weakEntries.map((entry) => entry.answer).sort(),
   twoLetterCount: lexicalEntries.filter((entry) => entry.length === 2).length,
