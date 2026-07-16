@@ -32,7 +32,9 @@ const assignClues = solver.assignClueTextCellsV2;
 if (typeof assignClues !== "function") throw new Error("assignClueTextCellsV2 is unavailable");
 
 function average(values) {
-  return +(values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length)).toFixed(2);
+  return values.length
+    ? +(values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2)
+    : null;
 }
 
 function weakCount(placed) {
@@ -88,6 +90,7 @@ function run(mode) {
     });
   }
 
+  const passing = samples.filter((sample) => sample.passed);
   const failureCounts = {};
   for (const key of Object.keys(samples[0].checks)) {
     failureCounts[key] = samples.filter((sample) => !sample.checks[key]).length;
@@ -95,7 +98,7 @@ function run(mode) {
   return {
     mode,
     attempts,
-    passed: samples.filter((sample) => sample.passed).length,
+    passed: passing.length,
     averageAnswers: average(samples.map((sample) => sample.placedBeforeClues)),
     minimumAnswers: Math.min(...samples.map((sample) => sample.placedBeforeClues)),
     maximumAnswers: Math.max(...samples.map((sample) => sample.placedBeforeClues)),
@@ -103,10 +106,19 @@ function run(mode) {
     minimumWeak: Math.min(...samples.map((sample) => sample.weakBeforeClues)),
     averageFinalPanels: average(samples.map((sample) => sample.finalPanels)),
     minimumFinalPanels: Math.min(...samples.map((sample) => sample.finalPanels)),
+    passingAverageAnswers: average(passing.map((sample) => sample.placedBeforeClues)),
+    passingAverageWeak: average(passing.map((sample) => sample.weakBeforeClues)),
+    passingMinimumWeak: passing.length ? Math.min(...passing.map((sample) => sample.weakBeforeClues)) : null,
+    passingMaximumWeak: passing.length ? Math.max(...passing.map((sample) => sample.weakBeforeClues)) : null,
+    passingAveragePanels: average(passing.map((sample) => sample.finalPanels)),
+    passingMinimumPanels: passing.length ? Math.min(...passing.map((sample) => sample.finalPanels)) : null,
     maximumActive: Math.max(...samples.map((sample) => sample.active)),
     maximumClueTextCells: Math.max(...samples.map((sample) => sample.clueTextCells)),
     maximumExternalClues: Math.max(...samples.map((sample) => sample.externalClues)),
     failureCounts,
+    bestPassingLexical: passing.length
+      ? [...passing].sort((a, b) => a.weakBeforeClues - b.weakBeforeClues || a.finalPanels - b.finalPanels)[0]
+      : null,
     bestByAnswers: [...samples].sort((a, b) => b.placedBeforeClues - a.placedBeforeClues || a.finalPanels - b.finalPanels)[0],
     bestByPanels: [...samples].sort((a, b) => a.finalPanels - b.finalPanels || b.placedBeforeClues - a.placedBeforeClues)[0],
   };
@@ -115,11 +127,14 @@ function run(mode) {
 console.log(JSON.stringify({
   seed,
   penalties: {
-    weak: Number(process.env.SCANWORD_WEAK_PLACEMENT_PENALTY || 70),
-    twoLetter: Number(process.env.SCANWORD_TWO_LETTER_PLACEMENT_PENALTY || 70),
-    threeLetter: Number(process.env.SCANWORD_THREE_LETTER_PLACEMENT_PENALTY || 18),
-    qualityWeight: Number(process.env.SCANWORD_LEXICAL_QUALITY_PENALTY || 1),
-    denseMultiplier: Number(process.env.SCANWORD_DENSE_LEXICAL_MULTIPLIER || 0.75),
+    weak: Number(process.env.SCANWORD_WEAK_PLACEMENT_PENALTY || 12),
+    twoLetter: Number(process.env.SCANWORD_TWO_LETTER_PLACEMENT_PENALTY || 8),
+    threeLetter: Number(process.env.SCANWORD_THREE_LETTER_PLACEMENT_PENALTY || 4),
+    qualityWeight: Number(process.env.SCANWORD_LEXICAL_QUALITY_PENALTY || 0.25),
+    growthMultiplier: Number(process.env.SCANWORD_GROWTH_LEXICAL_MULTIPLIER || 0),
+    denseMultiplier: Number(process.env.SCANWORD_DENSE_LEXICAL_MULTIPLIER || 0.65),
+    twoLetterBudget: Number(process.env.SCANWORD_TWO_LETTER_DENSE_BUDGET || 5),
+    excessTwoLetterPenalty: Number(process.env.SCANWORD_TWO_LETTER_EXCESS_PENALTY || 18),
   },
   baseline: run("off"),
   lexical: run("on"),
