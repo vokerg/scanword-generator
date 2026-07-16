@@ -26,3 +26,14 @@ jobs:
         run: node tools/construction-victim-targeted-cross-relaxed-test.cjs
       - name: Test bounded weak-fill rollback cross policy
         run: node tools/construction-victim-targeted-cross-budget-test.cjs
+      - name: Probe real rollback-cross tail seed
+        env:
+          SCANWORD_TAIL_SEEDS: "40"
+        run: node tools/construction-tail-probe.cjs | tee rollback-cross-seed40.jsonl
+      - name: Publish real rollback-cross probe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-cross-seed40
+          path: rollback-cross-seed40.jsonl
+          if-no-files-found: warn
