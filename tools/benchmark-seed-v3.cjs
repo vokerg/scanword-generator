@@ -13,6 +13,7 @@ for (const file of [
   "core.js",
   "dictionary-policy.js",
   "lexical-policy-v2.js",
+  "editorial-lexical-policy-v3.js",
   "solver.js",
   "construction-lexical-placement-v3.js",
   "closed-fill.js",
@@ -38,6 +39,7 @@ for (const file of [
   "construction-victim-targeted-cross-budget.js",
   "construction-victim-targeted-exact.js",
   "construction-guard.js",
+  "construction-editorial-replace-v3.js",
 ]) {
   require(path.join(root, file));
 }
@@ -50,6 +52,7 @@ const result = window.ScanwordSolver.generateBest(seed, window.RUSSIAN_WORDS.len
 const placedById = new Map(result.placed.map((word) => [word.id, word]));
 const poolByAnswer = new Map((result.pool || []).map((entry) => [entry.answer, entry]));
 const extractedRegions = window.ScanwordClosedFill?.extractResidualRegions?.(result) || [];
+const editorialPolicy = window.ScanwordEditorialLexicalPolicyV3;
 const OFFSETS = [
   [-1, -1], [-1, 0], [-1, 1],
   [0, -1], [0, 1],
@@ -109,6 +112,7 @@ const lexicalEntries = result.placed.map((word) => {
   const answer = String(word.answer || "");
   const lexicalQuality = Number(word.lexicalQuality || metadata.lexicalQuality || (answer.length >= 4 ? 80 : 65));
   const weakFill = Boolean(word.weakFill || metadata.weakFill);
+  const editorial = editorialPolicy.classify(answer, { ...metadata, ...word });
   return {
     answer,
     length: answer.length,
@@ -116,6 +120,13 @@ const lexicalEntries = result.placed.map((word) => {
     lexicalQuality,
     lexicalSource: word.lexicalSource || metadata.lexicalSource || null,
     placementAdjustment: Number(word.lexicalPlacementAdjustment || 0),
+    editorialTier: editorial.editorialTier,
+    editorialWeak: editorial.editorialWeak,
+    editorialQuality: editorial.editorialQuality,
+    editorialPenalty: editorial.editorialPenalty,
+    formulaicShort: editorial.formulaicShort,
+    specialistShort: editorial.specialistShort,
+    commonShort: editorial.commonShort,
   };
 });
 const weakEntries = lexicalEntries.filter((entry) => entry.weakFill);
@@ -126,6 +137,7 @@ const lexicalPenalty = lexicalEntries.reduce(
 const averageLexicalQuality = lexicalEntries.length
   ? +(lexicalEntries.reduce((total, entry) => total + entry.lexicalQuality, 0) / lexicalEntries.length).toFixed(2)
   : 0;
+const editorialSummary = editorialPolicy.summarize(result.placed);
 
 console.log(JSON.stringify({
   seed,
@@ -155,10 +167,18 @@ console.log(JSON.stringify({
   constructionMode: result.mode || result.constructionV2?.mode || "legacy",
   constructionV2: result.constructionV2 || null,
   lexicalPlacementMode: process.env.SCANWORD_LEXICAL_PLACEMENT || "off",
+  editorialReplacementMode: process.env.SCANWORD_EDITORIAL_REPLACE || "off",
   cumulativePlacementAdjustment: lexicalEntries.reduce((total, entry) => total + entry.placementAdjustment, 0),
   weakFillCount: weakEntries.length,
   weakAnswers: weakEntries.map((entry) => entry.answer).sort(),
-  twoLetterCount: lexicalEntries.filter((entry) => entry.length === 2).length,
+  twoLetterCount: editorialSummary.twoLetterCount,
+  commonShortCount: editorialSummary.commonShortCount,
+  specialistShortCount: editorialSummary.specialistShortCount,
+  formulaicShortCount: editorialSummary.formulaicShortCount,
+  editorialWeakCount: editorialSummary.editorialWeakCount,
+  editorialPenalty: editorialSummary.editorialPenalty,
+  formulaicAnswers: editorialSummary.formulaicAnswers,
+  specialistAnswers: editorialSummary.specialistAnswers,
   shortAnswerCount: lexicalEntries.filter((entry) => entry.length <= 3).length,
   lexicalPenalty,
   averageLexicalQuality,
