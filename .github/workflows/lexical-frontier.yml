@@ -23,6 +23,7 @@ jobs:
     timeout-minutes: 60
     env:
       SCANWORD_LEXICAL_CONCURRENCY: 2
+      SCANWORD_EDITORIAL_REPLACEMENT_ENFORCE: 1
       SCANWORD_PORTFOLIO_PANEL_SLACK: 1
       SCANWORD_PORTFOLIO_ATTEMPTS: 240
       SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
@@ -77,7 +78,7 @@ jobs:
 
       - name: Run editorial replacement A/B
         env:
-          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '12' }}
+          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '20' }}
         run: |
           mkdir -p research-output
           node tools/editorial-replacement-checkpoint.cjs "${SEED_COUNT}" \
