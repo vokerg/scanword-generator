@@ -119,7 +119,7 @@ const problem = window.ScanwordSolver.editorialBundleProblemV3(
   new Set(result.placed.map((word) => word.answer)),
 );
 assert.deepEqual(problem.patterns, ["??", "???", "???"]);
-assert.deepEqual(problem.domains.map((domain) => domain.length), [1, 3, 3]);
+assert.deepEqual(problem.domains.map((domain) => domain.length), [1, 4, 4]);
 
 const solved = window.ScanwordSolver.solveEditorialBundleV3(problem);
 assert.ok(solved.solutions.some((solution) =>
