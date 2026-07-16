@@ -28,6 +28,13 @@
     return true;
   }
 
+  function wordNeighborIds(result, word) {
+    return [...new Set(word.cells.flatMap((cell) =>
+      (result.grid[cell.row]?.[cell.col]?.slotIds || [])
+        .map(Number)
+        .filter((slotId) => slotId !== Number(word.id))))];
+  }
+
   function mutablePattern(result, word, mutableSlotIds) {
     return word.cells.map((cell) => {
       const gridCell = result.grid[cell.row]?.[cell.col];
@@ -85,7 +92,7 @@
       .slice(0, maximum);
   }
 
-  function buildBundleProblem(result, target, partners, usedAnswers) {
+  function buildBundleProblem(result, target, partners, usedAnswers, kind = "bundle") {
     const words = [target, ...partners];
     const mutableIds = new Set(words.map((word) => Number(word.id)));
     const usedOutside = new Set(usedAnswers);
@@ -94,7 +101,7 @@
     const domains = words.map((word, index) =>
       domainForWord(result, word, patterns[index], usedOutside, index === 0));
     const intersections = buildIntersections(words);
-    return { words, mutableIds, usedOutside, patterns, domains, intersections };
+    return { kind, words, mutableIds, usedOutside, patterns, domains, intersections };
   }
 
   function compatibleWithAssigned(problem, wordIndex, entry, assignments) {
@@ -128,6 +135,28 @@
       if (!supported) return false;
     }
     return true;
+  }
+
+  function missingSupportReport(problem) {
+    const targetDomain = problem.domains[0] || [];
+    return targetDomain.slice(0, 20).map((targetEntry) => {
+      const assignments = new Array(problem.words.length).fill(null);
+      assignments[0] = targetEntry;
+      const support = problem.words.slice(1).map((word, offset) => {
+        const wordIndex = offset + 1;
+        const compatible = problem.domains[wordIndex]
+          .filter((entry) => compatibleWithAssigned(problem, wordIndex, entry, assignments))
+          .slice(0, 8)
+          .map((entry) => entry.answer);
+        return {
+          slotId: word.id,
+          currentAnswer: word.answer,
+          pattern: problem.patterns[wordIndex],
+          compatible,
+        };
+      });
+      return { targetAnswer: targetEntry.answer, support };
+    });
   }
 
   function solveBundle(problem) {
@@ -282,6 +311,64 @@
     return { accepted: false, validation, duplicateAnswers, exactClues };
   }
 
+  function combinations(items, count) {
+    const result = [];
+    function visit(start, selected) {
+      if (selected.length === count) {
+        result.push([...selected]);
+        return;
+      }
+      for (let index = start; index < items.length; index += 1) {
+        selected.push(items[index]);
+        visit(index + 1, selected);
+        selected.pop();
+      }
+    }
+    visit(0, []);
+    return result;
+  }
+
+  function enumerateBundleCandidates(result, target, byId) {
+    const maximum = numericOption("SCANWORD_EDITORIAL_BUNDLE_VARIANTS", 24);
+    const direct = wordNeighborIds(result, target).map((slotId) => byId.get(slotId)).filter(Boolean);
+    const candidates = [];
+    const seen = new Set();
+
+    function add(kind, words) {
+      const unique = [];
+      const ids = new Set([Number(target.id)]);
+      for (const word of words) {
+        if (!word || ids.has(Number(word.id))) continue;
+        ids.add(Number(word.id));
+        unique.push(word);
+      }
+      if (!unique.length || unique.length > 2) return;
+      const key = [...ids].sort((a, b) => a - b).join(":");
+      if (seen.has(key)) return;
+      seen.add(key);
+      candidates.push({ kind, partners: unique });
+    }
+
+    for (const pair of combinations(direct, 2)) add("star", pair);
+
+    for (const partner of direct) {
+      const secondHop = wordNeighborIds(result, partner)
+        .filter((slotId) => slotId !== Number(target.id))
+        .map((slotId) => byId.get(slotId))
+        .filter(Boolean)
+        .sort((a, b) => a.answer.length - b.answer.length || a.id - b.id);
+      for (const neighbor of secondHop) add("chain", [partner, neighbor]);
+    }
+
+    candidates.sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === "chain" ? -1 : 1;
+      const lengthA = a.partners.reduce((sum, word) => sum + word.answer.length, 0);
+      const lengthB = b.partners.reduce((sum, word) => sum + word.answer.length, 0);
+      return lengthA - lengthB || a.partners.map((word) => word.id).join(":").localeCompare(b.partners.map((word) => word.id).join(":"));
+    });
+    return { directPartnerIds: direct.map((word) => word.id), candidates: candidates.slice(0, maximum) };
+  }
+
   function applyEditorialBundleRefits(result) {
     if (!result?.grid || !Array.isArray(result.placed) || !Array.isArray(result.pool)) return result;
 
@@ -291,6 +378,9 @@
     const replacements = [];
     const unresolved = [];
     let targetsAttempted = 0;
+    let bundleVariants = 0;
+    let starVariants = 0;
+    let chainVariants = 0;
     let bundlesBuilt = 0;
     let emptyDomainBundles = 0;
     let nodes = 0;
@@ -305,71 +395,78 @@
     for (const target of targets) {
       if (!policy.classify(target.answer, target).formulaicShort) continue;
       targetsAttempted += 1;
-      const partnerIds = [...new Set(target.cells.flatMap((cell) =>
-        (result.grid[cell.row]?.[cell.col]?.slotIds || [])
-          .map(Number)
-          .filter((slotId) => slotId !== Number(target.id)))),
-      ];
-      const partners = partnerIds.map((slotId) => byId.get(slotId)).filter(Boolean);
-      if (partners.length < 2) {
-        unresolved.push({ targetSlotId: target.id, targetAnswer: target.answer, reason: "fewer-than-two-crossing-partners", partnerIds });
-        continue;
-      }
-
-      const problem = buildBundleProblem(result, target, partners, usedAnswers);
-      bundlesBuilt += 1;
-      if (problem.domains.some((domain) => domain.length === 0)) {
-        emptyDomainBundles += 1;
-        unresolved.push({
-          targetSlotId: target.id,
-          targetAnswer: target.answer,
-          reason: "empty-domain",
-          patterns: problem.patterns,
-          domainSizes: problem.domains.map((domain) => domain.length),
-          partnerAnswers: partners.map((word) => word.answer),
-        });
-        continue;
-      }
-
-      const solved = solveBundle(problem);
-      nodes += solved.nodes;
-      forwardPrunes += solved.forwardPrunes;
-      solutionsFound += solved.solutions.length;
+      const generated = enumerateBundleCandidates(result, target, byId);
+      bundleVariants += generated.candidates.length;
+      starVariants += generated.candidates.filter((candidate) => candidate.kind === "star").length;
+      chainVariants += generated.candidates.filter((candidate) => candidate.kind === "chain").length;
       let accepted = false;
-      for (const solution of solved.solutions) {
-        const oldAnswers = problem.words.map((word) => word.answer);
-        const outcome = applySolution(result, problem, solution);
-        if (!outcome.accepted) {
-          rejectedSolutions += 1;
+      const targetDiagnostics = [];
+
+      for (const candidate of generated.candidates) {
+        const problem = buildBundleProblem(result, target, candidate.partners, usedAnswers, candidate.kind);
+        bundlesBuilt += 1;
+        if (problem.domains.some((domain) => domain.length === 0)) {
+          emptyDomainBundles += 1;
+          targetDiagnostics.push({
+            kind: candidate.kind,
+            reason: "empty-domain",
+            slotIds: problem.words.map((word) => word.id),
+            patterns: problem.patterns,
+            domainSizes: problem.domains.map((domain) => domain.length),
+          });
           continue;
         }
-        for (const answer of oldAnswers) usedAnswers.delete(answer);
-        for (const entry of solution.entries) usedAnswers.add(entry.answer);
-        replacements.push({
-          targetSlotId: target.id,
+
+        const solved = solveBundle(problem);
+        nodes += solved.nodes;
+        forwardPrunes += solved.forwardPrunes;
+        solutionsFound += solved.solutions.length;
+        for (const solution of solved.solutions) {
+          const oldAnswers = problem.words.map((word) => word.answer);
+          const outcome = applySolution(result, problem, solution);
+          if (!outcome.accepted) {
+            rejectedSolutions += 1;
+            continue;
+          }
+          for (const answer of oldAnswers) usedAnswers.delete(answer);
+          for (const entry of solution.entries) usedAnswers.add(entry.answer);
+          replacements.push({
+            targetSlotId: target.id,
+            kind: candidate.kind,
+            slotIds: problem.words.map((word) => word.id),
+            from: oldAnswers,
+            to: solution.entries.map((entry) => entry.answer),
+            patterns: problem.patterns,
+            formulaicGain: solution.formulaicGain,
+            penaltyGain: solution.penaltyGain,
+            nodes: solved.nodes,
+            forwardPrunes: solved.forwardPrunes,
+          });
+          accepted = true;
+          break;
+        }
+        if (accepted) break;
+        targetDiagnostics.push({
+          kind: candidate.kind,
+          reason: solved.solutions.length ? "validation-rejected" : "no-improving-assignment",
           slotIds: problem.words.map((word) => word.id),
-          from: oldAnswers,
-          to: solution.entries.map((entry) => entry.answer),
           patterns: problem.patterns,
-          formulaicGain: solution.formulaicGain,
-          penaltyGain: solution.penaltyGain,
+          domainSizes: problem.domains.map((domain) => domain.length),
           nodes: solved.nodes,
           forwardPrunes: solved.forwardPrunes,
+          nodeLimitReached: solved.nodeLimitReached,
+          missingSupport: solved.solutions.length ? [] : missingSupportReport(problem),
         });
-        accepted = true;
-        break;
       }
+
       if (!accepted) {
         unresolved.push({
           targetSlotId: target.id,
           targetAnswer: target.answer,
-          reason: solved.solutions.length ? "validation-rejected" : "no-improving-assignment",
-          patterns: problem.patterns,
-          domainSizes: problem.domains.map((domain) => domain.length),
-          partnerAnswers: partners.map((word) => word.answer),
-          nodes: solved.nodes,
-          forwardPrunes: solved.forwardPrunes,
-          nodeLimitReached: solved.nodeLimitReached,
+          directPartnerIds: generated.directPartnerIds,
+          reason: generated.candidates.length ? "no-bundle-solution" : "no-radius-two-bundle",
+          variantsTried: generated.candidates.length,
+          diagnostics: targetDiagnostics.slice(0, 12),
         });
       }
     }
@@ -384,8 +481,11 @@
     result.constructionV2 = {
       ...(result.constructionV2 || {}),
       editorialBundleRefit: {
-        mode: "same-geometry-three-slot-csp-v3",
+        mode: "same-geometry-radius-two-csp-v4",
         targetsAttempted,
+        bundleVariants,
+        starVariants,
+        chainVariants,
         bundlesBuilt,
         emptyDomainBundles,
         nodes,
@@ -415,6 +515,7 @@
     applyEditorialBundleRefitsV3: applyEditorialBundleRefits,
     editorialBundleProblemV3: buildBundleProblem,
     solveEditorialBundleV3: solveBundle,
+    enumerateEditorialBundleCandidatesV3: enumerateBundleCandidates,
     __editorialBundleRefitV3Installed: true,
   });
 })();
