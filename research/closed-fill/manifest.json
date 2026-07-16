@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "project": "closed-fill",
+  "status": "research-snapshot",
+  "snapshotDate": "2026-07-16",
+  "production": {
+    "branch": "main",
+    "commit": "a50c2c25642032cd4c3a9df13580bf5ea9e916a4",
+    "checkpoint": "0.9 plus indexed candidate retrieval"
+  },
+  "snapshot": {
+    "branch": "research/closed-fill-snapshot-2026-07-16",
+    "commit": "d1c12d8acca31edb3b38775db5166f4f5f59ce04",
+    "historicalPullRequest": 4,
+    "productionRuntimeEnabled": false
+  },
+  "verification": {
+    "qualityWorkflowRun": 29480865364,
+    "rollbackCrossWorkflowRun": 29480865358,
+    "qualityConclusion": "success",
+    "rollbackCrossConclusion": "success",
+    "artifacts": {
+      "constructionCheckpoint100": {
+        "artifactId": 8368630760,
+        "sha256": "d611759cdb05e5bb2c9a7ee139702257c05b46bdf25bd42ffa89a55cf86affbe"
+      },
+      "constructionTailProbe": {
+        "artifactId": 8368470599,
+        "sha256": "cea165ab376c2c61eae6541e5b132404ba1f0a4eae8186e9c23336194adb7fe5"
+      },
+      "constructionDiagnostics": {
+        "artifactId": 8368686578,
+        "sha256": "b87ad75b52c83c41b7f5b8af83b2f7a6045ea6697119f712a5d30d1969f5267a"
+      }
+    }
+  },
+  "baseline100Seeds": {
+    "valid": 100,
+    "averageResidualPanels": 15.42,
+    "minimumResidualPanels": 10,
+    "maximumResidualPanels": 20,
+    "averageAnswers": 44.63,
+    "averageElapsedSeconds": 1.43
+  },
+  "checkpointA100Seeds": {
+    "commit": "17ba4687ffc94af80cd51c11738e8b4396a03b9f",
+    "workflowRun": 29307485549,
+    "valid": 100,
+    "averageResidualPanels": 7.77,
+    "minimumResidualPanels": 4,
+    "maximumResidualPanels": 11,
+    "averageRawLetterPercent": 49.65,
+    "averageAnswers": 45.13,
+    "passed": true
+  },
+  "final100Seeds": {
+    "valid": 100,
+    "averageResidualPanels": 6.78,
+    "minimumResidualPanels": 3,
+    "maximumResidualPanels": 11,
+    "averageRawLetterPercent": 49.72,
+    "averageAnswers": 45.25,
+    "averageElapsedMilliseconds": 10610.46,
+    "victimSelectedSeeds": 63,
+    "targetedExactAcceptedSeeds": 16,
+    "atomicPairSelectedSeeds": 5,
+    "exactClueRepackAcceptedSeeds": 90,
+    "adaptiveClueRepackAcceptedSeeds": 40,
+    "clueTailAcceptedSeeds": 35,
+    "clueReflowAcceptedSeeds": 10,
+    "passed": true
+  },
+  "tail15Seeds": {
+    "indices": [14, 21, 24, 28, 40, 43, 53, 62, 65, 67, 69, 70, 71, 83, 89],
+    "averageResidualPanels": 9.27,
+    "residualRegions": 112,
+    "isolatedRegions": 89,
+    "maximumRegionSize": 4,
+    "regionSizeDistribution": {
+      "1": 89,
+      "2": 20,
+      "3": 2,
+      "4": 1
+    },
+    "rollbackAwareCross": {
+      "regionsConsidered": 60,
+      "victimsConsidered": 275,
+      "victimsRolledBack": 159,
+      "disconnectedRollbacks": 62,
+      "horizontalSlots": 39,
+      "verticalSlots": 51,
+      "slotPairs": 3,
+      "entryPairs": 3,
+      "characterMatches": 1,
+      "acceptedStates": 1,
+      "selectedStates": 1
+    }
+  },
+  "seed40Case": {
+    "seed": "construction-checkpoint-40",
+    "removedAnswer": "БЫТ",
+    "insertedAnswers": ["ИЛ", "ПЕТЛЯ"],
+    "panelsBefore": 9,
+    "panelsAfter": 8,
+    "answersBefore": 44,
+    "answersAfter": 45,
+    "structuralPanelGainBeforeRepack": 2,
+    "components": 1,
+    "valid": true,
+    "weakFillDebtDelta": 1
+  },
+  "lexicalTelemetry": {
+    "field": "targetedExactWeakFillBudget",
+    "mean": 10.62,
+    "minimum": 5,
+    "maximum": 16,
+    "seedsAtOrBelowProposedLimit2": 0,
+    "distribution": {
+      "5": 1,
+      "6": 3,
+      "7": 3,
+      "8": 11,
+      "9": 12,
+      "10": 20,
+      "11": 14,
+      "12": 12,
+      "13": 16,
+      "14": 5,
+      "15": 2,
+      "16": 1
+    }
+  },
+  "claims": {
+    "structuralValidity": "supported",
+    "materialPanelReduction": "supported",
+    "zeroPanelSolver": "not-supported",
+    "publicationQualityLexicon": "not-supported",
+    "productionReadiness": "not-supported"
+  }
+}
