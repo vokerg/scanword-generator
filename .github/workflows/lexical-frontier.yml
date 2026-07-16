@@ -46,6 +46,9 @@ jobs:
       SCANWORD_TWO_LETTER_EXCESS_PENALTY: 18
       SCANWORD_EDITORIAL_PAIR_DOMAIN: 80
       SCANWORD_EDITORIAL_PAIR_CANDIDATES: 600
+      SCANWORD_EDITORIAL_BUNDLE_DOMAIN: 100
+      SCANWORD_EDITORIAL_BUNDLE_NODES: 50000
+      SCANWORD_EDITORIAL_BUNDLE_SOLUTIONS: 24
     steps:
       - name: Check out branch
         uses: actions/checkout@v4
@@ -60,6 +63,7 @@ jobs:
           node --check editorial-lexical-policy-v3.js
           node --check construction-editorial-replace-v3.js
           node --check construction-editorial-pair-refit-v3.js
+          node --check construction-editorial-bundle-refit-v3.js
           node --check construction-portfolio-v3.js
           node --check construction-lexical-placement-v3.js
           node --check tools/benchmark-seed-v3.cjs
@@ -75,6 +79,7 @@ jobs:
           node tools/construction-lexical-placement-v3-test.cjs
           node tools/construction-editorial-replace-v3-test.cjs
           node tools/construction-editorial-pair-refit-v3-test.cjs
+          node tools/construction-editorial-bundle-refit-v3-test.cjs
 
       - name: Run editorial replacement A/B
         env:
