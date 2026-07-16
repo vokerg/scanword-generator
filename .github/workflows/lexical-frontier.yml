@@ -1,0 +1,67 @@
+name: Lexical Pareto frontier
+
+on:
+  push:
+    branches:
+      - r-and-d/lexical-pareto-frontier
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: Number of identical-seed A/B pairs
+        required: true
+        default: "20"
+
+permissions:
+  contents: read
+
+jobs:
+  lexical-frontier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SCANWORD_LEXICAL_CONCURRENCY: 2
+      SCANWORD_PORTFOLIO_PANEL_SLACK: 1
+      SCANWORD_PORTFOLIO_ATTEMPTS: 240
+      SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
+      SCANWORD_VICTIM_BASES: 8
+      SCANWORD_VICTIM_VARIANTS: 6
+      SCANWORD_TARGETED_VICTIM_REGIONS: 3
+      SCANWORD_TARGETED_VICTIM_WORDS: 4
+      SCANWORD_TARGETED_VICTIM_DEPTH: 2
+      SCANWORD_TARGETED_EXACT_VARIANTS: 4
+      SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
+      SCANWORD_REPACK_NODES: 600000
+      SCANWORD_REPACK_BRANCH: 24
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check syntax
+        run: |
+          node --check construction-portfolio-v3.js
+          node --check tools/benchmark-seed-v3.cjs
+          node --check tools/lexical-frontier-checkpoint.cjs
+
+      - name: Test Pareto primitives
+        run: node tools/construction-portfolio-v3-test.cjs
+
+      - name: Run identical-seed A/B
+        env:
+          SEED_COUNT: ${{ inputs.seeds || '20' }}
+        run: |
+          mkdir -p research-output
+          node tools/lexical-frontier-checkpoint.cjs "${SEED_COUNT}" \
+            | tee research-output/lexical-frontier-${SEED_COUNT}.jsonl
+
+      - name: Publish A/B output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lexical-frontier-${{ github.sha }}
+          path: research-output/
+          if-no-files-found: error
