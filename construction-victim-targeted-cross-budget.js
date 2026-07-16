@@ -52,12 +52,13 @@
       panelsAfter: Number(meta.panelsAfter ?? 0),
       panelGain: Number(meta.panelsBefore ?? 0) - Number(meta.panelsAfter ?? 0),
       weakFillAfter: candidateWeak,
+      weakFillDebt: 0,
     };
   }
 
   function telemetryTemplate() {
     return {
-      mode: "rollback-aware-cross-pair-budget-v2",
+      mode: "rollback-aware-cross-pair-budget-v3",
       regionsConsidered: 0,
       victimsConsidered: 0,
       victimsRolledBack: 0,
@@ -73,6 +74,7 @@
       validationRejected: 0,
       answerCountRejected: 0,
       weakBudgetRejected: 0,
+      weakDebtAccepted: 0,
       nonImprovingRejected: 0,
       statesAccepted: 0,
       statesAcceptedBeforeBudget: 0,
@@ -105,6 +107,8 @@
       relaxedCrossMaxVariants: 8,
       relaxedCrossFinalists: 2,
       relaxedCrossWeakBudget: 2,
+      relaxedCrossWeakDebt: 1,
+      relaxedCrossMinimumPanelGainForDebt: 2,
       ...suppliedOptions,
     };
 
@@ -123,13 +127,18 @@
     for (const state of generated) {
       const candidateWeak = weakCount(state, poolByAnswer);
       const detail = candidateDetail(state, candidateWeak);
-      if (candidateWeak > weakLimit) {
+      const weakDebt = Math.max(0, candidateWeak - weakLimit);
+      detail.weakFillDebt = weakDebt;
+      const debtAllowed = weakDebt <= Number(options.relaxedCrossWeakDebt || 0)
+        && detail.panelGain >= Number(options.relaxedCrossMinimumPanelGainForDebt || 0);
+      if (weakDebt > 0 && !debtAllowed) {
         telemetry.weakBudgetFiltered += 1;
         telemetry.weakBudgetRejected += 1;
         telemetry.rejectedWeakFillCounts.push(candidateWeak);
         telemetry.rejectedCandidates.push(detail);
         continue;
       }
+      if (weakDebt > 0) telemetry.weakDebtAccepted += 1;
       telemetry.acceptedWeakFillCounts.push(candidateWeak);
       telemetry.acceptedCandidates.push(detail);
       state.targetedVictimMeta = {
@@ -137,6 +146,7 @@
         weakFillBefore: baselineWeak,
         weakFillAfter: candidateWeak,
         weakFillLimit: weakLimit,
+        weakFillDebt: weakDebt,
       };
       accepted.push(state);
     }
