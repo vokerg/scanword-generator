@@ -24,9 +24,10 @@ function runVariant(seed, replacementMode) {
       SCANWORD_CLOSED_FILL: "diagnostic",
       SCANWORD_PORTFOLIO_SELECTION: "panel-first",
       SCANWORD_LEXICAL_PLACEMENT: "off",
-      SCANWORD_EDITORIAL_REPLACE: replacementMode,
-      SCANWORD_EDITORIAL_PAIR_REFIT: replacementMode,
-      SCANWORD_EDITORIAL_BUNDLE_REFIT: replacementMode,
+      SCANWORD_EDITORIAL_REPAIR: replacementMode,
+      SCANWORD_EDITORIAL_REPLACE: "off",
+      SCANWORD_EDITORIAL_PAIR_REFIT: "off",
+      SCANWORD_EDITORIAL_BUNDLE_REFIT: "off",
       SCANWORD_PORTFOLIO_ATTEMPTS: process.env.SCANWORD_PORTFOLIO_ATTEMPTS || "240",
       SCANWORD_PORTFOLIO_CLUE_RESTARTS: process.env.SCANWORD_PORTFOLIO_CLUE_RESTARTS || "160",
       SCANWORD_VICTIM_BASES: process.env.SCANWORD_VICTIM_BASES || "8",
@@ -52,6 +53,7 @@ function runVariant(seed, replacementMode) {
       SCANWORD_EDITORIAL_BUNDLE_DOMAIN: process.env.SCANWORD_EDITORIAL_BUNDLE_DOMAIN || "100",
       SCANWORD_EDITORIAL_BUNDLE_NODES: process.env.SCANWORD_EDITORIAL_BUNDLE_NODES || "50000",
       SCANWORD_EDITORIAL_BUNDLE_SOLUTIONS: process.env.SCANWORD_EDITORIAL_BUNDLE_SOLUTIONS || "24",
+      SCANWORD_EDITORIAL_BUNDLE_VARIANTS: process.env.SCANWORD_EDITORIAL_BUNDLE_VARIANTS || "24",
     };
     const child = spawn(process.execPath, [workerPath, seed], {
       cwd: root,
@@ -83,6 +85,9 @@ function runVariant(seed, replacementMode) {
         if (sample.components !== 1) throw new Error("disconnected answer graph");
         if (!sample.exactCluesOnly) throw new Error("fallback clue detected");
         if (!sample.coverageCheckpointPassed) throw new Error("preserved production checkpoint failed");
+        if (replacementMode === "on" && !sample.constructionV2?.editorialRepair) {
+          throw new Error("unified editorial repair telemetry is missing");
+        }
         resolve(sample);
       } catch (error) {
         reject(new Error(`${seed}/${replacementMode}: ${error.message}`));
@@ -92,6 +97,7 @@ function runVariant(seed, replacementMode) {
 }
 
 function describe(sample) {
+  const pipeline = sample.constructionV2?.editorialRepair || null;
   const single = sample.constructionV2?.editorialReplacement || null;
   const pair = sample.constructionV2?.editorialPairRefit || null;
   const bundle = sample.constructionV2?.editorialBundleRefit || null;
@@ -108,6 +114,13 @@ function describe(sample) {
     editorialPenalty: sample.editorialPenalty,
     formulaicAnswers: sample.formulaicAnswers,
     elapsedMs: sample.elapsedMs,
+    pipeline: {
+      mode: pipeline?.mode || null,
+      accepted: Number(pipeline?.accepted || 0),
+      formulaicGain: Number(pipeline?.formulaicGain || 0),
+      editorialPenaltyGain: Number(pipeline?.editorialPenaltyGain || 0),
+      stages: pipeline?.stages || [],
+    },
     single: {
       attempted: Number(single?.attempted || 0),
       matchedCandidates: Number(single?.matchedCandidates || 0),
@@ -125,6 +138,9 @@ function describe(sample) {
     },
     bundle: {
       targetsAttempted: Number(bundle?.targetsAttempted || 0),
+      bundleVariants: Number(bundle?.bundleVariants || 0),
+      starVariants: Number(bundle?.starVariants || 0),
+      chainVariants: Number(bundle?.chainVariants || 0),
       bundlesBuilt: Number(bundle?.bundlesBuilt || 0),
       emptyDomainBundles: Number(bundle?.emptyDomainBundles || 0),
       nodes: Number(bundle?.nodes || 0),
@@ -195,6 +211,7 @@ async function workerLoop() {
         averageFormulaicShortCount: average(samples.map((sample) => sample.replacement.formulaicShortCount)),
         maximumFormulaicShortCount: Math.max(...samples.map((sample) => sample.replacement.formulaicShortCount)),
         averageEditorialPenalty: average(samples.map((sample) => sample.replacement.editorialPenalty)),
+        pipelineAccepted: samples.reduce((sum, sample) => sum + sample.replacement.pipeline.accepted, 0),
         singleAttempted: samples.reduce((sum, sample) => sum + sample.replacement.single.attempted, 0),
         singleMatchedCandidates: samples.reduce((sum, sample) => sum + sample.replacement.single.matchedCandidates, 0),
         singleAccepted: samples.reduce((sum, sample) => sum + sample.replacement.single.accepted, 0),
@@ -203,6 +220,9 @@ async function workerLoop() {
         pairCompatibleCandidates: samples.reduce((sum, sample) => sum + sample.replacement.pair.compatiblePairs, 0),
         pairAccepted: samples.reduce((sum, sample) => sum + sample.replacement.pair.accepted, 0),
         bundleTargetsAttempted: samples.reduce((sum, sample) => sum + sample.replacement.bundle.targetsAttempted, 0),
+        bundleVariants: samples.reduce((sum, sample) => sum + sample.replacement.bundle.bundleVariants, 0),
+        starVariants: samples.reduce((sum, sample) => sum + sample.replacement.bundle.starVariants, 0),
+        chainVariants: samples.reduce((sum, sample) => sum + sample.replacement.bundle.chainVariants, 0),
         bundlesBuilt: samples.reduce((sum, sample) => sum + sample.replacement.bundle.bundlesBuilt, 0),
         bundleNodes: samples.reduce((sum, sample) => sum + sample.replacement.bundle.nodes, 0),
         bundleSolutionsFound: samples.reduce((sum, sample) => sum + sample.replacement.bundle.solutionsFound, 0),
@@ -213,6 +233,7 @@ async function workerLoop() {
         unchangedSeeds: samples.filter((sample) => sample.delta.formulaicShortCount === 0).length,
         regressedSeeds: samples.filter((sample) => sample.delta.formulaicShortCount > 0).length,
         geometryStableSeeds: samples.filter((sample) => sample.geometryStable).length,
+        pipelineReportedSeeds: samples.filter((sample) => sample.replacement.pipeline.mode === "same-geometry-editorial-repair-pipeline-v3").length,
         averageFormulaicDelta: average(samples.map((sample) => sample.delta.formulaicShortCount)),
         minimumFormulaicDelta: Math.min(...samples.map((sample) => sample.delta.formulaicShortCount)),
         averageEditorialPenaltyDelta: average(samples.map((sample) => sample.delta.editorialPenalty)),
@@ -222,13 +243,16 @@ async function workerLoop() {
 
     if (enforce) {
       if (summary.comparison.geometryStableSeeds !== samples.length) {
-        throw new Error("editorial replacement changed grid geometry");
+        throw new Error("editorial repair changed grid geometry");
+      }
+      if (summary.comparison.pipelineReportedSeeds !== samples.length) {
+        throw new Error("not every repaired seed used the unified editorial pipeline");
       }
       if (summary.comparison.regressedSeeds > 0) {
-        throw new Error("editorial replacement increased formulaic short answers");
+        throw new Error("editorial repair increased formulaic short answers");
       }
       if (summary.replacement.averageFormulaicShortCount >= summary.baseline.averageFormulaicShortCount) {
-        throw new Error("editorial replacement did not reduce formulaic short answers");
+        throw new Error("editorial repair did not reduce formulaic short answers");
       }
     }
   } catch (error) {
