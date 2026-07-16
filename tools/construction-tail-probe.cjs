@@ -56,6 +56,8 @@ for (const index of indices) {
   const exact = sample.constructionV2?.targetedExactVictim || null;
   const atomic = exact?.search?.atomicPair || null;
   const direct = exact?.search?.directCross || null;
+  const rollbackCross = exact?.search?.rollbackAssistedCross || null;
+  const rollbackDirect = rollbackCross?.direct || null;
   const row = {
     type: "seed",
     index,
@@ -70,6 +72,7 @@ for (const index of indices) {
     selectedVictim: exact?.selected?.victimAnswer || null,
     selectedAtomicPair: Boolean(exact?.selected?.atomicPair),
     selectedDirectCross: Boolean(exact?.selected?.directCross),
+    selectedRollbackCross: Boolean(exact?.selected?.rollbackAssistedCross),
     atomicStates: Number(atomic?.statesAccepted || 0),
     atomicCompatiblePairs: Number(atomic?.compatibleSlotPairs || 0),
     atomicComponentPrunedPairs: Number(atomic?.componentPrunedPairs || 0),
@@ -86,6 +89,25 @@ for (const index of indices) {
     directWeakRejected: Number(direct?.weakBudgetRejected || 0),
     directStates: Number(direct?.statesAccepted || 0),
     directEmptyPatterns: direct?.emptyPatterns || [],
+    rollbackCrossRegions: Number(rollbackCross?.regionsConsidered || 0),
+    rollbackCrossVictimsConsidered: Number(rollbackCross?.victimsConsidered || 0),
+    rollbackCrossVictimsRolledBack: Number(rollbackCross?.victimsRolledBack || 0),
+    rollbackCrossDisconnectedRollbacks: Number(rollbackCross?.disconnectedRollbacks || 0),
+    rollbackCrossDirectSearches: Number(rollbackCross?.directSearches || 0),
+    rollbackCrossCandidateStates: Number(rollbackCross?.candidateStates || 0),
+    rollbackCrossValidationRejected: Number(rollbackCross?.validationRejected || 0),
+    rollbackCrossAnswerCountRejected: Number(rollbackCross?.answerCountRejected || 0),
+    rollbackCrossNonImprovingRejected: Number(rollbackCross?.nonImprovingRejected || 0),
+    rollbackCrossStates: Number(rollbackCross?.statesAccepted || 0),
+    rollbackCrossFinalistsReserved: Number(rollbackCross?.finalistsReserved || 0),
+    rollbackDirectJunctions: Number(rollbackDirect?.junctionRegions || 0),
+    rollbackDirectHorizontalUnavailable: Number(rollbackDirect?.horizontalUnavailable || 0),
+    rollbackDirectVerticalUnavailable: Number(rollbackDirect?.verticalUnavailable || 0),
+    rollbackDirectSlotPairs: Number(rollbackDirect?.slotPairsBuilt || 0),
+    rollbackDirectEntryPairs: Number(rollbackDirect?.entryPairsConsidered || 0),
+    rollbackDirectCharacterPairs: Number(rollbackDirect?.characterPairsMatched || 0),
+    rollbackDirectStates: Number(rollbackDirect?.statesAccepted || 0),
+    rollbackDirectEmptyPatterns: rollbackDirect?.emptyPatterns || [],
   };
   rows.push(row);
   console.log(JSON.stringify(row));
@@ -122,4 +144,25 @@ console.log(JSON.stringify({
   totalDirectValidationRejected: rows.reduce((sum, row) => sum + row.directValidationRejected, 0),
   totalDirectWeakRejected: rows.reduce((sum, row) => sum + row.directWeakRejected, 0),
   directEmptyPatterns: [...new Set(rows.flatMap((row) => row.directEmptyPatterns))].sort(),
+  rollbackCrossStateSeeds: rows.filter((row) => row.rollbackCrossStates > 0).length,
+  rollbackCrossSelectedSeeds: rows.filter((row) => row.selectedRollbackCross).length,
+  totalRollbackCrossRegions: rows.reduce((sum, row) => sum + row.rollbackCrossRegions, 0),
+  totalRollbackCrossVictimsConsidered: rows.reduce((sum, row) => sum + row.rollbackCrossVictimsConsidered, 0),
+  totalRollbackCrossVictimsRolledBack: rows.reduce((sum, row) => sum + row.rollbackCrossVictimsRolledBack, 0),
+  totalRollbackCrossDisconnectedRollbacks: rows.reduce((sum, row) => sum + row.rollbackCrossDisconnectedRollbacks, 0),
+  totalRollbackCrossDirectSearches: rows.reduce((sum, row) => sum + row.rollbackCrossDirectSearches, 0),
+  totalRollbackCrossCandidateStates: rows.reduce((sum, row) => sum + row.rollbackCrossCandidateStates, 0),
+  totalRollbackCrossValidationRejected: rows.reduce((sum, row) => sum + row.rollbackCrossValidationRejected, 0),
+  totalRollbackCrossAnswerCountRejected: rows.reduce((sum, row) => sum + row.rollbackCrossAnswerCountRejected, 0),
+  totalRollbackCrossNonImprovingRejected: rows.reduce((sum, row) => sum + row.rollbackCrossNonImprovingRejected, 0),
+  totalRollbackCrossStates: rows.reduce((sum, row) => sum + row.rollbackCrossStates, 0),
+  totalRollbackCrossFinalistsReserved: rows.reduce((sum, row) => sum + row.rollbackCrossFinalistsReserved, 0),
+  totalRollbackDirectJunctions: rows.reduce((sum, row) => sum + row.rollbackDirectJunctions, 0),
+  totalRollbackDirectHorizontalUnavailable: rows.reduce((sum, row) => sum + row.rollbackDirectHorizontalUnavailable, 0),
+  totalRollbackDirectVerticalUnavailable: rows.reduce((sum, row) => sum + row.rollbackDirectVerticalUnavailable, 0),
+  totalRollbackDirectSlotPairs: rows.reduce((sum, row) => sum + row.rollbackDirectSlotPairs, 0),
+  totalRollbackDirectEntryPairs: rows.reduce((sum, row) => sum + row.rollbackDirectEntryPairs, 0),
+  totalRollbackDirectCharacterPairs: rows.reduce((sum, row) => sum + row.rollbackDirectCharacterPairs, 0),
+  totalRollbackDirectStates: rows.reduce((sum, row) => sum + row.rollbackDirectStates, 0),
+  rollbackDirectEmptyPatterns: [...new Set(rows.flatMap((row) => row.rollbackDirectEmptyPatterns))].sort(),
 }));
