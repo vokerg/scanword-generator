@@ -24,3 +24,5 @@ jobs:
         run: node tools/construction-victim-targeted-cross-rollback-test.cjs
       - name: Test rollback-aware crossing pair search
         run: node tools/construction-victim-targeted-cross-relaxed-test.cjs
+      - name: Test bounded weak-fill rollback cross policy
+        run: node tools/construction-victim-targeted-cross-budget-test.cjs
