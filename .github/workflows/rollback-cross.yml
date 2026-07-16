@@ -22,3 +22,5 @@ jobs:
           node-version: 22
       - name: Test rollback-assisted direct cross
         run: node tools/construction-victim-targeted-cross-rollback-test.cjs
+      - name: Test rollback-aware crossing pair search
+        run: node tools/construction-victim-targeted-cross-relaxed-test.cjs
