@@ -16,13 +16,23 @@ function average(values) {
   return +(values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length)).toFixed(2);
 }
 
-function sourceCounts(sample) {
+function countBy(sample, field, fallback) {
   const counts = {};
   for (const entry of sample.lexicalEntries || []) {
-    const source = entry.lexicalSource || "unknown";
-    counts[source] = (counts[source] || 0) + 1;
+    const value = entry[field] || fallback;
+    counts[value] = (counts[value] || 0) + 1;
   }
   return Object.fromEntries(Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
+}
+
+function mergeAverageCounts(samplesToMerge, field) {
+  const totals = {};
+  for (const sample of samplesToMerge) {
+    for (const [key, value] of Object.entries(sample[field] || {})) totals[key] = (totals[key] || 0) + value;
+  }
+  return Object.fromEntries(Object.entries(totals)
+    .map(([key, value]) => [key, +(value / Math.max(1, samplesToMerge.length)).toFixed(2)])
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
 }
 
 function runVariant(seed, bulkMode) {
@@ -90,6 +100,8 @@ function runVariant(seed, bulkMode) {
 function describe(sample) {
   return {
     dictionaryPool: Number(sample.poolEntries || 0),
+    sourceCorpusEntries: Number(sample.sourceCorpusEntries || 0),
+    poolSelection: sample.poolSelection || null,
     panels: sample.panelCells,
     answers: sample.answers,
     crossings: sample.crossings,
@@ -105,7 +117,8 @@ function describe(sample) {
     candidateChecks: Number(sample.candidateChecks || 0),
     candidateLookups: Number(sample.candidateLookups || 0),
     coverageCheckpointPassed: Boolean(sample.coverageCheckpointPassed),
-    lexicalSources: sourceCounts(sample),
+    lexicalSources: countBy(sample, "lexicalSource", "unknown"),
+    lexicalCategories: countBy(sample, "lexicalCategory", "core-reviewed"),
   };
 }
 
@@ -163,8 +176,11 @@ async function workerLoop() {
         averageFormulaicShort: average(samples.map((sample) => sample.baseline.formulaicShortCount)),
         averageEditorialPenalty: average(samples.map((sample) => sample.baseline.editorialPenalty)),
         averageElapsedMs: average(samples.map((sample) => sample.baseline.elapsedMs)),
+        averageLexicalSources: mergeAverageCounts(samples.map((sample) => sample.baseline), "lexicalSources"),
+        averageLexicalCategories: mergeAverageCounts(samples.map((sample) => sample.baseline), "lexicalCategories"),
       },
       expanded: {
+        sourceCorpusEntries: Math.max(...samples.map((sample) => sample.expanded.sourceCorpusEntries)),
         averageDictionaryPool: average(samples.map((sample) => sample.expanded.dictionaryPool)),
         averagePanels: average(samples.map((sample) => sample.expanded.panels)),
         averageAnswers: average(samples.map((sample) => sample.expanded.answers)),
@@ -176,6 +192,8 @@ async function workerLoop() {
         averageFormulaicShort: average(samples.map((sample) => sample.expanded.formulaicShortCount)),
         averageEditorialPenalty: average(samples.map((sample) => sample.expanded.editorialPenalty)),
         averageElapsedMs: average(samples.map((sample) => sample.expanded.elapsedMs)),
+        averageLexicalSources: mergeAverageCounts(samples.map((sample) => sample.expanded), "lexicalSources"),
+        averageLexicalCategories: mergeAverageCounts(samples.map((sample) => sample.expanded), "lexicalCategories"),
       },
       comparison: {
         fewerPanels: samples.filter((sample) => sample.delta.panels < 0).length,
