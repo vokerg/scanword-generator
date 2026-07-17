@@ -3,10 +3,10 @@
 
 Inputs:
 - RuWordNet 2.0 SQLite database
-- GeoNames cities15000.zip
+- GeoNames cities15000.zip and countryInfo.txt
 - wordfreq + pymorphy3 for frequency ranking and proper-name discovery
 
-Outputs are browser-loadable JS chunks plus a manifest/report.
+Outputs are browser-loadable JS chunks, a generated loader, and a manifest/report.
 """
 from __future__ import annotations
 
@@ -27,6 +27,15 @@ CYRILLIC_RE = re.compile(r"^[А-ЯЁа-яё]+$")
 SPACE_RE = re.compile(r"\s+")
 MARKUP_RE = re.compile(r"(?:https?://\S+|\[[^\]]*\]|\{[^}]*\}|<[^>]*>)")
 BAD_CLUE_RE = re.compile(r"(?:см\.|то же, что|вариант написания|форма слова)", re.I)
+CONTINENT_LOCATIVE = {
+    "AF": "Африке",
+    "AN": "Антарктиде",
+    "AS": "Азии",
+    "EU": "Европе",
+    "NA": "Северной Америке",
+    "OC": "Океании",
+    "SA": "Южной Америке",
+}
 
 try:
     from wordfreq import zipf_frequency, top_n_list
@@ -72,7 +81,12 @@ def clean_clue(value: str, answer: str) -> str | None:
     text = SPACE_RE.sub(" ", text).strip(" .;:,-—")
     if not text or len(text) < 4 or BAD_CLUE_RE.search(text):
         return None
-    text = re.sub(r"^(?:значение|действие по значению|состояние по значению)\s*[:—-]?\s*", "", text, flags=re.I)
+    text = re.sub(
+        r"^(?:значение|действие по значению|состояние по значению)\s*[:—-]?\s*",
+        "",
+        text,
+        flags=re.I,
+    )
     text = text[:1].upper() + text[1:]
     if len(text) > 118:
         text = text[:115].rsplit(" ", 1)[0] + "…"
@@ -137,7 +151,18 @@ def load_ruwordnet(db_path: Path, target: int, existing: set[str]) -> list[Entry
     ranked = sorted(best.values(), key=lambda item: (-item[0], item[1].answer))
     selected: list[Entry] = []
     length_counts = collections.Counter()
-    desired = {2: 0.01, 3: 0.10, 4: 0.17, 5: 0.20, 6: 0.19, 7: 0.14, 8: 0.09, 9: 0.05, 10: 0.025, 11: 0.0125, 12: 0.0125}
+    desired = {
+        3: 0.10,
+        4: 0.17,
+        5: 0.20,
+        6: 0.19,
+        7: 0.14,
+        8: 0.09,
+        9: 0.05,
+        10: 0.025,
+        11: 0.0125,
+        12: 0.0125,
+    }
     deferred: list[Entry] = []
     selected_answers: set[str] = set()
     for _, entry in ranked:
@@ -165,7 +190,8 @@ def load_names(target: int, existing: set[str]) -> list[Entry]:
         return []
     morph = pymorphy3.MorphAnalyzer()
     candidates: dict[str, tuple[float, Entry]] = {}
-    for token in top_n_list("ru", 350000):
+    scan_size = max(350_000, target * 100)
+    for token in top_n_list("ru", scan_size):
         if not valid_answer(token, 3, 12):
             continue
         parses = morph.parse(token)
@@ -280,6 +306,43 @@ def load_geography(zip_path: Path, target: int, existing: set[str]) -> list[Entr
     return [entry for _, entry in sorted(candidates.values(), key=lambda x: (-x[0], x[1].answer))[:target]]
 
 
+def load_countries(country_info_path: Path, existing: set[str]) -> list[Entry]:
+    territories = russian_territories()
+    entries: list[Entry] = []
+    for line in country_info_path.read_text(encoding="utf-8").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        fields = line.split("\t")
+        if len(fields) < 17:
+            continue
+        iso = fields[0]
+        population_raw = fields[7]
+        continent = fields[8]
+        geoname_id = fields[16]
+        name = territories.get(iso)
+        if not name or not valid_answer(name, 3, 12):
+            continue
+        answer = normalize(name)
+        if answer in existing:
+            continue
+        try:
+            population = int(population_raw or 0)
+        except ValueError:
+            population = 0
+        location = CONTINENT_LOCATIVE.get(continent, "мире")
+        entries.append(Entry(
+            answer=answer,
+            clue=f"Государство в {location}",
+            category="country",
+            lexicalQuality=min(90, 78 + int(math.log10(max(population, 1)))),
+            lexicalSource="geonames-country-info",
+            license="CC BY 4.0 GeoNames",
+            sourceId=geoname_id or iso,
+            frequency=None,
+        ))
+    return sorted(entries, key=lambda entry: (-entry.lexicalQuality, entry.answer))
+
+
 def write_chunks(entries: list[Entry], output_dir: Path, prefix: str, chunk_size: int) -> list[dict]:
     records = []
     for index in range(0, len(entries), chunk_size):
@@ -306,6 +369,31 @@ def write_chunks(entries: list[Entry], output_dir: Path, prefix: str, chunk_size
     return records
 
 
+def write_loader(files: list[dict], output_dir: Path) -> dict:
+    names = [record["file"] for record in files]
+    content = f'''(() => {{
+  "use strict";
+  const files = {json.dumps(names, ensure_ascii=False, separators=(",", ":"))};
+  window.SCANWORD_BULK_LEXICON_FILES = files;
+  if (typeof require === "function") {{
+    for (const file of files) require(`./${{file}}`);
+    return;
+  }}
+  const current = document.currentScript?.src || "";
+  const base = current.slice(0, current.lastIndexOf("/") + 1);
+  document.write(files.map((file) => `<script src="${{base}}${{file}}"><\\/script>`).join(""));
+}})();
+'''
+    path = output_dir / "loader.js"
+    path.write_text(content, encoding="utf-8")
+    return {
+        "file": path.name,
+        "entries": len(names),
+        "bytes": path.stat().st_size,
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+    }
+
+
 def summarize(entries: Iterable[Entry]) -> dict:
     entries = list(entries)
     return {
@@ -324,14 +412,18 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--ruwordnet-db", type=Path, required=True)
     parser.add_argument("--geonames-zip", type=Path, required=True)
+    parser.add_argument("--country-info", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
-    parser.add_argument("--common", type=int, default=15000)
-    parser.add_argument("--names", type=int, default=2500)
-    parser.add_argument("--geography", type=int, default=5000)
+    parser.add_argument("--common", type=int, default=35000)
+    parser.add_argument("--names", type=int, default=5000)
+    parser.add_argument("--geography", type=int, default=10000)
     parser.add_argument("--chunk-size", type=int, default=2500)
     args = parser.parse_args()
 
     args.out_dir.mkdir(parents=True, exist_ok=True)
+    for old in args.out_dir.glob("*.js"):
+        old.unlink()
+
     existing: set[str] = set()
     common = load_ruwordnet(args.ruwordnet_db, args.common, existing)
     existing.update(e.answer for e in common)
@@ -339,35 +431,51 @@ def main() -> None:
     existing.update(e.answer for e in names)
     geography = load_geography(args.geonames_zip, args.geography, existing)
     existing.update(e.answer for e in geography)
+    countries = load_countries(args.country_info, existing)
+    existing.update(e.answer for e in countries)
 
     files = []
     files += write_chunks(common, args.out_dir, "ruwordnet-common", args.chunk_size)
     files += write_chunks(names, args.out_dir, "proper-names", args.chunk_size)
     files += write_chunks(geography, args.out_dir, "geography", args.chunk_size)
-    all_entries = [*common, *names, *geography]
+    files += write_chunks(countries, args.out_dir, "countries", args.chunk_size)
+    loader = write_loader(files, args.out_dir)
+    all_entries = [*common, *names, *geography, *countries]
     manifest = {
-        "version": 1,
+        "version": 2,
         "generatedBy": "tools/build-bulk-lexicon.py",
         "sources": {
             "ruwordnet": {
                 "url": "https://github.com/avidale/python-ruwordnet/releases/download/0.0.4/ruwordnet-2021.db",
                 "role": "single-word noun senses and definitions",
             },
-            "geonames": {
+            "geonames-cities": {
                 "url": "https://download.geonames.org/export/dump/cities15000.zip",
                 "license": "CC BY 4.0",
                 "role": "cities and capitals",
             },
+            "geonames-countries": {
+                "url": "https://download.geonames.org/export/dump/countryInfo.txt",
+                "license": "CC BY 4.0",
+                "role": "country metadata and continent classification",
+            },
             "wordfreq+pymorphy3": {"role": "frequency ranking and proper-name morphology"},
         },
-        "requested": {"common": args.common, "names": args.names, "geography": args.geography},
+        "requested": {
+            "common": args.common,
+            "names": args.names,
+            "geography": args.geography,
+            "countries": "all valid single-token Russian territory names",
+        },
         "actual": {
             "common": summarize(common),
             "names": summarize(names),
             "geography": summarize(geography),
+            "countries": summarize(countries),
             "total": summarize(all_entries),
         },
         "files": files,
+        "loader": loader,
     }
     manifest_path = args.out_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
