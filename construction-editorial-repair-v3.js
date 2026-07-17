@@ -1,8 +1,11 @@
 (() => {
   "use strict";
 
-  if (!window.ScanwordEditorialDemandLexiconV3 && typeof require === "function") {
-    require("./editorial-demand-lexicon-v3.js");
+  if (typeof require === "function") {
+    if (!window.ScanwordEditorialDemandLexiconV3) require("./editorial-demand-lexicon-v3.js");
+    if (!window.ScanwordEditorialDemandLexiconSupplementV3) {
+      require("./editorial-demand-lexicon-supplement-v3.js");
+    }
   }
 
   const solver = window.ScanwordSolver;
@@ -30,6 +33,15 @@
         name: "demand-lexicon-extension",
         accepted: 0,
         added: Number(result.constructionV2?.editorialDemandLexicon?.addedEntries || 0),
+      });
+    }
+    const supplement = window.ScanwordEditorialDemandLexiconSupplementV3;
+    if (typeof supplement?.extendPool === "function") {
+      result = supplement.extendPool(result);
+      stages.push({
+        name: "demand-lexicon-supplement",
+        accepted: 0,
+        added: Number(result.constructionV2?.editorialDemandLexiconSupplement?.addedEntries || 0),
       });
     }
 
