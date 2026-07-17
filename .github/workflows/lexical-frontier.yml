@@ -12,7 +12,7 @@ on:
       seeds:
         description: Number of identical-seed A/B pairs
         required: true
-        default: "20"
+        default: "50"
 
 permissions:
   contents: read
@@ -95,7 +95,7 @@ jobs:
 
       - name: Run editorial replacement A/B
         env:
-          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '20' }}
+          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '50' }}
         run: |
           mkdir -p research-output
           node tools/editorial-replacement-checkpoint.cjs "${SEED_COUNT}" \
