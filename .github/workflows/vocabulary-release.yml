@@ -6,7 +6,7 @@ on:
       seeds:
         description: Number of identical-seed end-to-end A/B pairs
         required: true
-        default: "10"
+        default: "20"
   pull_request:
     branches:
       - research/closed-fill-snapshot-2026-07-16
@@ -64,7 +64,7 @@ jobs:
 
       - name: Run end-to-end release A/B
         env:
-          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '10' }}
+          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '20' }}
         run: |
           mkdir -p research-output
           node tools/vocabulary-release-checkpoint.cjs "${SEED_COUNT}" \
