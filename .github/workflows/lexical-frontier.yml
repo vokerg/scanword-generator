@@ -65,6 +65,7 @@ jobs:
           node --check editorial-demand-lexicon-v3.js
           node --check editorial-demand-lexicon-supplement-v3.js
           node --check editorial-demand-short-lexicon-v3.js
+          node --check editorial-demand-tail-lexicon-v3.js
           node --check construction-editorial-replace-v3.js
           node --check construction-editorial-pair-refit-v3.js
           node --check construction-editorial-bundle-refit-v3.js
