@@ -10,6 +10,7 @@ for (const file of [
   "editorial-demand-lexicon-v3.js",
   "editorial-demand-lexicon-supplement-v3.js",
   "editorial-demand-short-lexicon-v3.js",
+  "editorial-demand-tail-lexicon-v3.js",
 ]) require(path.join(root, file));
 
 const policy = window.ScanwordEditorialLexicalPolicyV3;
@@ -17,6 +18,7 @@ const batches = [
   window.ScanwordEditorialDemandLexiconV3,
   window.ScanwordEditorialDemandLexiconSupplementV3,
   window.ScanwordEditorialDemandShortLexiconV3,
+  window.ScanwordEditorialDemandTailLexiconV3,
 ];
 
 for (const batch of batches) {
@@ -29,14 +31,17 @@ for (const batch of batches) {
 
 const result = { pool: [], constructionV2: {} };
 for (const batch of batches) batch.extendPool(result);
-assert.ok(result.pool.length >= 500);
+assert.ok(result.pool.length >= 520);
 assert.equal(new Set(result.pool.map((entry) => entry.answer)).size, result.pool.length);
 assert.equal(result.constructionV2.editorialDemandLexicon.addedEntries, batches[0].entries.length);
 assert.ok(result.constructionV2.editorialDemandLexiconSupplement.addedEntries >= 100);
 assert.equal(result.constructionV2.editorialDemandShortLexicon.addedEntries, 13);
+assert.ok(result.constructionV2.editorialDemandTailLexicon.addedEntries >= 20);
 
 assert.equal(policy.classify("ДА").editorialTier, "common-short");
+assert.equal(policy.classify("МЫ").editorialTier, "common-short");
 assert.equal(policy.classify("ДИ").editorialTier, "specialist-short");
+assert.equal(policy.classify("МУ").editorialTier, "specialist-short");
 assert.equal(policy.classify("БА").editorialTier, "obscure-short");
 assert.ok(policy.classify("БА").editorialPenalty > policy.classify("ДИ").editorialPenalty);
 assert.ok(policy.classify("ДИ").editorialPenalty > policy.classify("ДА").editorialPenalty);
