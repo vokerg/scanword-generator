@@ -1,126 +1,154 @@
 {
-  "version": 1,
+  "version": 2,
   "generatedBy": "tools/build-bulk-lexicon.py",
   "sources": {
     "ruwordnet": {
       "url": "https://github.com/avidale/python-ruwordnet/releases/download/0.0.4/ruwordnet-2021.db",
       "role": "single-word noun senses and definitions"
     },
-    "geonames": {
+    "geonames-cities": {
       "url": "https://download.geonames.org/export/dump/cities15000.zip",
       "license": "CC BY 4.0",
       "role": "cities and capitals"
+    },
+    "geonames-countries": {
+      "url": "https://download.geonames.org/export/dump/countryInfo.txt",
+      "license": "CC BY 4.0",
+      "role": "country metadata and continent classification"
     },
     "wordfreq+pymorphy3": {
       "role": "frequency ranking and proper-name morphology"
     }
   },
   "requested": {
-    "common": 15000,
-    "names": 2500,
-    "geography": 5000
+    "common": 35000,
+    "names": 5000,
+    "geography": 10000,
+    "countries": "all valid single-token Russian territory names"
   },
   "actual": {
     "common": {
-      "entries": 15000,
+      "entries": 24457,
       "categories": {
         "common-noun": 4358,
-        "specialist-noun": 10642
+        "specialist-noun": 20099
       },
       "lengths": {
         "3": 448,
         "4": 1133,
         "5": 2220,
         "6": 2726,
-        "7": 2520,
-        "8": 1876,
-        "9": 1544,
-        "10": 1176,
-        "11": 818,
-        "12": 539
+        "7": 3502,
+        "8": 3468,
+        "9": 3343,
+        "10": 2929,
+        "11": 2554,
+        "12": 2134
       },
       "quality": {
         "min": 53,
         "max": 88,
-        "average": 70.15
+        "average": 65.26
       }
     },
     "names": {
-      "entries": 2500,
+      "entries": 5000,
       "categories": {
-        "given-name": 1458,
-        "patronymic": 59,
-        "surname": 983
+        "given-name": 2798,
+        "patronymic": 115,
+        "surname": 2087
       },
       "lengths": {
-        "3": 113,
-        "4": 334,
-        "5": 480,
-        "6": 527,
-        "7": 473,
-        "8": 289,
-        "9": 164,
-        "10": 80,
-        "11": 30,
-        "12": 10
+        "3": 165,
+        "4": 611,
+        "5": 928,
+        "6": 1019,
+        "7": 976,
+        "8": 639,
+        "9": 374,
+        "10": 181,
+        "11": 84,
+        "12": 23
       },
       "quality": {
-        "min": 62,
+        "min": 60,
         "max": 88,
-        "average": 72.36
+        "average": 70.13
       }
     },
     "geography": {
-      "entries": 5000,
+      "entries": 10000,
       "categories": {
-        "capital": 171,
-        "city": 4829
+        "capital": 170,
+        "city": 9830
       },
       "lengths": {
-        "3": 104,
-        "4": 419,
-        "5": 849,
-        "6": 1091,
-        "7": 981,
-        "8": 708,
-        "9": 422,
-        "10": 256,
-        "11": 125,
-        "12": 45
+        "3": 210,
+        "4": 722,
+        "5": 1620,
+        "6": 2109,
+        "7": 1881,
+        "8": 1531,
+        "9": 950,
+        "10": 587,
+        "11": 263,
+        "12": 127
       },
       "quality": {
         "min": 66,
         "max": 85,
-        "average": 72.14
+        "average": 69.02
+      }
+    },
+    "countries": {
+      "entries": 129,
+      "categories": {
+        "country": 129
+      },
+      "lengths": {
+        "4": 13,
+        "5": 16,
+        "6": 25,
+        "7": 32,
+        "8": 20,
+        "9": 9,
+        "10": 11,
+        "11": 3
+      },
+      "quality": {
+        "min": 78,
+        "max": 87,
+        "average": 84.24
       }
     },
     "total": {
-      "entries": 22500,
+      "entries": 39586,
       "categories": {
-        "capital": 171,
-        "city": 4829,
+        "capital": 170,
+        "city": 9830,
         "common-noun": 4358,
-        "given-name": 1458,
-        "patronymic": 59,
-        "specialist-noun": 10642,
-        "surname": 983
+        "country": 129,
+        "given-name": 2798,
+        "patronymic": 115,
+        "specialist-noun": 20099,
+        "surname": 2087
       },
       "lengths": {
-        "3": 665,
-        "4": 1886,
-        "5": 3549,
-        "6": 4344,
-        "7": 3974,
-        "8": 2873,
-        "9": 2130,
-        "10": 1512,
-        "11": 973,
-        "12": 594
+        "3": 823,
+        "4": 2479,
+        "5": 4784,
+        "6": 5879,
+        "7": 6391,
+        "8": 5658,
+        "9": 4676,
+        "10": 3708,
+        "11": 2904,
+        "12": 2284
       },
       "quality": {
         "min": 53,
         "max": 88,
-        "average": 70.84
+        "average": 66.89
       }
     }
   },
@@ -140,26 +168,50 @@
     {
       "file": "ruwordnet-common-03.js",
       "entries": 2500,
-      "bytes": 820568,
-      "sha256": "d5b8b2ad26ec06cf54f70c83c4a3bc6a47d94d68b06f2978d1658c9081218cf1"
+      "bytes": 823348,
+      "sha256": "9124df26d322c88dd21ce7ebacaa8d08a370c66db87acede4b41b5b835636e04"
     },
     {
       "file": "ruwordnet-common-04.js",
       "entries": 2500,
-      "bytes": 781639,
-      "sha256": "90829eab540c89edae9948434d6e14686342916b5ef02c0022a05cd47208383d"
+      "bytes": 803027,
+      "sha256": "2d8f1dc037932c66d25ec00fdebca34c8cc95d0c076eaf6eb5db5463e8ba7dc1"
     },
     {
       "file": "ruwordnet-common-05.js",
       "entries": 2500,
-      "bytes": 751712,
-      "sha256": "97aa921fefb9f5b12b6187a0713c2bdc48eb7fca9757b2d0ac5132e41abcb0e9"
+      "bytes": 783005,
+      "sha256": "fc280d2f8cc5cccaab7158956d3b075b9358527b44544e54d8684ef93f7bcfb4"
     },
     {
       "file": "ruwordnet-common-06.js",
       "entries": 2500,
-      "bytes": 817683,
-      "sha256": "978d0cf38a680bf072bdc943ded7e6e31dc1e1d3dcc2a63dbd8b3f906cbc6f51"
+      "bytes": 765436,
+      "sha256": "d6c3b2c90980c12df10f84492e3a448e51d33782933abb3a7b840eb345818fae"
+    },
+    {
+      "file": "ruwordnet-common-07.js",
+      "entries": 2500,
+      "bytes": 728612,
+      "sha256": "5ea6031d178b8f4e1e8fb83b0ef59b8df77bae047b77b74f838f139d97760e72"
+    },
+    {
+      "file": "ruwordnet-common-08.js",
+      "entries": 2500,
+      "bytes": 808924,
+      "sha256": "8f36914caa2e5d427c53da1c399d0c89d85fce726d0200358e72e2623f364e44"
+    },
+    {
+      "file": "ruwordnet-common-09.js",
+      "entries": 2500,
+      "bytes": 751520,
+      "sha256": "e00363ee0d08e4f22d7ebbc17b481fdcf7ae9b11391ab2e2deee14f0a8bac322"
+    },
+    {
+      "file": "ruwordnet-common-10.js",
+      "entries": 1957,
+      "bytes": 619344,
+      "sha256": "ea5070dbf6c29788e24c77203e54ba3636adc0489600dea04013dbf99e49d1d9"
     },
     {
       "file": "proper-names-01.js",
@@ -168,16 +220,46 @@
       "sha256": "b6e9d8b4c40aeeee6a7d63bc21aa20546ef4b1fd4593ef51288ae91c1279ec1d"
     },
     {
+      "file": "proper-names-02.js",
+      "entries": 2500,
+      "bytes": 608840,
+      "sha256": "451bfb0400379a99ebedb32388284d5f512f1d899f28b51dd8608ed539c4823f"
+    },
+    {
       "file": "geography-01.js",
       "entries": 2500,
-      "bytes": 653578,
-      "sha256": "6d91efb52c56d75cbbae2f337c4b4e3ea8d4818467f5c42a49e9a1d65c378173"
+      "bytes": 653456,
+      "sha256": "1f95378296d6d78ad642fb7327a01c3475a345cc21ac48c9bb1e22a9fa175535"
     },
     {
       "file": "geography-02.js",
       "entries": 2500,
-      "bytes": 576240,
-      "sha256": "cc4e9ab082e616e3ae85ac7f701c1e30dc51b38c03220f05bc909a7be902647f"
+      "bytes": 574105,
+      "sha256": "ee0d210b5cc75a31015d834b5081d8233e383dabbe8f06314927df0b2b0640e5"
+    },
+    {
+      "file": "geography-03.js",
+      "entries": 2500,
+      "bytes": 546021,
+      "sha256": "835f07539f791a19c19edcfa693991e720c1c9dab390220984165403fea07a71"
+    },
+    {
+      "file": "geography-04.js",
+      "entries": 2500,
+      "bytes": 548236,
+      "sha256": "4642dfdd4e509229bf561ea26c5a726488f5bc0f89a2c8943d7d7010b478611b"
+    },
+    {
+      "file": "countries-01.js",
+      "entries": 129,
+      "bytes": 29739,
+      "sha256": "dd4dbf08957574c674a1bdd894c7df3233af09233bbfd94bce6639e584555987"
     }
-  ]
+  ],
+  "loader": {
+    "file": "loader.js",
+    "entries": 17,
+    "bytes": 792,
+    "sha256": "70dad65d925ccc1ba2847037686fb50b7c6a6e159bdf57553c9225e8d0c58ad5"
+  }
 }
