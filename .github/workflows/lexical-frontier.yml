@@ -62,6 +62,9 @@ jobs:
       - name: Check syntax
         run: |
           node --check editorial-lexical-policy-v3.js
+          node --check editorial-demand-lexicon-v3.js
+          node --check editorial-demand-lexicon-supplement-v3.js
+          node --check editorial-demand-short-lexicon-v3.js
           node --check construction-editorial-replace-v3.js
           node --check construction-editorial-pair-refit-v3.js
           node --check construction-editorial-bundle-refit-v3.js
@@ -74,6 +77,8 @@ jobs:
           node --check tools/lexical-placement-checkpoint.cjs
           node --check tools/lexical-build-attempt-probe.cjs
           node --check tools/lexical-build-sweep.cjs
+          node --check tools/editorial-demand-lexicon-v3-test.cjs
+          node --check tools/editorial-demand-lexicons-v3-test.cjs
           node --check tools/construction-editorial-repair-v3-test.cjs
 
       - name: Test research primitives
@@ -84,6 +89,8 @@ jobs:
           node tools/construction-editorial-pair-refit-v3-test.cjs
           node tools/construction-editorial-bundle-refit-v3-test.cjs
           node tools/construction-editorial-repair-v3-test.cjs
+          node tools/editorial-demand-lexicon-v3-test.cjs
+          node tools/editorial-demand-lexicons-v3-test.cjs
 
       - name: Run editorial replacement A/B
         env:
