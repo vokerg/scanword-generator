@@ -81,6 +81,7 @@ jobs:
           node --check editorial-demand-lexicon-supplement-v3.js
           node --check editorial-demand-short-lexicon-v3.js
           node --check editorial-demand-tail-lexicon-v3.js
+          node --check bulk-lexicon-runtime.js
           node --check construction-editorial-replace-v3.js
           node --check construction-editorial-pair-refit-v3.js
           node --check construction-editorial-bundle-refit-v3.js
@@ -186,3 +187,56 @@ jobs:
           name: filled-sample-${{ github.sha }}
           path: research-output/filled-sample.svg
           if-no-files-found: error
+
+  bulk-lexicon-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lexical tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install wordfreq pymorphy3 pymorphy3-dicts-ru Babel
+
+      - name: Download attributed source data
+        run: |
+          mkdir -p source-data generated/bulk-lexicon
+          curl --fail --location --retry 4 \
+            https://github.com/avidale/python-ruwordnet/releases/download/0.0.4/ruwordnet-2021.db \
+            --output source-data/ruwordnet-2021.db
+          curl --fail --location --retry 4 \
+            https://download.geonames.org/export/dump/cities15000.zip \
+            --output source-data/cities15000.zip
+
+      - name: Build first vocabulary-first corpus
+        run: |
+          python tools/build-bulk-lexicon.py \
+            --ruwordnet-db source-data/ruwordnet-2021.db \
+            --geonames-zip source-data/cities15000.zip \
+            --out-dir generated/bulk-lexicon \
+            --common 15000 \
+            --names 2500 \
+            --geography 5000 \
+            --chunk-size 2500 \
+            | tee generated/bulk-lexicon/build-report.json
+
+      - name: Validate generated corpus
+        run: |
+          python -m py_compile tools/build-bulk-lexicon.py
+          for file in generated/bulk-lexicon/*.js; do node --check "$file"; done
+          cat generated/bulk-lexicon/manifest.json
+
+      - name: Publish generated corpus
+        uses: actions/upload-artifact@v4
+        with:
+          name: bulk-lexicon-${{ github.sha }}
+          path: generated/bulk-lexicon/
+          if-no-files-found: error
+          retention-days: 30
