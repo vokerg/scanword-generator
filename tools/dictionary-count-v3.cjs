@@ -37,18 +37,8 @@ const baseWords = [...window.RUSSIAN_WORDS];
 const baseSet = unique(baseWords);
 
 require(path.join(root, "bulk-lexicon-runtime.js"));
-const bulkFiles = [
-  "ruwordnet-common-01.js",
-  "ruwordnet-common-02.js",
-  "ruwordnet-common-03.js",
-  "ruwordnet-common-04.js",
-  "ruwordnet-common-05.js",
-  "ruwordnet-common-06.js",
-  "proper-names-01.js",
-  "geography-01.js",
-  "geography-02.js",
-];
-for (const file of bulkFiles) require(path.join(root, "bulk-lexicon", file));
+require(path.join(root, "bulk-lexicon", "loader.js"));
+const bulkFiles = [...(window.SCANWORD_BULK_LEXICON_FILES || [])];
 const constructionWords = [...window.RUSSIAN_WORDS];
 const constructionSet = unique(constructionWords);
 const bulkState = window.ScanwordBulkLexiconV1?.state || {};
