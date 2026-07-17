@@ -19,6 +19,10 @@ on:
         type: boolean
         default: false
 
+concurrency:
+  group: vocabulary-first-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -74,7 +78,7 @@ jobs:
 
       - name: Run pre-construction vocabulary A/B
         env:
-          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '10' }}
+          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '3' }}
         run: |
           mkdir -p research-output
           node tools/vocabulary-first-checkpoint.cjs "${SEED_COUNT}" \
