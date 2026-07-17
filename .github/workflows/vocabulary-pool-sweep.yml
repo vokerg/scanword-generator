@@ -1,0 +1,74 @@
+name: Vocabulary working-set sweep
+
+on:
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: Number of identical seeds
+        required: true
+        default: "3"
+      limits:
+        description: Comma-separated active pool limits
+        required: true
+        default: "2500,3500,5000,7500"
+  push:
+    branches:
+      - r-and-d/lexical-pareto-frontier
+    paths:
+      - core.js
+      - tools/vocabulary-pool-sweep.cjs
+      - .github/workflows/vocabulary-pool-sweep.yml
+  pull_request:
+    branches:
+      - research/closed-fill-snapshot-2026-07-16
+    paths:
+      - core.js
+      - tools/vocabulary-pool-sweep.cjs
+      - .github/workflows/vocabulary-pool-sweep.yml
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SCANWORD_PORTFOLIO_PANEL_SLACK: 1
+      SCANWORD_PORTFOLIO_ATTEMPTS: 240
+      SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
+      SCANWORD_VICTIM_BASES: 8
+      SCANWORD_VICTIM_VARIANTS: 6
+      SCANWORD_TARGETED_VICTIM_REGIONS: 3
+      SCANWORD_TARGETED_VICTIM_WORDS: 4
+      SCANWORD_TARGETED_VICTIM_DEPTH: 2
+      SCANWORD_TARGETED_EXACT_VARIANTS: 4
+      SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
+      SCANWORD_REPACK_NODES: 600000
+      SCANWORD_REPACK_BRANCH: 24
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run active-pool sweep
+        env:
+          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '3' }}
+          ACTIVE_LIMITS: ${{ github.event_name == 'workflow_dispatch' && inputs.limits || '2500,3500,5000,7500' }}
+        run: |
+          mkdir -p research-output
+          node --check tools/vocabulary-pool-sweep.cjs
+          node tools/vocabulary-pool-sweep.cjs "${SEED_COUNT}" "${ACTIVE_LIMITS}" \
+            | tee research-output/vocabulary-pool-sweep-${SEED_COUNT}.jsonl
+
+      - name: Publish sweep output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocabulary-pool-sweep-${{ github.sha }}
+          path: research-output/
+          if-no-files-found: error

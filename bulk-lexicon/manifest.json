@@ -1,0 +1,183 @@
+{
+  "version": 1,
+  "generatedBy": "tools/build-bulk-lexicon.py",
+  "sources": {
+    "ruwordnet": {
+      "url": "https://github.com/avidale/python-ruwordnet/releases/download/0.0.4/ruwordnet-2021.db",
+      "role": "single-word noun senses and definitions"
+    },
+    "geonames": {
+      "url": "https://download.geonames.org/export/dump/cities15000.zip",
+      "license": "CC BY 4.0",
+      "role": "cities and capitals"
+    },
+    "wordfreq+pymorphy3": {
+      "role": "frequency ranking and proper-name morphology"
+    }
+  },
+  "requested": {
+    "common": 15000,
+    "names": 2500,
+    "geography": 5000
+  },
+  "actual": {
+    "common": {
+      "entries": 15000,
+      "categories": {
+        "common-noun": 4358,
+        "specialist-noun": 10642
+      },
+      "lengths": {
+        "3": 448,
+        "4": 1133,
+        "5": 2220,
+        "6": 2726,
+        "7": 2520,
+        "8": 1876,
+        "9": 1544,
+        "10": 1176,
+        "11": 818,
+        "12": 539
+      },
+      "quality": {
+        "min": 53,
+        "max": 88,
+        "average": 70.15
+      }
+    },
+    "names": {
+      "entries": 2500,
+      "categories": {
+        "given-name": 1458,
+        "patronymic": 59,
+        "surname": 983
+      },
+      "lengths": {
+        "3": 113,
+        "4": 334,
+        "5": 480,
+        "6": 527,
+        "7": 473,
+        "8": 289,
+        "9": 164,
+        "10": 80,
+        "11": 30,
+        "12": 10
+      },
+      "quality": {
+        "min": 62,
+        "max": 88,
+        "average": 72.36
+      }
+    },
+    "geography": {
+      "entries": 5000,
+      "categories": {
+        "capital": 171,
+        "city": 4829
+      },
+      "lengths": {
+        "3": 104,
+        "4": 419,
+        "5": 849,
+        "6": 1091,
+        "7": 981,
+        "8": 708,
+        "9": 422,
+        "10": 256,
+        "11": 125,
+        "12": 45
+      },
+      "quality": {
+        "min": 66,
+        "max": 85,
+        "average": 72.14
+      }
+    },
+    "total": {
+      "entries": 22500,
+      "categories": {
+        "capital": 171,
+        "city": 4829,
+        "common-noun": 4358,
+        "given-name": 1458,
+        "patronymic": 59,
+        "specialist-noun": 10642,
+        "surname": 983
+      },
+      "lengths": {
+        "3": 665,
+        "4": 1886,
+        "5": 3549,
+        "6": 4344,
+        "7": 3974,
+        "8": 2873,
+        "9": 2130,
+        "10": 1512,
+        "11": 973,
+        "12": 594
+      },
+      "quality": {
+        "min": 53,
+        "max": 88,
+        "average": 70.84
+      }
+    }
+  },
+  "files": [
+    {
+      "file": "ruwordnet-common-01.js",
+      "entries": 2500,
+      "bytes": 793135,
+      "sha256": "0647771b8acc62199bc0f67cf6084c0233043d4621565461e4df901f836bb57e"
+    },
+    {
+      "file": "ruwordnet-common-02.js",
+      "entries": 2500,
+      "bytes": 808752,
+      "sha256": "e5f1b7f4a8aef17892a0c58922a63914b6f235704cdaa301ed484a24567dfed4"
+    },
+    {
+      "file": "ruwordnet-common-03.js",
+      "entries": 2500,
+      "bytes": 820568,
+      "sha256": "d5b8b2ad26ec06cf54f70c83c4a3bc6a47d94d68b06f2978d1658c9081218cf1"
+    },
+    {
+      "file": "ruwordnet-common-04.js",
+      "entries": 2500,
+      "bytes": 781639,
+      "sha256": "90829eab540c89edae9948434d6e14686342916b5ef02c0022a05cd47208383d"
+    },
+    {
+      "file": "ruwordnet-common-05.js",
+      "entries": 2500,
+      "bytes": 751712,
+      "sha256": "97aa921fefb9f5b12b6187a0713c2bdc48eb7fca9757b2d0ac5132e41abcb0e9"
+    },
+    {
+      "file": "ruwordnet-common-06.js",
+      "entries": 2500,
+      "bytes": 817683,
+      "sha256": "978d0cf38a680bf072bdc943ded7e6e31dc1e1d3dcc2a63dbd8b3f906cbc6f51"
+    },
+    {
+      "file": "proper-names-01.js",
+      "entries": 2500,
+      "bytes": 608335,
+      "sha256": "b6e9d8b4c40aeeee6a7d63bc21aa20546ef4b1fd4593ef51288ae91c1279ec1d"
+    },
+    {
+      "file": "geography-01.js",
+      "entries": 2500,
+      "bytes": 653578,
+      "sha256": "6d91efb52c56d75cbbae2f337c4b4e3ea8d4818467f5c42a49e9a1d65c378173"
+    },
+    {
+      "file": "geography-02.js",
+      "entries": 2500,
+      "bytes": 576240,
+      "sha256": "cc4e9ab082e616e3ae85ac7f701c1e30dc51b38c03220f05bc909a7be902647f"
+    }
+  ]
+}
