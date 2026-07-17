@@ -1,4 +1,4 @@
-name: Dictionary size report
+name: Dictionary size and quality report
 
 on:
   push:
@@ -15,7 +15,7 @@ permissions:
 jobs:
   report:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Check out branch
         uses: actions/checkout@v4
@@ -25,15 +25,19 @@ jobs:
         with:
           node-version: 22
 
-      - name: Build report
+      - name: Build dictionary reports
         run: |
           mkdir -p research-output
+          node --check tools/dictionary-count-v3.cjs
+          node --check tools/bulk-lexicon-audit.cjs
           node tools/dictionary-count-v3.cjs > research-output/dictionary-count.json
+          node tools/bulk-lexicon-audit.cjs > research-output/bulk-lexicon-audit.json
           cat research-output/dictionary-count.json
+          cat research-output/bulk-lexicon-audit.json
 
-      - name: Publish report
+      - name: Publish reports
         uses: actions/upload-artifact@v4
         with:
-          name: dictionary-count-${{ github.sha }}
-          path: research-output/dictionary-count.json
+          name: dictionary-report-${{ github.sha }}
+          path: research-output/
           if-no-files-found: error
