@@ -1,0 +1,107 @@
+name: Build bulk lexicon
+
+on:
+  workflow_dispatch:
+    inputs:
+      common:
+        description: RuWordNet noun target
+        required: true
+        default: "35000"
+      names:
+        description: Proper-name target
+        required: true
+        default: "5000"
+      geography:
+        description: City and capital target
+        required: true
+        default: "10000"
+  push:
+    branches:
+      - r-and-d/lexical-pareto-frontier
+    paths:
+      - tools/build-bulk-lexicon.py
+      - .github/workflows/build-bulk-lexicon.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out research branch
+        uses: actions/checkout@v4
+        with:
+          ref: r-and-d/lexical-pareto-frontier
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lexical tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install wordfreq pymorphy3 pymorphy3-dicts-ru Babel
+
+      - name: Download attributed source data
+        run: |
+          mkdir -p source-data generated/bulk-lexicon
+          curl --fail --location --retry 4 \
+            https://github.com/avidale/python-ruwordnet/releases/download/0.0.4/ruwordnet-2021.db \
+            --output source-data/ruwordnet-2021.db
+          curl --fail --location --retry 4 \
+            https://download.geonames.org/export/dump/cities15000.zip \
+            --output source-data/cities15000.zip
+          curl --fail --location --retry 4 \
+            https://download.geonames.org/export/dump/countryInfo.txt \
+            --output source-data/countryInfo.txt
+
+      - name: Build corpus chunks
+        env:
+          COMMON_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.common || '35000' }}
+          NAME_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.names || '5000' }}
+          GEOGRAPHY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.geography || '10000' }}
+        run: |
+          python tools/build-bulk-lexicon.py \
+            --ruwordnet-db source-data/ruwordnet-2021.db \
+            --geonames-zip source-data/cities15000.zip \
+            --country-info source-data/countryInfo.txt \
+            --out-dir generated/bulk-lexicon \
+            --common "${COMMON_TARGET}" \
+            --names "${NAME_TARGET}" \
+            --geography "${GEOGRAPHY_TARGET}" \
+            --chunk-size 2500 \
+            | tee generated/bulk-lexicon/build-report.json
+
+      - name: Validate generated JavaScript
+        run: |
+          python -m py_compile tools/build-bulk-lexicon.py
+          for file in generated/bulk-lexicon/*.js; do node --check "$file"; done
+          cat generated/bulk-lexicon/manifest.json
+
+      - name: Commit generated corpus
+        run: |
+          rm -rf bulk-lexicon
+          mkdir -p bulk-lexicon
+          cp generated/bulk-lexicon/*.js bulk-lexicon/
+          cp generated/bulk-lexicon/manifest.json bulk-lexicon/
+          git config user.name "scanword-lexicon-bot"
+          git config user.email "scanword-lexicon-bot@users.noreply.github.com"
+          git add bulk-lexicon
+          if git diff --cached --quiet; then
+            echo "Generated corpus is unchanged"
+          else
+            TOTAL=$(python -c 'import json; print(json.load(open("generated/bulk-lexicon/manifest.json"))["actual"]["total"]["entries"])')
+            git commit -m "Expand pre-construction vocabulary corpus to ${TOTAL} entries [skip ci]"
+            git push origin HEAD:r-and-d/lexical-pareto-frontier
+          fi
+
+      - name: Publish corpus artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bulk-lexicon-${{ github.sha }}
+          path: generated/bulk-lexicon/
+          if-no-files-found: error
+          retention-days: 30

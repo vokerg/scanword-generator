@@ -2,20 +2,33 @@
 
 A browser-based R&D prototype for generating Swedish-style crosswords (arrowwords / scanwords) on an exact A5 page.
 
-## Current checkpoint: 0.9
+## Default research direction: vocabulary-first dense fill
 
-Version 0.9 raises the default 13 × 17 grid from the previous 78% quality floor to a strict **90% active-cell checkpoint** while keeping every answer in one connected component.
+The main bottleneck is now treated as **lexical domain breadth**, not another round of placement coefficients.
+
+The previous constructor had only 857 unique answers available before generation and 1,441 across construction plus post-generation repair. That is insufficient for a dense publication-style scanword: once two or three crossing letters are fixed, many slots have no compatible answer at all.
+
+The active program therefore:
+
+1. builds a 15,000–50,000+ answer corpus with usable clues;
+2. loads that corpus before initial construction;
+3. includes ordinary nouns, names, surnames, geography and specialist vocabulary;
+4. assigns editorial tiers rather than pretending every valid word is equally desirable;
+5. benchmarks density, intersections, empty domains and runtime on identical seeds;
+6. keeps same-geometry editorial repair as a secondary cleanup stage.
+
+The complete rationale, experiment history, source policy and staged targets are documented in [`research/vocabulary-first/README.md`](research/vocabulary-first/README.md).
+
+## Structural checkpoint
 
 The generator:
 
-- uses only reviewed Russian answers and human-readable clues;
-- supports answer lengths from 2 to 12 letters;
-- places answers algorithmically and validates every crossing;
+- validates every crossing;
 - rejects accidental horizontal and vertical letter runs;
+- keeps every answer in one connected component;
 - supports right and down answers and dual arrow cells;
-- expands clue text into connected one-to-four-cell footprints when space is available;
-- keeps every arrow anchor attached to the exact answer start;
-- uses no placeholder definitions or pseudo-words;
+- expands clue text into connected one-to-four-cell footprints;
+- preserves exact arrow-to-answer attachment;
 - exports exact A5 SVG and JSON project files;
 - can reveal answers for visual validation.
 
@@ -27,11 +40,11 @@ Three separate measurements are reported:
 - **Answer-space coverage** — letter cells divided by cells not occupied by clues.
 - **Residual panels** — cells that are neither answers nor real clues.
 
-This prevents a misleading single density number. Version 0.9 requires at least 90% active coverage, at least 65% answer-space coverage, and no more than 20 residual panels on the default A5 grid.
+This prevents a misleading single density number.
 
 ## Multi-cell clue footprints
 
-Long definitions often do not fit legibly beside an arrow. The post-layout clue allocator now:
+Long definitions often do not fit legibly beside an arrow. The post-layout clue allocator:
 
 1. finds connected panel footprints next to each arrow anchor;
 2. generates one-to-four-cell candidate shapes;
@@ -51,36 +64,34 @@ A generated grid is accepted only when:
 3. Crossing letters agree.
 4. An arrow cell contains at most one right arrow and one down arrow.
 5. Every external clue footprint points to an existing arrow and answer.
-6. Every used answer has a reviewed clue.
+6. Every used answer has a clue admitted by the active dictionary policy.
 7. The answer graph is one connected component.
 8. Residual non-answer areas are explicit panel cells, never blank answer cells.
 
 ## Generation strategy
 
-Version 0.9 remains word-first but adds a coverage-oriented selection layer:
+The constructor remains word-first, but the default sequence is now:
 
-1. build one connected answer graph;
-2. continue dense valid placements after the requested minimum is reached;
-3. allocate multi-cell clue footprints over remaining panel regions;
-4. score valid candidates by active coverage, answer-space coverage, residual panels, intersections, and clue sharing;
-5. stop early on a preferred result, continue to 120 attempts for the mandatory checkpoint, and extend to 240 attempts only when necessary.
+1. assemble the full categorized pre-construction lexicon;
+2. index candidates by length and letter patterns;
+3. build one connected answer graph;
+4. continue dense valid placements after the requested minimum is reached;
+5. allocate clue footprints over remaining panel regions;
+6. run bounded local repair for editorial cleanup;
+7. validate all structural and lexical invariants.
 
-## Verified 40-seed results
+## Research results retained
 
-Local deterministic regression run on the default 13 × 17 grid:
+The branch preserves all negative and positive experiments:
 
-```text
-Answers:               41–50, average 44.08
-Active coverage:       91.0–95.0%, average 92.44%
-Answer-space coverage: 85.0–91.3%, average 87.14%
-Residual panels:       11–20, average 16.70
-Answer components:     exactly 1
-Crossings:             43–53, average 47.38
-Accidental runs:       0
-Fallback clues:        0
-```
+- early lexical placement pressure reduced short fill but made the 40-answer checkpoint unreachable;
+- dense-only penalty sweeps preserved reachability but produced negligible lexical gains;
+- pre-downstream Pareto selection improved vocabulary but amplified downstream panel damage;
+- one-slot, pair and radius-two repair reduced formulaic answers without geometry loss;
+- demand-driven vocabulary additions reduced the 50-seed average formulaic count from 3.44 to 0.34;
+- panel and structural-short counts did not improve, confirming that repair alone is not the dense-fill solution.
 
-The GitHub Actions gate runs the same 40 deterministic seeds before the branch can be considered merge-ready.
+See [`research/lexical-quality/README.md`](research/lexical-quality/README.md) for the detailed experiment log.
 
 ## Running locally
 
@@ -94,51 +105,46 @@ Then open `http://localhost:8080`.
 
 ## Quality gates
 
+Current research tools include:
+
 ```bash
 node tools/dictionary-audit.cjs
+node tools/dictionary-count-v3.cjs
 node tools/benchmark.cjs
+node tools/editorial-replacement-checkpoint.cjs 50
 ```
 
-The benchmark rejects a result that:
+Bulk-corpus gates additionally report:
 
-- fails structural validation;
-- contains fewer than 40 answers;
-- has less than 90% active coverage;
-- has less than 65% answer-space coverage;
-- has more than 20 residual panels;
-- contains more or fewer than one answer component;
-- externalizes fewer than 24 real clues;
-- uses fewer than 45 clue-footprint cells;
-- uses a fallback clue.
+- unique pre-construction entries;
+- category and length distributions;
+- duplicate and clue failures;
+- slot-domain availability;
+- density and crossing deltas versus the closed-fill snapshot;
+- rare and specialist answer usage;
+- generation time and candidate lookup growth.
 
-## Files
+## Main files
 
 ```text
-index.html                 Browser interface
-styles.css                 Interface styling
-words.js                   Main Russian answer dictionary
-short-words.js             Three-letter compact answers
-clues.js                   Original clue dictionary
-extra-dictionary.js        Reviewed answer-and-clue expansion
-two-letter-words.js        Reviewed two-letter answers
-core.js                    Randomization and dictionary utilities
-dictionary-policy.js       Restricts generation to reviewed clues
-solver.js                  Connected word placement and clue-footprint allocation
-renderer.js                A5 SVG renderer with merged clue footprints
-ui.js                      Browser UI and JSON export
-tools/benchmark.cjs        40-seed coverage regression benchmark
-tools/dictionary-audit.cjs Dictionary validation and length audit
+index.html                         Browser interface and script order
+words.js                           Original Russian answer dictionary
+short-words.js                     Three-letter compact answers
+clues.js                           Original clue dictionary
+extra-dictionary.js                Reviewed answer-and-clue expansion
+two-letter-words.js                Reviewed two-letter answers
+bulk-lexicon-runtime.js            Bulk corpus registration and deduplication
+bulk-lexicon/                      Generated categorized corpus chunks
+core.js                            Randomization and dictionary utilities
+dictionary-policy.js               Dictionary admission policy
+solver.js                          Connected placement and clue allocation
+construction-editorial-repair-v3.js Same-geometry cleanup pipeline
+renderer.js                        A5 SVG renderer
+ui.js                              Browser UI and JSON export
+research/vocabulary-first/         Primary research program
+research/lexical-quality/          Retained experiment history
 ```
 
-## Why PDF is deferred
+## Production boundary
 
-SVG already preserves exact A5 dimensions and prints without raster quality loss. PDF export will be added after clue typography, arrow placement, and the solution-page layout are stable.
-
-## Next milestones
-
-- replace the remaining residual panels through local closed-fill CSP patches;
-- raise the active checkpoint above 94%;
-- expand the reviewed lexicon into the low thousands;
-- add bent and offset arrow variants used by printed scanwords;
-- move long generation runs into a Web Worker;
-- add print-ready PDF and solution-page export.
+The large corpus work remains on the research branch. Production `main` is unchanged until source licensing, editorial sampling, runtime and deterministic benchmarks are independently reviewable.
