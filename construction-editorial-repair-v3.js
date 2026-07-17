@@ -9,6 +9,9 @@
     if (!window.ScanwordEditorialDemandShortLexiconV3) {
       require("./editorial-demand-short-lexicon-v3.js");
     }
+    if (!window.ScanwordEditorialDemandTailLexiconV3) {
+      require("./editorial-demand-tail-lexicon-v3.js");
+    }
   }
 
   const solver = window.ScanwordSolver;
@@ -54,6 +57,15 @@
         name: "demand-short-lexicon",
         accepted: 0,
         added: Number(result.constructionV2?.editorialDemandShortLexicon?.addedEntries || 0),
+      });
+    }
+    const tailLexicon = window.ScanwordEditorialDemandTailLexiconV3;
+    if (typeof tailLexicon?.extendPool === "function") {
+      result = tailLexicon.extendPool(result);
+      stages.push({
+        name: "demand-tail-lexicon",
+        accepted: 0,
+        added: Number(result.constructionV2?.editorialDemandTailLexicon?.addedEntries || 0),
       });
     }
 
