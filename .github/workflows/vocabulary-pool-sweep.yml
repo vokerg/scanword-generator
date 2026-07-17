@@ -18,6 +18,13 @@ on:
       - core.js
       - tools/vocabulary-pool-sweep.cjs
       - .github/workflows/vocabulary-pool-sweep.yml
+  pull_request:
+    branches:
+      - research/closed-fill-snapshot-2026-07-16
+    paths:
+      - core.js
+      - tools/vocabulary-pool-sweep.cjs
+      - .github/workflows/vocabulary-pool-sweep.yml
 
 concurrency:
   group: vocabulary-pool-sweep-${{ github.ref }}
