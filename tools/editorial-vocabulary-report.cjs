@@ -69,11 +69,11 @@ const perSeed = [];
 
 for (const seed of seeds) {
   const assignments = replacementAssignments(seed);
-  const localTierCounts = new Map();
+  const localAssignmentTierCounts = new Map();
   for (const assignment of assignments) {
     const classification = policy.classify(assignment.to);
     increment(tierCounts, classification.editorialTier);
-    increment(localTierCounts, classification.editorialTier);
+    increment(localAssignmentTierCounts, classification.editorialTier);
     increment(acceptedByStage, assignment.stage);
     if (assignment.role === "target") {
       increment(targetTierCounts, classification.editorialTier);
@@ -81,17 +81,22 @@ for (const seed of seeds) {
     }
   }
   for (const stage of seed.replacement?.pipeline?.stages || []) {
-    if (Number(stage.added || 0) > 0) increment(addedEntriesByStage, stage.name, Number(stage.added));
+    const added = Number(stage.added || 0);
+    if (added <= 0) continue;
+    if (addedEntriesByStage.has(stage.name) && addedEntriesByStage.get(stage.name) !== added) {
+      throw new Error(`Vocabulary stage ${stage.name} reported inconsistent pool sizes.`);
+    }
+    addedEntriesByStage.set(stage.name, added);
   }
   perSeed.push({
     index: seed.index,
     baselineFormulaic: seed.baseline.formulaicShortCount,
     repairedFormulaic: seed.replacement.formulaicShortCount,
     acceptedTargets: Number(seed.replacement?.pipeline?.accepted || 0),
-    addedCommonTargets: Number(localTierCounts.get("common-short") || 0),
-    addedSpecialistTargets: Number(localTierCounts.get("specialist-short") || 0),
-    addedObscureTargets: Number(localTierCounts.get("obscure-short") || 0),
-    addedUnclassifiedTargets: Number(localTierCounts.get("unclassified-short") || 0),
+    addedCommonAssignments: Number(localAssignmentTierCounts.get("common-short") || 0),
+    addedSpecialistAssignments: Number(localAssignmentTierCounts.get("specialist-short") || 0),
+    addedObscureAssignments: Number(localAssignmentTierCounts.get("obscure-short") || 0),
+    addedUnclassifiedAssignments: Number(localAssignmentTierCounts.get("unclassified-short") || 0),
   });
 }
 
@@ -102,6 +107,8 @@ const report = {
   type: "editorial-vocabulary-report",
   runs: seeds.length,
   vocabularyAddedPerRepairedSeed: sortedObject(addedEntriesByStage),
+  uniqueVocabularyAddedPerRepairedSeed: [...addedEntriesByStage.values()]
+    .reduce((sum, value) => sum + value, 0),
   acceptedAssignmentsByStage: sortedObject(acceptedByStage),
   acceptedAssignmentTiers: sortedObject(tierCounts),
   acceptedTargetTiers: sortedObject(targetTierCounts),
@@ -109,12 +116,12 @@ const report = {
   residualFormulaicDistribution: Object.fromEntries(
     [...residualDistribution.entries()].sort((a, b) => Number(a[0]) - Number(b[0])),
   ),
-  maximumAddedObscureAssignmentsPerSeed: Math.max(...perSeed.map((seed) => seed.addedObscureTargets)),
+  maximumAddedObscureAssignmentsPerSeed: Math.max(...perSeed.map((seed) => seed.addedObscureAssignments)),
   averageAddedObscureAssignmentsPerSeed: +(
-    perSeed.reduce((sum, seed) => sum + seed.addedObscureTargets, 0) / seeds.length
+    perSeed.reduce((sum, seed) => sum + seed.addedObscureAssignments, 0) / seeds.length
   ).toFixed(2),
   averageAddedSpecialistAssignmentsPerSeed: +(
-    perSeed.reduce((sum, seed) => sum + seed.addedSpecialistTargets, 0) / seeds.length
+    perSeed.reduce((sum, seed) => sum + seed.addedSpecialistAssignments, 0) / seeds.length
   ).toFixed(2),
   perSeed,
 };
