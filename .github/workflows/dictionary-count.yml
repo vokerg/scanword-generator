@@ -1,0 +1,36 @@
+name: Dictionary size report
+
+on:
+  push:
+    branches:
+      - r-and-d/lexical-pareto-frontier
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build report
+        run: |
+          mkdir -p research-output
+          node tools/dictionary-count-v3.cjs > research-output/dictionary-count.json
+          cat research-output/dictionary-count.json
+
+      - name: Publish report
+        uses: actions/upload-artifact@v4
+        with:
+          name: dictionary-count-${{ github.sha }}
+          path: research-output/dictionary-count.json
+          if-no-files-found: error
