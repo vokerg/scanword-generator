@@ -13,6 +13,7 @@
 
   window.RUSSIAN_WORDS = Array.isArray(window.RUSSIAN_WORDS) ? window.RUSSIAN_WORDS : [];
   window.RUSSIAN_CLUES = { ...(window.RUSSIAN_CLUES || {}) };
+  window.RUSSIAN_LEXICAL_META = { ...(window.RUSSIAN_LEXICAL_META || {}) };
   const existing = new Set(window.RUSSIAN_WORDS.map(normalize));
 
   function register(entries, source = "bulk-lexicon-v1") {
@@ -58,6 +59,16 @@
       }
       const key = clueKey(answer);
       if (!window.RUSSIAN_CLUES[key]) window.RUSSIAN_CLUES[key] = clue;
+      if (!window.RUSSIAN_LEXICAL_META[key]) {
+        window.RUSSIAN_LEXICAL_META[key] = {
+          lexicalQuality: entry.lexicalQuality,
+          weakFill: false,
+          source: entry.lexicalSource,
+          category: entry.category,
+          license: entry.license,
+          sourceId: entry.sourceId,
+        };
+      }
     }
 
     state.sources[source] = local;
