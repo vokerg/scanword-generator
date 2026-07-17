@@ -31,9 +31,11 @@
   }
   window.TWO_LETTER_WORDS = entries.map(([word]) => word);
 
-  // Browser paths load these files explicitly in index.html. Node research tools
-  // load two-letter-words.js directly, so attach the same pre-construction corpus here.
-  if (typeof require === "function") {
+  // Browser paths load corpus chunks explicitly in index.html. Node research tools
+  // load two-letter-words.js directly; the environment switch enables true A/B runs.
+  const bulkDisabled = typeof process !== "undefined"
+    && String(process?.env?.SCANWORD_BULK_LEXICON || "on").toLowerCase() === "off";
+  if (typeof require === "function" && !bulkDisabled) {
     require("./bulk-lexicon-runtime.js");
     for (const file of [
       "ruwordnet-common-01.js",
