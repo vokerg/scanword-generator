@@ -7,9 +7,9 @@ on:
         description: Number of identical-seed category A/B pairs
         required: true
         default: "10"
-  pull_request:
+  push:
     branches:
-      - research/closed-fill-snapshot-2026-07-16
+      - r-and-d/lexical-pareto-frontier
     paths:
       - core.js
       - dictionary-policy.js
@@ -17,6 +17,10 @@ on:
       - tools/benchmark-seed-v3.cjs
       - tools/vocabulary-category-checkpoint.cjs
       - .github/workflows/vocabulary-category-balance.yml
+
+concurrency:
+  group: vocabulary-category-balance-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
