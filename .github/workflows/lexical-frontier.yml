@@ -73,6 +73,7 @@ jobs:
           node --check construction-lexical-placement-v3.js
           node --check tools/benchmark-seed-v3.cjs
           node --check tools/editorial-replacement-checkpoint.cjs
+          node --check tools/editorial-vocabulary-report.cjs
           node --check tools/lexical-frontier-checkpoint.cjs
           node --check tools/lexical-placement-checkpoint.cjs
           node --check tools/lexical-build-attempt-probe.cjs
@@ -99,6 +100,9 @@ jobs:
           mkdir -p research-output
           node tools/editorial-replacement-checkpoint.cjs "${SEED_COUNT}" \
             | tee research-output/editorial-replacement-${SEED_COUNT}.jsonl
+          node tools/editorial-vocabulary-report.cjs \
+            research-output/editorial-replacement-${SEED_COUNT}.jsonl \
+            | tee research-output/editorial-vocabulary-report-${SEED_COUNT}.json
 
       - name: Run previous research gates
         if: github.event_name == 'workflow_dispatch'
