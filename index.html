@@ -13,8 +13,8 @@
         <p class="eyebrow">ARROWORD GENERATOR · VOCABULARY-FIRST R&amp;D</p>
         <h1>Dense, structurally valid arrowword grids</h1>
         <p class="lead">
-          Builds one connected answer graph from a large categorized Russian lexicon, expands real clues into compact
-          footprints, and rejects every accidental letter run before selection.
+          Builds one connected answer graph from a 22,500-entry categorized Russian corpus, derives a balanced
+          seed-specific working set, and rejects every accidental letter run before selection.
         </p>
       </div>
       <div class="badge">A5<br />SVG + JSON</div>
@@ -42,8 +42,8 @@
 
         <div class="field-row">
           <label>
-            Word pool
-            <input id="poolSize" type="number" min="1000" max="30000" value="24000" />
+            Active working set
+            <input id="poolSize" type="number" min="1000" max="10000" value="3500" />
           </label>
           <label>
             Minimum answers
@@ -71,8 +71,8 @@
         <div id="stats" class="stats" aria-live="polite"></div>
 
         <div class="note">
-          <strong>Vocabulary-first R&amp;D:</strong> the complete categorized corpus is loaded before placement. Local
-          editorial repair remains a secondary cleanup stage rather than the source of missing domains.
+          <strong>Vocabulary-first R&amp;D:</strong> the full 22,500-entry corpus is loaded before placement. Each seed
+          receives a length-balanced 3,500-word working set; local editorial repair remains a secondary cleanup stage.
         </div>
       </aside>
 
