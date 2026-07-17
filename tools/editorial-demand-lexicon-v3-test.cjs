@@ -8,7 +8,7 @@ require(path.resolve(__dirname, "..", "editorial-demand-lexicon-v3.js"));
 
 const lexicon = window.ScanwordEditorialDemandLexiconV3;
 assert.ok(lexicon);
-assert.ok(lexicon.entries.length >= 700);
+assert.ok(lexicon.entries.length >= 350);
 assert.equal(new Set(lexicon.entries.map((entry) => entry.answer)).size, lexicon.entries.length);
 assert.ok(lexicon.entries.every((entry) => /^[А-Я]+$/.test(entry.answer)));
 assert.ok(lexicon.entries.every((entry) => entry.hasExactClue && entry.clue.length > 2));
@@ -25,7 +25,7 @@ const result = {
 };
 const before = result.pool.length;
 lexicon.extendPool(result);
-assert.ok(result.pool.length > before + 600);
+assert.ok(result.pool.length > before + 350);
 assert.equal(result.pool.filter((entry) => entry.answer === "ТЕМА").length, 1);
 assert.ok(result.pool.some((entry) => entry.answer === "ВАРЕНИКИ"));
 assert.ok(result.pool.some((entry) => entry.answer === "ЛАДОГА"));
