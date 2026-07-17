@@ -8,6 +8,7 @@ const workerPath = path.join(__dirname, "benchmark-seed-v3.cjs");
 const runCount = Math.max(1, Number(process.argv[2]) || 5);
 const prefix = process.argv[3] || "vocabulary-category-balance";
 const concurrency = Math.max(1, Number(process.env.SCANWORD_CATEGORY_CONCURRENCY) || 1);
+const repairMode = String(process.env.SCANWORD_CATEGORY_REPAIR || "off").toLowerCase() === "on" ? "on" : "off";
 const samples = new Array(runCount);
 let cursor = 0;
 
@@ -47,7 +48,7 @@ function runVariant(seed, categoryBalance) {
       SCANWORD_CLOSED_FILL: "diagnostic",
       SCANWORD_PORTFOLIO_SELECTION: "panel-first",
       SCANWORD_LEXICAL_PLACEMENT: "off",
-      SCANWORD_EDITORIAL_REPAIR: "off",
+      SCANWORD_EDITORIAL_REPAIR: repairMode,
       SCANWORD_EDITORIAL_REPLACE: "off",
       SCANWORD_EDITORIAL_PAIR_REFIT: "off",
       SCANWORD_EDITORIAL_BUNDLE_REFIT: "off",
@@ -129,6 +130,7 @@ async function runSeed(index) {
     type: "seed",
     index,
     seed,
+    repairMode,
     unbounded,
     balanced,
     delta: {
@@ -184,6 +186,7 @@ function summarizeVariant(records, key) {
     const summary = {
       type: "summary",
       runs: samples.length,
+      repairMode,
       unbounded: summarizeVariant(samples, "unbounded"),
       balanced: summarizeVariant(samples, "balanced"),
       comparison: {
