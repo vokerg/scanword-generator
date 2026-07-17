@@ -49,9 +49,13 @@
     return String(value).trim().toUpperCase().replaceAll("Ё", "Е");
   }
 
-  function numericOption(name, fallback) {
+  function environmentOption(name, fallback) {
     const raw = typeof process !== "undefined" ? process?.env?.[name] : window[name];
-    const value = Number(raw);
+    return raw == null || raw === "" ? fallback : raw;
+  }
+
+  function numericOption(name, fallback) {
+    const value = Number(environmentOption(name, fallback));
     return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
   }
 
@@ -60,8 +64,13 @@
     return window.RUSSIAN_LEXICAL_META?.[key] || {};
   }
 
+  function lexicalCategory(entry) {
+    return lexicalMetadata(entry.answer).category || "core-reviewed";
+  }
+
   function categoryPreference(category) {
     if (category === "common-noun") return 8;
+    if (category === "country") return 4;
     if (category === "capital") return 3;
     if (category === "specialist-noun") return 0;
     if (category === "given-name") return -2;
@@ -82,6 +91,23 @@
     }).sort((a, b) => b.rank - a.rank || a.entry.answer.localeCompare(b.entry.answer));
   }
 
+  function categoryBalanceEnabled() {
+    return String(environmentOption("SCANWORD_CATEGORY_BALANCE", "off")).toLowerCase() === "on";
+  }
+
+  function categoryCap(category, limit) {
+    const shares = {
+      "specialist-noun": 0.35,
+      "given-name": 0.06,
+      surname: 0.03,
+      patronymic: 0.01,
+      city: 0.05,
+      capital: 0.012,
+      country: 0.012,
+    };
+    return shares[category] == null ? Infinity : Math.max(8, Math.ceil(limit * shares[category]));
+  }
+
   function selectBalancedWorkingSet(entries, requestedCount, random) {
     const total = entries.length;
     const defaultLimit = total > 5000 ? 5000 : total;
@@ -99,24 +125,48 @@
       byLength.get(length).push(entry);
     }
 
+    const balanceCategories = categoryBalanceEnabled();
     const selected = [];
     const selectedAnswers = new Set();
+    const categoryCounts = new Map();
+
+    function addEntry(entry, bypassCategoryCap = false) {
+      if (selectedAnswers.has(entry.answer)) return false;
+      const category = lexicalCategory(entry);
+      if (balanceCategories && !bypassCategoryCap) {
+        const count = categoryCounts.get(category) || 0;
+        if (count >= categoryCap(category, limit)) return false;
+      }
+      selected.push(entry);
+      selectedAnswers.add(entry.answer);
+      categoryCounts.set(category, (categoryCounts.get(category) || 0) + 1);
+      return true;
+    }
+
     for (let length = 2; length <= 12; length += 1) {
       const bucket = rankBucket(byLength.get(length) || [], random);
       let quota = Math.floor(limit * (shares.get(length) || 0));
       if (length === 2 || length === 3) quota = Math.max(quota, bucket.length);
-      for (const item of bucket.slice(0, Math.min(quota, bucket.length))) {
-        if (selectedAnswers.has(item.entry.answer)) continue;
-        selected.push(item.entry);
-        selectedAnswers.add(item.entry.answer);
+      let added = 0;
+      for (const item of bucket) {
+        if (addEntry(item.entry, length <= 3)) added += 1;
+        if (added >= Math.min(quota, bucket.length)) break;
       }
     }
 
     if (selected.length < limit) {
       const remainder = rankBucket(entries.filter((entry) => !selectedAnswers.has(entry.answer)), random);
       for (const item of remainder) {
-        selected.push(item.entry);
-        selectedAnswers.add(item.entry.answer);
+        addEntry(item.entry, false);
+        if (selected.length >= limit) break;
+      }
+    }
+
+    // Category caps are editorial preferences, not hard feasibility constraints.
+    if (selected.length < limit) {
+      const relaxed = rankBucket(entries.filter((entry) => !selectedAnswers.has(entry.answer)), random);
+      for (const item of relaxed) {
+        addEntry(item.entry, true);
         if (selected.length >= limit) break;
       }
     }
@@ -126,9 +176,13 @@
       sourceEntries: total,
       requestedCount,
       activeEntries: result.length,
+      categoryBalance: balanceCategories ? "on" : "off",
       lengths: Object.fromEntries([...new Set(result.map((entry) => entry.answer.length))]
         .sort((a, b) => a - b)
         .map((length) => [length, result.filter((entry) => entry.answer.length === length).length])),
+      categories: Object.fromEntries([...new Set(result.map(lexicalCategory))]
+        .sort()
+        .map((category) => [category, result.filter((entry) => lexicalCategory(entry) === category).length])),
     };
     return result;
   }
