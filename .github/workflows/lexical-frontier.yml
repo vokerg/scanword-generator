@@ -75,6 +75,7 @@ jobs:
           node --check tools/benchmark-seed-v3.cjs
           node --check tools/editorial-replacement-checkpoint.cjs
           node --check tools/editorial-vocabulary-report.cjs
+          node --check tools/render-filled-sample-v3.cjs
           node --check tools/lexical-frontier-checkpoint.cjs
           node --check tools/lexical-placement-checkpoint.cjs
           node --check tools/lexical-build-attempt-probe.cjs
@@ -123,4 +124,49 @@ jobs:
         with:
           name: lexical-quality-${{ github.sha }}
           path: research-output/
+          if-no-files-found: error
+
+  filled-sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SCANWORD_PORTFOLIO_PANEL_SLACK: 1
+      SCANWORD_PORTFOLIO_ATTEMPTS: 240
+      SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
+      SCANWORD_VICTIM_BASES: 8
+      SCANWORD_VICTIM_VARIANTS: 6
+      SCANWORD_TARGETED_VICTIM_REGIONS: 3
+      SCANWORD_TARGETED_VICTIM_WORDS: 4
+      SCANWORD_TARGETED_VICTIM_DEPTH: 2
+      SCANWORD_TARGETED_EXACT_VARIANTS: 4
+      SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
+      SCANWORD_REPACK_NODES: 600000
+      SCANWORD_REPACK_BRANCH: 24
+      SCANWORD_EDITORIAL_PAIR_DOMAIN: 80
+      SCANWORD_EDITORIAL_PAIR_CANDIDATES: 600
+      SCANWORD_EDITORIAL_BUNDLE_DOMAIN: 100
+      SCANWORD_EDITORIAL_BUNDLE_NODES: 50000
+      SCANWORD_EDITORIAL_BUNDLE_SOLUTIONS: 24
+      SCANWORD_EDITORIAL_BUNDLE_VARIANTS: 24
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Render filled sample
+        run: |
+          mkdir -p research-output
+          node tools/render-filled-sample-v3.cjs \
+            editorial-replacement-1 \
+            research-output/filled-sample.svg
+
+      - name: Publish filled sample
+        uses: actions/upload-artifact@v4
+        with:
+          name: filled-sample-${{ github.sha }}
+          path: research-output/filled-sample.svg
           if-no-files-found: error
