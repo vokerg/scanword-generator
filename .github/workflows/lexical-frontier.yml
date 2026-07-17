@@ -1,4 +1,4 @@
-name: Lexical quality research
+name: Vocabulary-first dense fill
 
 on:
   push:
@@ -10,9 +10,14 @@ on:
   workflow_dispatch:
     inputs:
       seeds:
-        description: Number of identical-seed A/B pairs
+        description: Number of identical-seed vocabulary A/B pairs
         required: true
-        default: "50"
+        default: "20"
+      run_archived_gates:
+        description: Run superseded lexical-placement and repair gates
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -33,12 +38,12 @@ jobs:
       - name: Report dictionary size
         run: node tools/dictionary-count-v3.cjs
 
-  lexical-quality:
+  vocabulary-first-density:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
-      SCANWORD_LEXICAL_CONCURRENCY: 2
-      SCANWORD_EDITORIAL_REPLACEMENT_ENFORCE: 1
+      SCANWORD_VOCABULARY_CONCURRENCY: 1
+      SCANWORD_VOCABULARY_ENFORCE: 0
       SCANWORD_PORTFOLIO_PANEL_SLACK: 1
       SCANWORD_PORTFOLIO_ATTEMPTS: 240
       SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
@@ -51,14 +56,87 @@ jobs:
       SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
       SCANWORD_REPACK_NODES: 600000
       SCANWORD_REPACK_BRANCH: 24
-      SCANWORD_WEAK_PLACEMENT_PENALTY: 12
-      SCANWORD_TWO_LETTER_PLACEMENT_PENALTY: 8
-      SCANWORD_THREE_LETTER_PLACEMENT_PENALTY: 4
-      SCANWORD_LEXICAL_QUALITY_PENALTY: 0.25
-      SCANWORD_GROWTH_LEXICAL_MULTIPLIER: 0
-      SCANWORD_DENSE_LEXICAL_MULTIPLIER: 0.65
-      SCANWORD_TWO_LETTER_DENSE_BUDGET: 5
-      SCANWORD_TWO_LETTER_EXCESS_PENALTY: 18
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check vocabulary-first syntax
+        run: |
+          node --check bulk-lexicon-runtime.js
+          node --check tools/benchmark-seed-v3.cjs
+          node --check tools/vocabulary-first-checkpoint.cjs
+          for file in bulk-lexicon/*.js; do node --check "$file"; done
+
+      - name: Run pre-construction vocabulary A/B
+        env:
+          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '10' }}
+        run: |
+          mkdir -p research-output
+          node tools/vocabulary-first-checkpoint.cjs "${SEED_COUNT}" \
+            | tee research-output/vocabulary-first-${SEED_COUNT}.jsonl
+
+      - name: Publish vocabulary-first output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocabulary-first-${{ github.sha }}
+          path: research-output/
+          if-no-files-found: error
+
+  filled-sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SCANWORD_PORTFOLIO_PANEL_SLACK: 1
+      SCANWORD_PORTFOLIO_ATTEMPTS: 240
+      SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
+      SCANWORD_VICTIM_BASES: 8
+      SCANWORD_VICTIM_VARIANTS: 6
+      SCANWORD_TARGETED_VICTIM_REGIONS: 3
+      SCANWORD_TARGETED_VICTIM_WORDS: 4
+      SCANWORD_TARGETED_VICTIM_DEPTH: 2
+      SCANWORD_TARGETED_EXACT_VARIANTS: 4
+      SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
+      SCANWORD_REPACK_NODES: 600000
+      SCANWORD_REPACK_BRANCH: 24
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Render filled sample from expanded corpus
+        run: |
+          mkdir -p research-output
+          node tools/render-filled-sample-v3.cjs \
+            vocabulary-first-sample \
+            research-output/filled-sample.svg
+
+      - name: Publish filled sample
+        uses: actions/upload-artifact@v4
+        with:
+          name: filled-sample-${{ github.sha }}
+          path: research-output/filled-sample.svg
+          if-no-files-found: error
+
+  archived-lexical-research:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_archived_gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SCANWORD_LEXICAL_CONCURRENCY: 2
+      SCANWORD_EDITORIAL_REPLACEMENT_ENFORCE: 1
+      SCANWORD_PORTFOLIO_PANEL_SLACK: 1
+      SCANWORD_PORTFOLIO_ATTEMPTS: 240
+      SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
       SCANWORD_EDITORIAL_PAIR_DOMAIN: 80
       SCANWORD_EDITORIAL_PAIR_CANDIDATES: 600
       SCANWORD_EDITORIAL_BUNDLE_DOMAIN: 100
@@ -74,47 +152,9 @@ jobs:
         with:
           node-version: 22
 
-      - name: Check syntax
-        run: |
-          node --check editorial-lexical-policy-v3.js
-          node --check editorial-demand-lexicon-v3.js
-          node --check editorial-demand-lexicon-supplement-v3.js
-          node --check editorial-demand-short-lexicon-v3.js
-          node --check editorial-demand-tail-lexicon-v3.js
-          node --check bulk-lexicon-runtime.js
-          node --check construction-editorial-replace-v3.js
-          node --check construction-editorial-pair-refit-v3.js
-          node --check construction-editorial-bundle-refit-v3.js
-          node --check construction-editorial-repair-v3.js
-          node --check construction-portfolio-v3.js
-          node --check construction-lexical-placement-v3.js
-          node --check tools/benchmark-seed-v3.cjs
-          node --check tools/editorial-replacement-checkpoint.cjs
-          node --check tools/editorial-vocabulary-report.cjs
-          node --check tools/render-filled-sample-v3.cjs
-          node --check tools/dictionary-count-v3.cjs
-          node --check tools/lexical-frontier-checkpoint.cjs
-          node --check tools/lexical-placement-checkpoint.cjs
-          node --check tools/lexical-build-attempt-probe.cjs
-          node --check tools/lexical-build-sweep.cjs
-          node --check tools/editorial-demand-lexicon-v3-test.cjs
-          node --check tools/editorial-demand-lexicons-v3-test.cjs
-          node --check tools/construction-editorial-repair-v3-test.cjs
-
-      - name: Test research primitives
-        run: |
-          node tools/construction-portfolio-v3-test.cjs
-          node tools/construction-lexical-placement-v3-test.cjs
-          node tools/construction-editorial-replace-v3-test.cjs
-          node tools/construction-editorial-pair-refit-v3-test.cjs
-          node tools/construction-editorial-bundle-refit-v3-test.cjs
-          node tools/construction-editorial-repair-v3-test.cjs
-          node tools/editorial-demand-lexicon-v3-test.cjs
-          node tools/editorial-demand-lexicons-v3-test.cjs
-
-      - name: Run editorial replacement A/B
+      - name: Run retained same-geometry repair gate
         env:
-          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '50' }}
+          SEED_COUNT: ${{ inputs.seeds }}
         run: |
           mkdir -p research-output
           node tools/editorial-replacement-checkpoint.cjs "${SEED_COUNT}" \
@@ -123,8 +163,7 @@ jobs:
             research-output/editorial-replacement-${SEED_COUNT}.jsonl \
             | tee research-output/editorial-vocabulary-report-${SEED_COUNT}.json
 
-      - name: Run previous research gates
-        if: github.event_name == 'workflow_dispatch'
+      - name: Run superseded placement/frontier probes
         env:
           SEED_COUNT: ${{ inputs.seeds }}
         run: |
@@ -135,108 +174,10 @@ jobs:
           node tools/lexical-placement-checkpoint.cjs "${SEED_COUNT}" \
             | tee research-output/lexical-placement-${SEED_COUNT}.jsonl
 
-      - name: Publish research output
+      - name: Publish archived research output
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lexical-quality-${{ github.sha }}
+          name: archived-lexical-research-${{ github.sha }}
           path: research-output/
           if-no-files-found: error
-
-  filled-sample:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      SCANWORD_PORTFOLIO_PANEL_SLACK: 1
-      SCANWORD_PORTFOLIO_ATTEMPTS: 240
-      SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
-      SCANWORD_VICTIM_BASES: 8
-      SCANWORD_VICTIM_VARIANTS: 6
-      SCANWORD_TARGETED_VICTIM_REGIONS: 3
-      SCANWORD_TARGETED_VICTIM_WORDS: 4
-      SCANWORD_TARGETED_VICTIM_DEPTH: 2
-      SCANWORD_TARGETED_EXACT_VARIANTS: 4
-      SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
-      SCANWORD_REPACK_NODES: 600000
-      SCANWORD_REPACK_BRANCH: 24
-      SCANWORD_EDITORIAL_PAIR_DOMAIN: 80
-      SCANWORD_EDITORIAL_PAIR_CANDIDATES: 600
-      SCANWORD_EDITORIAL_BUNDLE_DOMAIN: 100
-      SCANWORD_EDITORIAL_BUNDLE_NODES: 50000
-      SCANWORD_EDITORIAL_BUNDLE_SOLUTIONS: 24
-      SCANWORD_EDITORIAL_BUNDLE_VARIANTS: 24
-    steps:
-      - name: Check out branch
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Render filled sample
-        run: |
-          mkdir -p research-output
-          node tools/render-filled-sample-v3.cjs \
-            editorial-replacement-1 \
-            research-output/filled-sample.svg
-
-      - name: Publish filled sample
-        uses: actions/upload-artifact@v4
-        with:
-          name: filled-sample-${{ github.sha }}
-          path: research-output/filled-sample.svg
-          if-no-files-found: error
-
-  bulk-lexicon-build:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - name: Check out branch
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install lexical tooling
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install wordfreq pymorphy3 pymorphy3-dicts-ru Babel
-
-      - name: Download attributed source data
-        run: |
-          mkdir -p source-data generated/bulk-lexicon
-          curl --fail --location --retry 4 \
-            https://github.com/avidale/python-ruwordnet/releases/download/0.0.4/ruwordnet-2021.db \
-            --output source-data/ruwordnet-2021.db
-          curl --fail --location --retry 4 \
-            https://download.geonames.org/export/dump/cities15000.zip \
-            --output source-data/cities15000.zip
-
-      - name: Build first vocabulary-first corpus
-        run: |
-          python tools/build-bulk-lexicon.py \
-            --ruwordnet-db source-data/ruwordnet-2021.db \
-            --geonames-zip source-data/cities15000.zip \
-            --out-dir generated/bulk-lexicon \
-            --common 15000 \
-            --names 2500 \
-            --geography 5000 \
-            --chunk-size 2500 \
-            | tee generated/bulk-lexicon/build-report.json
-
-      - name: Validate generated corpus
-        run: |
-          python -m py_compile tools/build-bulk-lexicon.py
-          for file in generated/bulk-lexicon/*.js; do node --check "$file"; done
-          cat generated/bulk-lexicon/manifest.json
-
-      - name: Publish generated corpus
-        uses: actions/upload-artifact@v4
-        with:
-          name: bulk-lexicon-${{ github.sha }}
-          path: generated/bulk-lexicon/
-          if-no-files-found: error
-          retention-days: 30
