@@ -31,6 +31,7 @@ jobs:
       SCANWORD_VOCABULARY_CONCURRENCY: 2
       SCANWORD_VOCABULARY_ENFORCE: 0
       SCANWORD_ACTIVE_POOL_LIMIT: 3500
+      SCANWORD_EXPECTED_SOURCE_CORPUS: 39586
       SCANWORD_PORTFOLIO_PANEL_SLACK: 1
       SCANWORD_PORTFOLIO_ATTEMPTS: 240
       SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
@@ -57,6 +58,7 @@ jobs:
           node --check core.js
           node --check dictionary-policy.js
           node --check bulk-lexicon-runtime.js
+          node --check bulk-lexicon/loader.js
           node --check tools/benchmark-seed-v3.cjs
           node --check tools/vocabulary-first-checkpoint.cjs
 
@@ -67,6 +69,20 @@ jobs:
           mkdir -p research-output
           node tools/vocabulary-first-checkpoint.cjs "${SEED_COUNT}" vocabulary-confirmation \
             | tee research-output/vocabulary-confirmation-${SEED_COUNT}.jsonl
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const file = `research-output/vocabulary-confirmation-${process.env.SEED_COUNT}.jsonl`;
+          const records = fs.readFileSync(file, "utf8").trim().split(/\r?\n/).map(JSON.parse);
+          const summary = records.find((record) => record.type === "summary");
+          const expected = Number(process.env.SCANWORD_EXPECTED_SOURCE_CORPUS);
+          if (!summary || summary.expanded.sourceCorpusEntries !== expected) {
+            throw new Error(`Expected ${expected} source entries, got ${summary?.expanded?.sourceCorpusEntries}`);
+          }
+          if (summary.comparison.expandedCheckpointPasses !== summary.runs) {
+            throw new Error("Not every expanded grid passed the preserved structural checkpoint");
+          }
+          console.log(JSON.stringify({ sourceCorpusVerified: expected, runs: summary.runs }));
+          NODE
 
       - name: Publish confirmation output
         if: always()
