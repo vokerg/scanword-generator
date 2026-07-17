@@ -18,6 +18,16 @@
     if (!result?.grid || !Array.isArray(result.placed)) return result;
     const before = policy.summarize(result.placed);
     const stages = [];
+    const demandLexicon = window.ScanwordEditorialDemandLexiconV3;
+
+    if (typeof demandLexicon?.extendPool === "function") {
+      result = demandLexicon.extendPool(result);
+      stages.push({
+        name: "demand-lexicon-extension",
+        accepted: 0,
+        added: Number(result.constructionV2?.editorialDemandLexicon?.addedEntries || 0),
+      });
+    }
 
     if (typeof solver.applyEditorialReplacementsV3 === "function") {
       result = solver.applyEditorialReplacementsV3(result);
