@@ -36,6 +36,7 @@
   const bulkDisabled = typeof process !== "undefined"
     && String(process?.env?.SCANWORD_BULK_LEXICON || "on").toLowerCase() === "off";
   if (typeof require === "function" && !bulkDisabled) {
+    if (!process.env.SCANWORD_ACTIVE_POOL_LIMIT) process.env.SCANWORD_ACTIVE_POOL_LIMIT = "3500";
     require("./bulk-lexicon-runtime.js");
     for (const file of [
       "ruwordnet-common-01.js",
