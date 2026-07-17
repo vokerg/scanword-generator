@@ -7,15 +7,19 @@ on:
         description: Number of identical-seed category A/B pairs
         required: true
         default: "10"
-  pull_request:
+  push:
     branches:
-      - research/closed-fill-snapshot-2026-07-16
+      - r-and-d/lexical-pareto-frontier
     paths:
       - core.js
       - construction-editorial-repair-v3.js
       - editorial-demand-*.js
       - tools/vocabulary-category-checkpoint.cjs
       - .github/workflows/vocabulary-category-repair.yml
+
+concurrency:
+  group: vocabulary-category-repair-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
