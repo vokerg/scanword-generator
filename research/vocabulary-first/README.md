@@ -79,6 +79,8 @@ Category counts:
 
 Length counts include 3,549 five-letter, 4,344 six-letter and 3,974 seven-letter entries. The source versions, attribution, file hashes and full distribution are pinned in `bulk-lexicon/manifest.json`.
 
+After deduplication with the original project dictionary, the pre-construction inventory contains **22,668 unique answers**. Repair adds only 105 further unique answers, for **22,773 across every layer**. The validated per-seed working set is intentionally smaller than the source corpus.
+
 ### Naive full-pool integration: negative result
 
 The first A/B exposed all 22,657 exact-clue entries directly to the existing indexed greedy search.
@@ -104,12 +106,12 @@ Artifact: `vocabulary-first-f28ffbbd5b16163bbb14be42b2c091af45602bbb`.
 
 ### Length-balanced 5,000-word working set: first positive density result
 
-The database remains 22,500 entries, but each seed now derives a deterministic 5,000-entry working set:
+The database remained 22,500 entries, but each seed derived a deterministic 5,000-entry working set:
 
-- all available two- and three-letter answers are retained;
-- longer lengths receive explicit quotas;
-- lexical quality and category preference influence selection;
-- different seeds sample different words from the full corpus.
+- all available two- and three-letter answers were retained;
+- longer lengths received explicit quotas;
+- lexical quality and category preference influenced selection;
+- different seeds sampled different words from the full corpus.
 
 Three identical seeds produced:
 
@@ -125,11 +127,68 @@ Three identical seeds produced:
 | average elapsed time | 9.41 s | 13.67 s |
 | old coverage checkpoint | 3/3 | 3/3 |
 
-The expanded set produced no answer-count regressions, increased crossings on all three seeds, and raised answers on two. One seed retained the same panel count, one improved structural content at equal panels, and one regressed by two panels, leaving an average panel delta of `+0.67`.
-
-**Conclusion:** vocabulary expansion can improve answer and crossing density once the working set is balanced, but active-set size and category composition still need tuning before a larger confirmation run.
+The expanded set produced no answer-count regressions, increased crossings on all three seeds, and raised answers on two. Its average panel delta was still `+0.67`, so active-set size required a sweep.
 
 Artifact: `vocabulary-first-15dd6b349f96fe6d3a572ee54ad3922b02dede76`.
+
+### Active working-set sweep: 3,500 selected
+
+The same three seeds compared 2,500, 3,500, 5,000 and 7,500 active entries drawn from the unchanged 22,500-entry source corpus.
+
+| active set | panels | answers | crossings | raw letters | formulaic | checkpoint |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| old 887 | 6.67 | 45.33 | 45.67 | 47.83% | — | 3/3 |
+| 2,500 | 7.33 | 47.33 | 52.67 | 51.13% | 2.67 | 3/3 |
+| **3,500** | **5.67** | **45.67** | **50.67** | **52.17%** | **1.33** | **3/3** |
+| 5,000 | 8.33 | 45.00 | 51.00 | 50.97% | 1.00 | 3/3 |
+| 7,500 | 7.00 | 46.33 | 51.33 | 51.87% | 2.00 | 3/3 |
+
+The 3,500-entry set was the smallest tested configuration that simultaneously reduced panels, preserved answer count and materially increased crossings. It is now the browser and Node default. The full source corpus remains available for seed-specific sampling.
+
+Artifact: `vocabulary-pool-sweep-7e3a9163e998d2e7cad1c0756488104739d42c9c`.
+
+### Twenty-seed confirmation: direction validated
+
+The selected 3,500-entry working set was then tested on twenty new identical-seed A/B pairs.
+
+| metric | old 887-word pool | vocabulary-first 3,500 | delta |
+| --- | ---: | ---: | ---: |
+| average residual panels | 7.35 | **6.20** | **−1.15** |
+| average answers | 44.90 | **46.35** | **+1.45** |
+| average crossings | 47.20 | **51.05** | **+3.85** |
+| average active coverage | 96.67% | **97.18%** | **+0.51 pp** |
+| average answer-space coverage | 93.72% | **94.85%** | **+1.13 pp** |
+| average raw-letter coverage | 49.21% | **51.39%** | **+2.18 pp** |
+| average formulaic short answers | 4.00 | **1.30** | **−2.70** |
+| average editorial penalty | 544.95 | **441.10** | **−103.85** |
+| average elapsed time | 10.58 s | 13.76 s | +3.18 s |
+
+Outcomes:
+
+- fewer panels: **12/20**;
+- equal panels: **3/20**;
+- panel regressions: **5/20**;
+- more answers: **12/20**;
+- equal answers: **2/20**;
+- answer regressions: **6/20**;
+- more crossings: **17/20**;
+- higher raw-letter coverage: **14/20**;
+- preserved structural coverage checkpoint: **20/20**;
+- valid, connected grids with exact clues: **20/20**.
+
+Average placed categories in expanded grids:
+
+- 19.65 common nouns;
+- 8.65 specialist nouns;
+- 6.10 given names;
+- 5.80 core-reviewed answers;
+- 4.95 cities;
+- 0.80 capitals;
+- 0.40 surnames.
+
+This confirms the central direction: a much larger source corpus, combined with a controlled seed-specific working set, improves density and intersection structure rather than merely reducing a lexical metric.
+
+Artifact: `vocabulary-confirmation-4304e64f11a0184be5b00c6c42d09d47659fbf0f`; digest `sha256:9f2e65bf0c4fe2ce598ce1fb47c62ec43a537ebab8dad819946c8fd98b347656`.
 
 ## Corpus architecture
 
@@ -213,19 +272,18 @@ Primary metrics:
 - rare and specialist answer count;
 - duplicate and clue-validity failures.
 
-The current hypothesis is more precise than the original:
+The validated hypothesis is:
 
-> A large source corpus improves dense fill only when candidate sampling preserves short structural domains and controls category composition.
+> A large source corpus improves dense fill when candidate sampling preserves short structural domains and controls the per-seed working-set distribution.
 
 ## Current implementation sequence
 
-1. Complete the active working-set sweep at 2,500, 3,500, 5,000 and 7,500 entries.
-2. Select the smallest non-regressing configuration that improves answers and crossings.
-3. Reduce overuse of generic name and city clues through category quotas and penalties.
-4. Run 20-seed confirmation, then 50 seeds.
-5. Add countries, rivers, mountains, regions, arts, science, sport and historical names toward 30,000–50,000 source entries.
-6. Add slot-pattern coverage telemetry and expand weak domains by category.
-7. Apply same-geometry editorial repair as the final cleanup stage.
+1. Expand the source corpus toward 40,000–50,000 entries while retaining the 3,500-word active-set boundary.
+2. Add countries, regions, rivers, mountains, arts, science, sport and historical names.
+3. Improve generic clues for names and geography and add category-sensitive scoring.
+4. Add slot-pattern coverage telemetry and expand weak domains by category.
+5. Run a new 20-seed comparison after each corpus-generation milestone, then a 50-seed release checkpoint.
+6. Apply same-geometry editorial repair as the final cleanup stage.
 
 ## Production boundary
 
