@@ -1,6 +1,10 @@
 (() => {
   "use strict";
 
+  if (!window.ScanwordEditorialDemandLexiconV3 && typeof require === "function") {
+    require("./editorial-demand-lexicon-v3.js");
+  }
+
   const solver = window.ScanwordSolver;
   const policy = window.ScanwordEditorialLexicalPolicyV3;
   if (!solver || !policy || solver.__editorialRepairV3Installed) return;
