@@ -18,6 +18,21 @@ permissions:
   contents: read
 
 jobs:
+  dictionary-count:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Report dictionary size
+        run: node tools/dictionary-count-v3.cjs
+
   lexical-quality:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -76,6 +91,7 @@ jobs:
           node --check tools/editorial-replacement-checkpoint.cjs
           node --check tools/editorial-vocabulary-report.cjs
           node --check tools/render-filled-sample-v3.cjs
+          node --check tools/dictionary-count-v3.cjs
           node --check tools/lexical-frontier-checkpoint.cjs
           node --check tools/lexical-placement-checkpoint.cjs
           node --check tools/lexical-build-attempt-probe.cjs
