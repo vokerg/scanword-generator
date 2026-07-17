@@ -1,0 +1,79 @@
+name: Vocabulary portfolio release candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: Number of identical-seed end-to-end A/B pairs
+        required: true
+        default: "10"
+  pull_request:
+    branches:
+      - research/closed-fill-snapshot-2026-07-16
+    paths:
+      - construction-vocabulary-portfolio-v1.js
+      - construction-editorial-repair-v3.js
+      - tools/vocabulary-release-checkpoint.cjs
+      - .github/workflows/vocabulary-release.yml
+
+concurrency:
+  group: vocabulary-release-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  release-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SCANWORD_RELEASE_CONCURRENCY: 2
+      SCANWORD_PORTFOLIO_PANEL_SLACK: 1
+      SCANWORD_PORTFOLIO_ATTEMPTS: 240
+      SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
+      SCANWORD_VICTIM_BASES: 8
+      SCANWORD_VICTIM_VARIANTS: 6
+      SCANWORD_TARGETED_VICTIM_REGIONS: 3
+      SCANWORD_TARGETED_VICTIM_WORDS: 4
+      SCANWORD_TARGETED_VICTIM_DEPTH: 2
+      SCANWORD_TARGETED_EXACT_VARIANTS: 4
+      SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
+      SCANWORD_REPACK_NODES: 600000
+      SCANWORD_REPACK_BRANCH: 24
+      SCANWORD_EDITORIAL_PAIR_DOMAIN: 80
+      SCANWORD_EDITORIAL_PAIR_CANDIDATES: 600
+      SCANWORD_EDITORIAL_BUNDLE_DOMAIN: 100
+      SCANWORD_EDITORIAL_BUNDLE_NODES: 50000
+      SCANWORD_EDITORIAL_BUNDLE_SOLUTIONS: 24
+      SCANWORD_EDITORIAL_BUNDLE_VARIANTS: 24
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate release-candidate syntax
+        run: |
+          node --check construction-vocabulary-portfolio-v1.js
+          node --check construction-editorial-repair-v3.js
+          node --check tools/vocabulary-release-checkpoint.cjs
+
+      - name: Run end-to-end release A/B
+        env:
+          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '10' }}
+        run: |
+          mkdir -p research-output
+          node tools/vocabulary-release-checkpoint.cjs "${SEED_COUNT}" \
+            | tee research-output/vocabulary-release-${SEED_COUNT}.jsonl
+
+      - name: Publish release-candidate output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocabulary-release-${{ github.sha }}
+          path: research-output/
+          if-no-files-found: error
