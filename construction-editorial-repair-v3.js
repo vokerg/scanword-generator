@@ -129,3 +129,7 @@
     __editorialRepairV3Installed: true,
   });
 })();
+
+if (typeof require === "function" && !window.ScanwordSolver?.__vocabularyPortfolioV1Installed) {
+  require("./construction-vocabulary-portfolio-v1.js");
+}
