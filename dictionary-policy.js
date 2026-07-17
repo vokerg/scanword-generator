@@ -142,6 +142,7 @@
       lexicalQuality: word.length >= 4 ? 95 : 88,
       weakFill: false,
       source: "curated-common-fill-v1",
+      category: "common-noun",
     };
   }
 
@@ -156,6 +157,9 @@
         lexicalQuality: Number(metadata.lexicalQuality || (entry.answer.length >= 4 ? 80 : 65)),
         weakFill: Boolean(metadata.weakFill),
         lexicalSource: metadata.source || "reviewed-project-dictionary",
+        lexicalCategory: metadata.category || "core-reviewed",
+        lexicalLicense: metadata.license || null,
+        lexicalSourceId: metadata.sourceId || null,
       };
     });
     return reviewed.slice(0, Math.min(count, reviewed.length));

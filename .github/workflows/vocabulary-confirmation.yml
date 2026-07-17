@@ -1,0 +1,77 @@
+name: Vocabulary-first 20-seed confirmation
+
+on:
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: Number of identical-seed A/B pairs
+        required: true
+        default: "20"
+  pull_request:
+    branches:
+      - research/closed-fill-snapshot-2026-07-16
+    paths:
+      - core.js
+      - dictionary-policy.js
+      - bulk-lexicon-runtime.js
+      - two-letter-words.js
+      - bulk-lexicon/**
+      - tools/benchmark-seed-v3.cjs
+      - tools/vocabulary-first-checkpoint.cjs
+      - .github/workflows/vocabulary-confirmation.yml
+
+permissions:
+  contents: read
+
+jobs:
+  confirmation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SCANWORD_VOCABULARY_CONCURRENCY: 2
+      SCANWORD_VOCABULARY_ENFORCE: 0
+      SCANWORD_ACTIVE_POOL_LIMIT: 3500
+      SCANWORD_PORTFOLIO_PANEL_SLACK: 1
+      SCANWORD_PORTFOLIO_ATTEMPTS: 240
+      SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
+      SCANWORD_VICTIM_BASES: 8
+      SCANWORD_VICTIM_VARIANTS: 6
+      SCANWORD_TARGETED_VICTIM_REGIONS: 3
+      SCANWORD_TARGETED_VICTIM_WORDS: 4
+      SCANWORD_TARGETED_VICTIM_DEPTH: 2
+      SCANWORD_TARGETED_EXACT_VARIANTS: 4
+      SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
+      SCANWORD_REPACK_NODES: 600000
+      SCANWORD_REPACK_BRANCH: 24
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate benchmark syntax
+        run: |
+          node --check core.js
+          node --check dictionary-policy.js
+          node --check bulk-lexicon-runtime.js
+          node --check tools/benchmark-seed-v3.cjs
+          node --check tools/vocabulary-first-checkpoint.cjs
+
+      - name: Run 20-seed vocabulary confirmation
+        env:
+          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '20' }}
+        run: |
+          mkdir -p research-output
+          node tools/vocabulary-first-checkpoint.cjs "${SEED_COUNT}" vocabulary-confirmation \
+            | tee research-output/vocabulary-confirmation-${SEED_COUNT}.jsonl
+
+      - name: Publish confirmation output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocabulary-confirmation-${{ github.sha }}
+          path: research-output/
+          if-no-files-found: error

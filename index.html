@@ -10,11 +10,11 @@
   <main class="app-shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">ARROWORD GENERATOR · R&amp;D 0.11</p>
+        <p class="eyebrow">ARROWORD GENERATOR · VOCABULARY-FIRST R&amp;D</p>
         <h1>Dense, structurally valid arrowword grids</h1>
         <p class="lead">
-          Builds one connected answer graph, expands real clues into compact multi-cell footprints,
-          and rejects every accidental letter run before a result can be selected.
+          Builds one connected answer graph from a 22,500-entry categorized Russian corpus, derives a balanced
+          seed-specific working set, and rejects every accidental letter run before selection.
         </p>
       </div>
       <div class="badge">A5<br />SVG + JSON</div>
@@ -26,7 +26,7 @@
 
         <label>
           Seed
-          <input id="seed" type="text" value="arrowword-rnd-009" />
+          <input id="seed" type="text" value="arrowword-vocabulary-first-001" />
         </label>
 
         <div class="field-row">
@@ -42,8 +42,8 @@
 
         <div class="field-row">
           <label>
-            Word pool
-            <input id="poolSize" type="number" min="100" max="1000" value="1000" />
+            Active working set
+            <input id="poolSize" type="number" min="1000" max="10000" value="3500" />
           </label>
           <label>
             Minimum answers
@@ -71,8 +71,8 @@
         <div id="stats" class="stats" aria-live="polite"></div>
 
         <div class="note">
-          <strong>Construction V2 R&amp;D:</strong> panel-first selection can replace one or two low-value answers with
-          bounded replacement bundles and repack clue footprints before final validation. Legacy guards regressions.
+          <strong>Vocabulary-first R&amp;D:</strong> the full 22,500-entry corpus is loaded before placement. Each seed
+          receives a length-balanced 3,500-word working set; local editorial repair remains a secondary cleanup stage.
         </div>
       </aside>
 
@@ -102,6 +102,16 @@
   <script src="clues.js"></script>
   <script src="extra-dictionary.js"></script>
   <script src="two-letter-words.js"></script>
+  <script src="bulk-lexicon-runtime.js"></script>
+  <script src="bulk-lexicon/ruwordnet-common-01.js"></script>
+  <script src="bulk-lexicon/ruwordnet-common-02.js"></script>
+  <script src="bulk-lexicon/ruwordnet-common-03.js"></script>
+  <script src="bulk-lexicon/ruwordnet-common-04.js"></script>
+  <script src="bulk-lexicon/ruwordnet-common-05.js"></script>
+  <script src="bulk-lexicon/ruwordnet-common-06.js"></script>
+  <script src="bulk-lexicon/proper-names-01.js"></script>
+  <script src="bulk-lexicon/geography-01.js"></script>
+  <script src="bulk-lexicon/geography-02.js"></script>
   <script src="core.js"></script>
   <script src="dictionary-policy.js"></script>
   <script src="lexical-policy-v2.js"></script>

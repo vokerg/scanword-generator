@@ -1,0 +1,187 @@
+name: Vocabulary-first dense fill
+
+on:
+  push:
+    branches:
+      - r-and-d/lexical-pareto-frontier
+  pull_request:
+    branches:
+      - research/closed-fill-snapshot-2026-07-16
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: Number of identical-seed vocabulary A/B pairs
+        required: true
+        default: "20"
+      run_archived_gates:
+        description: Run superseded lexical-placement and repair gates
+        required: true
+        type: boolean
+        default: false
+
+concurrency:
+  group: vocabulary-first-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  dictionary-count:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Report dictionary size
+        run: node tools/dictionary-count-v3.cjs
+
+  vocabulary-first-density:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SCANWORD_VOCABULARY_CONCURRENCY: 1
+      SCANWORD_VOCABULARY_ENFORCE: 0
+      SCANWORD_PORTFOLIO_PANEL_SLACK: 1
+      SCANWORD_PORTFOLIO_ATTEMPTS: 240
+      SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
+      SCANWORD_VICTIM_BASES: 8
+      SCANWORD_VICTIM_VARIANTS: 6
+      SCANWORD_TARGETED_VICTIM_REGIONS: 3
+      SCANWORD_TARGETED_VICTIM_WORDS: 4
+      SCANWORD_TARGETED_VICTIM_DEPTH: 2
+      SCANWORD_TARGETED_EXACT_VARIANTS: 4
+      SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
+      SCANWORD_REPACK_NODES: 600000
+      SCANWORD_REPACK_BRANCH: 24
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check vocabulary-first syntax
+        run: |
+          node --check bulk-lexicon-runtime.js
+          node --check tools/benchmark-seed-v3.cjs
+          node --check tools/vocabulary-first-checkpoint.cjs
+          for file in bulk-lexicon/*.js; do node --check "$file"; done
+
+      - name: Run pre-construction vocabulary A/B
+        env:
+          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '3' }}
+        run: |
+          mkdir -p research-output
+          node tools/vocabulary-first-checkpoint.cjs "${SEED_COUNT}" \
+            | tee research-output/vocabulary-first-${SEED_COUNT}.jsonl
+
+      - name: Publish vocabulary-first output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocabulary-first-${{ github.sha }}
+          path: research-output/
+          if-no-files-found: error
+
+  filled-sample:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SCANWORD_PORTFOLIO_PANEL_SLACK: 1
+      SCANWORD_PORTFOLIO_ATTEMPTS: 240
+      SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
+      SCANWORD_VICTIM_BASES: 8
+      SCANWORD_VICTIM_VARIANTS: 6
+      SCANWORD_TARGETED_VICTIM_REGIONS: 3
+      SCANWORD_TARGETED_VICTIM_WORDS: 4
+      SCANWORD_TARGETED_VICTIM_DEPTH: 2
+      SCANWORD_TARGETED_EXACT_VARIANTS: 4
+      SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
+      SCANWORD_REPACK_NODES: 600000
+      SCANWORD_REPACK_BRANCH: 24
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Render filled sample from expanded corpus
+        run: |
+          mkdir -p research-output
+          node tools/render-filled-sample-v3.cjs \
+            vocabulary-first-sample \
+            research-output/filled-sample.svg
+
+      - name: Publish filled sample
+        uses: actions/upload-artifact@v4
+        with:
+          name: filled-sample-${{ github.sha }}
+          path: research-output/filled-sample.svg
+          if-no-files-found: error
+
+  archived-lexical-research:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_archived_gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SCANWORD_LEXICAL_CONCURRENCY: 2
+      SCANWORD_EDITORIAL_REPLACEMENT_ENFORCE: 1
+      SCANWORD_PORTFOLIO_PANEL_SLACK: 1
+      SCANWORD_PORTFOLIO_ATTEMPTS: 240
+      SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
+      SCANWORD_EDITORIAL_PAIR_DOMAIN: 80
+      SCANWORD_EDITORIAL_PAIR_CANDIDATES: 600
+      SCANWORD_EDITORIAL_BUNDLE_DOMAIN: 100
+      SCANWORD_EDITORIAL_BUNDLE_NODES: 50000
+      SCANWORD_EDITORIAL_BUNDLE_SOLUTIONS: 24
+      SCANWORD_EDITORIAL_BUNDLE_VARIANTS: 24
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run retained same-geometry repair gate
+        env:
+          SEED_COUNT: ${{ inputs.seeds }}
+        run: |
+          mkdir -p research-output
+          node tools/editorial-replacement-checkpoint.cjs "${SEED_COUNT}" \
+            | tee research-output/editorial-replacement-${SEED_COUNT}.jsonl
+          node tools/editorial-vocabulary-report.cjs \
+            research-output/editorial-replacement-${SEED_COUNT}.jsonl \
+            | tee research-output/editorial-vocabulary-report-${SEED_COUNT}.json
+
+      - name: Run superseded placement/frontier probes
+        env:
+          SEED_COUNT: ${{ inputs.seeds }}
+        run: |
+          node tools/lexical-build-sweep.cjs lexical-build-sweep 40 \
+            | tee research-output/lexical-build-sweep.jsonl
+          node tools/lexical-frontier-checkpoint.cjs "${SEED_COUNT}" \
+            | tee research-output/lexical-frontier-${SEED_COUNT}.jsonl
+          node tools/lexical-placement-checkpoint.cjs "${SEED_COUNT}" \
+            | tee research-output/lexical-placement-${SEED_COUNT}.jsonl
+
+      - name: Publish archived research output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: archived-lexical-research-${{ github.sha }}
+          path: research-output/
+          if-no-files-found: error
