@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - r-and-d/lexical-pareto-frontier
+  pull_request:
+    branches:
+      - research/closed-fill-snapshot-2026-07-16
   workflow_dispatch:
 
 permissions:
