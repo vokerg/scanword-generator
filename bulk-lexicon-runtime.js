@@ -14,6 +14,7 @@
   window.RUSSIAN_WORDS = Array.isArray(window.RUSSIAN_WORDS) ? window.RUSSIAN_WORDS : [];
   window.RUSSIAN_CLUES = { ...(window.RUSSIAN_CLUES || {}) };
   window.RUSSIAN_LEXICAL_META = { ...(window.RUSSIAN_LEXICAL_META || {}) };
+  if (!Number.isFinite(Number(window.SCANWORD_ACTIVE_POOL_LIMIT))) window.SCANWORD_ACTIVE_POOL_LIMIT = 3500;
   const existing = new Set(window.RUSSIAN_WORDS.map(normalize));
 
   function register(entries, source = "bulk-lexicon-v1") {
