@@ -26,10 +26,6 @@ on:
       - tools/vocabulary-pool-sweep.cjs
       - .github/workflows/vocabulary-pool-sweep.yml
 
-concurrency:
-  group: vocabulary-pool-sweep-${{ github.ref }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
