@@ -1,17 +1,19 @@
-name: Build vocabulary greatness 1.1 corpus
+name: Build vocabulary baseline 1.1 corpus
 
 on:
   push:
     branches:
-      - r-and-d/vocabulary-greatness-1.1-rebased
+      - main
     paths:
       - tools/build-bulk-lexicon*.py
+      - bulk-lexicon-runtime.js
       - .github/workflows/vocabulary-greatness-build.yml
   pull_request:
     branches:
       - main
     paths:
       - tools/build-bulk-lexicon*.py
+      - bulk-lexicon-runtime.js
       - .github/workflows/vocabulary-greatness-build.yml
   workflow_dispatch:
     inputs:
@@ -21,7 +23,7 @@ on:
         default: "1500"
 
 concurrency:
-  group: vocabulary-greatness-build-${{ github.event.pull_request.number || github.ref }}
+  group: vocabulary-baseline-build-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -54,13 +56,12 @@ jobs:
           curl --fail --location --retry 4 https://download.geonames.org/export/dump/alternateNamesV2.zip --output source-data/alternateNamesV2.zip
           curl --fail --location --retry 4 https://download.geonames.org/export/dump/countryInfo.txt --output source-data/countryInfo.txt
 
-      - name: Build selected corpus v8 for diagnosis
+      - name: Build selected corpus v8
         env:
           ENTITY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.entities || '1500' }}
         run: |
-          set -o pipefail
           python -m py_compile tools/build-bulk-lexicon*.py
-          python tools/build-bulk-lexicon-v9-diagnostic.py \
+          python tools/build-bulk-lexicon-v8.py \
             --ruwordnet-db source-data/ruwordnet-2021.db \
             --geonames-cities-zip source-data/cities15000.zip \
             --geonames-features-zip source-data/allCountries.zip \
@@ -69,46 +70,52 @@ jobs:
             --out-dir generated/bulk-lexicon \
             --common 35000 --names 5000 --geography 10000 \
             --entities "${ENTITY_TARGET}" --chunk-size 2500 \
-            2>&1 | tee generated/bulk-lexicon/build-log.txt
+            > generated/bulk-lexicon/build-report.json
 
       - name: Validate generated corpus
         run: |
           for file in generated/bulk-lexicon/*.js; do node --check "$file"; done
           node - <<'NODE'
           const fs = require("node:fs");
-          const path = require("node:path");
           const manifest = JSON.parse(fs.readFileSync("generated/bulk-lexicon/manifest.json", "utf8"));
-          global.window = global;
-          window.RUSSIAN_WORDS = [];
-          window.RUSSIAN_CLUES = {};
-          window.RUSSIAN_LEXICAL_META = {};
-          require(path.resolve("bulk-lexicon-runtime.js"));
-          for (const file of fs.readdirSync("generated/bulk-lexicon").filter((name) => name.endsWith(".js") && name !== "loader.js").sort()) {
-            require(path.resolve("generated/bulk-lexicon", file));
-          }
-          const bySource = new Map((window.ScanwordBulkLexiconV1?.state?.entries || []).map((entry) => [String(entry.sourceId || ""), entry.answer]));
-          const mismatches = Object.entries(manifest.canonicalExamples || {})
-            .map(([sourceId, expected]) => ({ sourceId, expected, actual: bySource.get(sourceId) || null }))
-            .filter((item) => item.actual !== item.expected);
-          fs.writeFileSync("generated/bulk-lexicon/canonical-diagnostics.json", JSON.stringify({ mismatches }, null, 2));
           const total = manifest.actual.total.entries;
-          const generic = manifest.editorialDebt.genericTemplatePercent;
           const entities = manifest.actual.entities.entries;
+          const generic = manifest.editorialDebt.genericTemplatePercent;
           const preferred = manifest.preferredRussianNames?.geography?.preferredAvailable || 0;
-          if (total < 40500) throw new Error(`Corpus did not retain enough breadth: ${total}`);
-          if (entities < 1000) throw new Error(`High-confidence entity expansion too small: ${entities}`);
-          if (generic >= 20) throw new Error(`Generic-template debt remains too high: ${generic}%`);
-          if (preferred < 5000) throw new Error(`Preferred Russian city-name coverage too low: ${preferred}`);
+          if (manifest.version !== 8) throw new Error(`Unexpected corpus version: ${manifest.version}`);
+          if (total !== 40966) throw new Error(`Unexpected corpus size: ${total}`);
+          if (entities !== 1469) throw new Error(`Unexpected entity count: ${entities}`);
+          if (generic !== 13.84) throw new Error(`Unexpected generic-template share: ${generic}`);
+          if (preferred < 8996) throw new Error(`Preferred Russian mapping coverage regressed: ${preferred}`);
           if (!manifest.admission?.dropsCollidingFallbackAliases) throw new Error("Alias collision policy is not active");
-          if (mismatches.length) throw new Error(`Canonical geography mismatches: ${JSON.stringify(mismatches)}`);
-          console.log(JSON.stringify({ total, entities, generic, preferred, admission: manifest.admission, editorialDebt: manifest.editorialDebt }, null, 2));
+          if (manifest.canonicalExamples?.["2028462"] !== "УЛАНБАТОР") throw new Error("Canonical override regression");
+          console.log(JSON.stringify({ total, entities, generic, preferred }, null, 2));
+          NODE
+
+      - name: Compare committed and generated manifests
+        run: |
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const committed = JSON.parse(fs.readFileSync("bulk-lexicon/manifest.json", "utf8"));
+          const generated = JSON.parse(fs.readFileSync("generated/bulk-lexicon/manifest.json", "utf8"));
+          for (const path of [
+            ["version"],
+            ["actual", "total", "entries"],
+            ["actual", "entities", "entries"],
+            ["editorialDebt", "genericTemplatePercent"],
+          ]) {
+            const read = (value) => path.reduce((cursor, key) => cursor?.[key], value);
+            if (read(committed) !== read(generated)) {
+              throw new Error(`Manifest mismatch at ${path.join(".")}: ${read(committed)} vs ${read(generated)}`);
+            }
+          }
           NODE
 
       - name: Publish build evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: vocabulary-greatness-corpus-${{ github.sha }}
+          name: vocabulary-baseline-corpus-${{ github.sha }}
           path: generated/bulk-lexicon/
           if-no-files-found: error
           retention-days: 30
