@@ -41,6 +41,7 @@ jobs:
 
       - name: Build and validate selected corpus
         run: |
+          set -o pipefail
           python -m py_compile tools/build-bulk-lexicon*.py
           python tools/build-bulk-lexicon-v8.py \
             --ruwordnet-db source-data/ruwordnet-2021.db \
@@ -49,25 +50,26 @@ jobs:
             --geonames-alternates-zip source-data/alternateNamesV2.zip \
             --country-info source-data/countryInfo.txt \
             --out-dir generated/bulk-lexicon \
-            --common 35000 --names 5000 --geography 10000 --entities 1500 --chunk-size 2500
+            --common 35000 --names 5000 --geography 10000 --entities 1500 --chunk-size 2500 \
+            | tee generated/bulk-lexicon/build-report.json
           for file in generated/bulk-lexicon/*.js; do node --check "$file"; done
           node - <<'NODE'
           const fs = require("node:fs");
           const manifest = JSON.parse(fs.readFileSync("generated/bulk-lexicon/manifest.json", "utf8"));
           if (manifest.actual.total.entries < 40500) throw new Error("Corpus breadth regression");
+          if (manifest.actual.entities.entries < 1400) throw new Error("Entity breadth regression");
           if (manifest.editorialDebt.genericTemplatePercent >= 20) throw new Error("Generic clue debt regression");
           if (!manifest.admission?.dropsCollidingFallbackAliases) throw new Error("Alias collision policy missing");
-          for (const [sourceId, answer] of Object.entries(manifest.canonicalExamples || {})) {
-            if (!answer) throw new Error(`Missing canonical answer for ${sourceId}`);
-          }
+          if (manifest.canonicalExamples?.["2028462"] !== "УЛАНБАТОР") throw new Error("Canonical override regression");
           NODE
 
-      - name: Commit generated corpus
+      - name: Commit generated corpus and retire this workflow
         run: |
           rm -rf bulk-lexicon
           mkdir -p bulk-lexicon
           cp generated/bulk-lexicon/*.js bulk-lexicon/
           cp generated/bulk-lexicon/manifest.json bulk-lexicon/
+          git rm .github/workflows/one-shot-commit-v8-corpus.yml
           git config user.name "scanword-lexicon-bot"
           git config user.email "scanword-lexicon-bot@users.noreply.github.com"
           git add bulk-lexicon
