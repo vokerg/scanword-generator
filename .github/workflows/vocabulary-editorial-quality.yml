@@ -77,7 +77,7 @@ jobs:
       - name: Compare baseline and editorial selection
         env:
           NODE_OPTIONS: --require=${{ github.workspace }}/tools/node-benchmark-bootstrap-v1.cjs --require=${{ github.workspace }}/tools/node-editorial-bootstrap-v1.cjs
-          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '3' }}
+          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '10' }}
           SCANWORD_EDITORIAL_VARIANT_SEARCH: ${{ github.event_name == 'workflow_dispatch' && inputs.variant_search && 'on' || 'off' }}
           SCANWORD_VOCABULARY_EDITORIAL_VARIANTS: ${{ github.event_name == 'workflow_dispatch' && inputs.variants || '1' }}
         run: |
