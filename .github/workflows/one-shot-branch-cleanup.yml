@@ -1,0 +1,64 @@
+name: One-shot retired branch cleanup
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/one-shot-branch-cleanup.yml
+
+permissions:
+  contents: write
+
+jobs:
+  delete-retired-branches:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Delete retired branch refs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          branches=(
+            "r-and-d/valid-arrowword-generator"
+            "r-and-d/coverage-090"
+            "r-and-d/dictionary-10k"
+            "r-and-d/closed-fill"
+            "research/closed-fill-checkpoint"
+            "research/closed-fill-snapshot-2026-07-16"
+            "r-and-d/lexical-pareto-frontier"
+            "tmp/history-anchor-build"
+          )
+
+          for branch in "${branches[@]}"; do
+            if git ls-remote --exit-code --heads origin "${branch}" >/dev/null 2>&1; then
+              echo "Deleting ${branch}"
+              git push origin --delete "${branch}"
+            else
+              echo "Already absent: ${branch}"
+            fi
+          done
+
+      - name: Verify only main remains
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t branches < <(
+            git ls-remote --heads origin \
+              | awk '{print $2}' \
+              | sed 's#^refs/heads/##' \
+              | sort
+          )
+
+          printf 'Remaining branches:\n'
+          printf '  %s\n' "${branches[@]}"
+
+          if [[ "${#branches[@]}" -ne 1 || "${branches[0]}" != "main" ]]; then
+            echo "Expected only main to remain." >&2
+            exit 1
+          fi
