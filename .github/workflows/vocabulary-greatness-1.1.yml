@@ -31,7 +31,7 @@ permissions:
 jobs:
   canonical-runtime:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     env:
       NODE_OPTIONS: --require=${{ github.workspace }}/tools/node-benchmark-bootstrap-v1.cjs
       SCANWORD_PORTFOLIO_ATTEMPTS: 240
@@ -55,6 +55,7 @@ jobs:
           node --check construction-vocabulary-portfolio-v1.js
           node --check bulk-lexicon-runtime.js
           node --check tools/bulk-lexicon-audit.cjs
+          node --check tools/vocabulary-adaptive-checkpoint.cjs
 
       - name: Audit current corpus
         run: node tools/bulk-lexicon-audit.cjs | tee corpus-audit.json
@@ -62,6 +63,7 @@ jobs:
       - name: Prove browser-equivalent benchmark bootstrap
         env:
           SCANWORD_BULK_LEXICON: "on"
+          SCANWORD_VOCABULARY_PORTFOLIO_MODE: full
         run: |
           node tools/benchmark-seed-v3.cjs vocabulary-greatness-bootstrap \
             | tee bootstrap.json
@@ -87,10 +89,19 @@ jobs:
         env:
           SEEDS: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '3' }}
           SCANWORD_RELEASE_CONCURRENCY: 1
+          SCANWORD_VOCABULARY_PORTFOLIO_MODE: full
         run: |
           mkdir -p research-output
           node tools/vocabulary-release-checkpoint.cjs "${SEEDS}" vocabulary-greatness-truth \
             | tee "research-output/truth-${SEEDS}.jsonl"
+
+      - name: Compare full and adaptive portfolio
+        env:
+          SEEDS: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '3' }}
+          SCANWORD_ADAPTIVE_CONCURRENCY: 1
+        run: |
+          node tools/vocabulary-adaptive-checkpoint.cjs "${SEEDS}" vocabulary-greatness-adaptive \
+            | tee "research-output/adaptive-${SEEDS}.jsonl"
 
       - name: Publish evidence
         if: always()
