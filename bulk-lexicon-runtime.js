@@ -23,6 +23,7 @@
       added: 0,
       skipped: 0,
       categories: {},
+      clueKinds: {},
     };
 
     for (const raw of entries || []) {
@@ -33,6 +34,7 @@
         continue;
       }
       const category = String(raw.category || "bulk");
+      const clueKind = String(raw.clueKind || "unclassified");
       const entry = {
         answer,
         clue,
@@ -42,8 +44,13 @@
         hasExactClue: raw.hasExactClue !== false,
         license: raw.license || null,
         sourceId: raw.sourceId || null,
+        clueKind,
+        genericTemplate: Boolean(raw.genericTemplate),
+        generatedTemplate: Boolean(raw.generatedTemplate),
+        clueFacts: raw.clueFacts && typeof raw.clueFacts === "object" ? { ...raw.clueFacts } : null,
       };
       local.categories[category] = (local.categories[category] || 0) + 1;
+      local.clueKinds[clueKind] = (local.clueKinds[clueKind] || 0) + 1;
 
       if (!state.byAnswer.has(answer)) {
         state.byAnswer.set(answer, entry);
@@ -68,6 +75,10 @@
           category: entry.category,
           license: entry.license,
           sourceId: entry.sourceId,
+          clueKind: entry.clueKind,
+          genericTemplate: entry.genericTemplate,
+          generatedTemplate: entry.generatedTemplate,
+          clueFacts: entry.clueFacts,
         };
       }
     }
