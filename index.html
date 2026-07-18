@@ -10,10 +10,10 @@
   <main class="app-shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">ARROWORD GENERATOR · VOCABULARY-FIRST 1.0</p>
+        <p class="eyebrow">ARROWORD GENERATOR · VOCABULARY-FIRST 1.1</p>
         <h1>Dense, structurally valid arrowword grids</h1>
         <p class="lead">
-          Builds one connected answer graph from a categorized Russian corpus, compares bounded seed-specific working
+          Builds one connected answer graph from an attributed Russian corpus, compares bounded seed-specific working
           sets, and applies a same-geometry editorial cleanup before selecting the final grid.
         </p>
       </div>
@@ -71,9 +71,9 @@
         <div id="stats" class="stats" aria-live="polite"></div>
 
         <div class="note">
-          <strong>Vocabulary-first 1.0:</strong> 39,586 attributed entries are available before construction. The default
-          pipeline compares 2,500- and 3,500-entry working sets panel-first, then removes avoidable formulaic short fill
-          without changing the selected geometry.
+          <strong>Vocabulary-first 1.1:</strong> 40,966 attributed entries are available before construction, including
+          filtered natural and administrative entities. The default pipeline compares 2,500- and 3,500-entry working
+          sets panel-first, then removes avoidable formulaic short fill without changing the selected geometry.
         </div>
       </aside>
 
@@ -106,6 +106,7 @@
     window.SCANWORD_EDITORIAL_REPAIR = "on";
     window.SCANWORD_VOCABULARY_PORTFOLIO = "on";
     window.SCANWORD_VOCABULARY_PORTFOLIO_LIMITS = "2500,3500";
+    window.SCANWORD_VOCABULARY_PORTFOLIO_MODE = "full";
   </script>
   <script src="words.js"></script>
   <script src="short-words.js"></script>

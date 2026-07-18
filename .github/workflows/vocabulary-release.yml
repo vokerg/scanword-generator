@@ -1,16 +1,9 @@
 name: Vocabulary portfolio release candidate
 
 on:
-  workflow_dispatch:
-    inputs:
-      seeds:
-        description: Number of identical-seed end-to-end A/B pairs
-        required: true
-        default: "20"
-  pull_request:
+  push:
     branches:
       - main
-      - research/closed-fill-snapshot-2026-07-16
     paths:
       - index.html
       - bulk-lexicon-runtime.js
@@ -21,6 +14,29 @@ on:
       - editorial-demand-*.js
       - construction-vocabulary-portfolio-v1.js
       - construction-editorial-*-v3.js
+      - tools/node-benchmark-bootstrap-v1.cjs
+      - tools/vocabulary-release-checkpoint.cjs
+      - .github/workflows/vocabulary-release.yml
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: Number of identical-seed end-to-end A/B pairs
+        required: true
+        default: "20"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - index.html
+      - bulk-lexicon-runtime.js
+      - bulk-lexicon/**
+      - core.js
+      - dictionary-policy.js
+      - editorial-lexical-policy-v3.js
+      - editorial-demand-*.js
+      - construction-vocabulary-portfolio-v1.js
+      - construction-editorial-*-v3.js
+      - tools/node-benchmark-bootstrap-v1.cjs
       - tools/vocabulary-release-checkpoint.cjs
       - .github/workflows/vocabulary-release.yml
 
@@ -55,6 +71,7 @@ jobs:
       SCANWORD_EDITORIAL_BUNDLE_NODES: 50000
       SCANWORD_EDITORIAL_BUNDLE_SOLUTIONS: 24
       SCANWORD_EDITORIAL_BUNDLE_VARIANTS: 24
+      SCANWORD_VOCABULARY_PORTFOLIO_MODE: full
     steps:
       - name: Check out branch
         uses: actions/checkout@v4
@@ -72,6 +89,7 @@ jobs:
           node --check editorial-lexical-policy-v3.js
           node --check construction-vocabulary-portfolio-v1.js
           node --check construction-editorial-repair-v3.js
+          node --check tools/node-benchmark-bootstrap-v1.cjs
           node --check tools/vocabulary-release-checkpoint.cjs
           for file in bulk-lexicon/*.js editorial-demand-*.js construction-editorial-*-v3.js; do
             node --check "$file"
@@ -79,15 +97,22 @@ jobs:
           node - <<'NODE'
           const fs = require("node:fs");
           const html = fs.readFileSync("index.html", "utf8");
+          const manifest = JSON.parse(fs.readFileSync("bulk-lexicon/manifest.json", "utf8"));
+          if (manifest.version !== 8 || manifest.actual.total.entries !== 40966) {
+            throw new Error(`Unexpected corpus checkpoint: v${manifest.version}/${manifest.actual.total.entries}`);
+          }
           for (const expected of [
             'window.SCANWORD_CONSTRUCTION_MODE = "portfolio"',
             'window.SCANWORD_EDITORIAL_REPAIR = "on"',
             'window.SCANWORD_VOCABULARY_PORTFOLIO = "on"',
             'window.SCANWORD_VOCABULARY_PORTFOLIO_LIMITS = "2500,3500"',
+            'window.SCANWORD_VOCABULARY_PORTFOLIO_MODE = "full"',
           ]) {
             if (!html.includes(expected)) throw new Error(`Missing browser default: ${expected}`);
           }
           const orderedScripts = [
+            "bulk-lexicon-runtime.js",
+            "bulk-lexicon/loader.js",
             "editorial-lexical-policy-v3.js",
             "construction-editorial-replace-v3.js",
             "construction-editorial-pair-refit-v3.js",
@@ -103,13 +128,14 @@ jobs:
           }
           NODE
 
-      - name: Run end-to-end release A/B
+      - name: Run end-to-end release A/B with canonical Node bootstrap
         env:
           SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '20' }}
+          NODE_OPTIONS: --require=${{ github.workspace }}/tools/node-benchmark-bootstrap-v1.cjs
         run: |
           mkdir -p research-output
           node tools/vocabulary-release-checkpoint.cjs "${SEED_COUNT}" \
-            | tee research-output/vocabulary-release-${SEED_COUNT}.jsonl
+            | tee "research-output/vocabulary-release-${SEED_COUNT}.jsonl"
 
       - name: Publish release-candidate output
         if: always()

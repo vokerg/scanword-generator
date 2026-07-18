@@ -1,6 +1,6 @@
 {
-  "version": 2,
-  "generatedBy": "tools/build-bulk-lexicon.py",
+  "version": 8,
+  "generatedBy": "tools/build-bulk-lexicon-v8.py",
   "sources": {
     "ruwordnet": {
       "url": "https://github.com/avidale/python-ruwordnet/releases/download/0.0.4/ruwordnet-2021.db",
@@ -9,21 +9,36 @@
     "geonames-cities": {
       "url": "https://download.geonames.org/export/dump/cities15000.zip",
       "license": "CC BY 4.0",
-      "role": "cities and capitals"
+      "role": "cities and capitals with population and region facts"
+    },
+    "geonames-features": {
+      "url": "https://download.geonames.org/export/dump/allCountries.zip",
+      "license": "CC BY 4.0",
+      "role": "high-confidence natural and first-level administrative entities"
+    },
+    "geonames-alternate-names": {
+      "url": "https://download.geonames.org/export/dump/alternateNamesV2.zip",
+      "license": "CC BY 4.0",
+      "role": "language-tagged preferred Russian surface names"
     },
     "geonames-countries": {
       "url": "https://download.geonames.org/export/dump/countryInfo.txt",
       "license": "CC BY 4.0",
-      "role": "country metadata and continent classification"
+      "role": "countries with continent, population and area facts"
     },
     "wordfreq+pymorphy3": {
-      "role": "frequency ranking and proper-name morphology"
+      "role": "fallback surface-name clustering, homograph control and frequency ranking"
+    },
+    "project-overrides": {
+      "role": "small source-id keyed letters-only canonical-answer exceptions",
+      "entries": 1
     }
   },
   "requested": {
     "common": 35000,
     "names": 5000,
     "geography": 10000,
+    "entities": 1500,
     "countries": "all valid single-token Russian territory names"
   },
   "actual": {
@@ -45,6 +60,11 @@
         "11": 2554,
         "12": 2134
       },
+      "clueKinds": {
+        "definition": 24457
+      },
+      "genericTemplateEntries": 0,
+      "generatedTemplateEntries": 0,
       "quality": {
         "min": 53,
         "max": 88,
@@ -70,6 +90,11 @@
         "11": 84,
         "12": 23
       },
+      "clueKinds": {
+        "generic-template": 5000
+      },
+      "genericTemplateEntries": 5000,
+      "generatedTemplateEntries": 5000,
       "quality": {
         "min": 60,
         "max": 88,
@@ -77,189 +102,313 @@
       }
     },
     "geography": {
-      "entries": 10000,
+      "entries": 9915,
       "categories": {
-        "capital": 170,
-        "city": 9830
+        "capital": 163,
+        "city": 9752
       },
       "lengths": {
-        "3": 210,
-        "4": 722,
-        "5": 1620,
-        "6": 2109,
-        "7": 1881,
-        "8": 1531,
-        "9": 950,
-        "10": 587,
-        "11": 263,
-        "12": 127
+        "3": 161,
+        "4": 621,
+        "5": 1452,
+        "6": 1974,
+        "7": 1885,
+        "8": 1609,
+        "9": 994,
+        "10": 677,
+        "11": 367,
+        "12": 175
       },
+      "clueKinds": {
+        "descriptive-template": 9915
+      },
+      "genericTemplateEntries": 0,
+      "generatedTemplateEntries": 9915,
       "quality": {
-        "min": 66,
-        "max": 85,
-        "average": 69.02
+        "min": 67,
+        "max": 87,
+        "average": 70.33
       }
     },
     "countries": {
-      "entries": 129,
+      "entries": 125,
       "categories": {
-        "country": 129
+        "country": 125
       },
       "lengths": {
         "4": 13,
         "5": 16,
         "6": 25,
-        "7": 32,
-        "8": 20,
+        "7": 31,
+        "8": 19,
         "9": 9,
-        "10": 11,
+        "10": 9,
         "11": 3
       },
+      "clueKinds": {
+        "descriptive-template": 125
+      },
+      "genericTemplateEntries": 0,
+      "generatedTemplateEntries": 125,
       "quality": {
         "min": 78,
         "max": 87,
-        "average": 84.24
+        "average": 84.28
+      }
+    },
+    "entities": {
+      "entries": 1469,
+      "categories": {
+        "bay": 35,
+        "hill": 22,
+        "hills": 5,
+        "island": 87,
+        "islands": 22,
+        "lake": 75,
+        "mountain": 178,
+        "mountain-range": 104,
+        "peak": 120,
+        "plateau": 27,
+        "region": 397,
+        "river": 328,
+        "sea": 8,
+        "valley": 38,
+        "volcano": 23
+      },
+      "lengths": {
+        "3": 63,
+        "4": 194,
+        "5": 239,
+        "6": 297,
+        "7": 262,
+        "8": 198,
+        "9": 106,
+        "10": 60,
+        "11": 31,
+        "12": 19
+      },
+      "clueKinds": {
+        "descriptive-template": 801,
+        "generic-template": 668
+      },
+      "genericTemplateEntries": 668,
+      "generatedTemplateEntries": 1469,
+      "quality": {
+        "min": 70,
+        "max": 90,
+        "average": 84.53
       }
     },
     "total": {
-      "entries": 39586,
+      "entries": 40966,
       "categories": {
-        "capital": 170,
-        "city": 9830,
+        "bay": 35,
+        "capital": 163,
+        "city": 9752,
         "common-noun": 4358,
-        "country": 129,
+        "country": 125,
         "given-name": 2798,
+        "hill": 22,
+        "hills": 5,
+        "island": 87,
+        "islands": 22,
+        "lake": 75,
+        "mountain": 178,
+        "mountain-range": 104,
         "patronymic": 115,
+        "peak": 120,
+        "plateau": 27,
+        "region": 397,
+        "river": 328,
+        "sea": 8,
         "specialist-noun": 20099,
-        "surname": 2087
+        "surname": 2087,
+        "valley": 38,
+        "volcano": 23
       },
       "lengths": {
-        "3": 823,
-        "4": 2479,
-        "5": 4784,
-        "6": 5879,
-        "7": 6391,
-        "8": 5658,
-        "9": 4676,
-        "10": 3708,
-        "11": 2904,
-        "12": 2284
+        "3": 837,
+        "4": 2572,
+        "5": 4855,
+        "6": 6041,
+        "7": 6656,
+        "8": 5933,
+        "9": 4826,
+        "10": 3856,
+        "11": 3039,
+        "12": 2351
       },
+      "clueKinds": {
+        "definition": 24457,
+        "descriptive-template": 10841,
+        "generic-template": 5668
+      },
+      "genericTemplateEntries": 5668,
+      "generatedTemplateEntries": 16509,
       "quality": {
         "min": 53,
-        "max": 88,
-        "average": 66.89
+        "max": 90,
+        "average": 67.83
       }
     }
+  },
+  "preferredRussianNames": {
+    "availableMappings": 321921,
+    "geography": {
+      "preferredAvailable": 8996,
+      "answersReplaced": 1014,
+      "canonicalOverrideUses": 1,
+      "collisionDrops": 63,
+      "duplicateDrops": 22
+    },
+    "entities": {
+      "preferredAvailable": 1094,
+      "answersReplaced": 108,
+      "canonicalOverrideUses": 0,
+      "collisionDrops": 30,
+      "duplicateDrops": 1
+    }
+  },
+  "canonicalExamples": {
+    "3530597": "МЕХИКО",
+    "3688689": "БОГОТА",
+    "2365267": "ЛОМЕ",
+    "1581130": "ХАНОЙ",
+    "1668341": "ТАЙБЕЙ",
+    "964137": "ПРЕТОРИЯ",
+    "2220957": "ЯУНДЕ",
+    "2028462": "УЛАНБАТОР"
+  },
+  "editorialDebt": {
+    "genericTemplateEntries": 5668,
+    "genericTemplatePercent": 13.84,
+    "generatedTemplateEntries": 16509,
+    "generatedTemplatePercent": 40.3
+  },
+  "admission": {
+    "maximumEntityFrequency": 4.05,
+    "usesPreferredRussianGeoNames": true,
+    "dropsCollidingFallbackAliases": true,
+    "usesCanonicalSourceOverrides": true,
+    "usesSurfaceAlternateClustersAsFallback": true,
+    "usesAlternateNameEvidence": true,
+    "featureSpecificEvidenceThresholds": true,
+    "generatedCluesAvoidInflection": true
   },
   "files": [
     {
       "file": "ruwordnet-common-01.js",
       "entries": 2500,
-      "bytes": 793135,
-      "sha256": "0647771b8acc62199bc0f67cf6084c0233043d4621565461e4df901f836bb57e"
+      "bytes": 1020635,
+      "sha256": "a02485575709d4ceedcdfa7bdd97ef1184f98f22cacd7587901eb79d26a873ce"
     },
     {
       "file": "ruwordnet-common-02.js",
       "entries": 2500,
-      "bytes": 808752,
-      "sha256": "e5f1b7f4a8aef17892a0c58922a63914b6f235704cdaa301ed484a24567dfed4"
+      "bytes": 1036252,
+      "sha256": "51e3c178fd691ebf92654199fb2aadcec940a57dd8b90cf9f32ed5f9a3f52335"
     },
     {
       "file": "ruwordnet-common-03.js",
       "entries": 2500,
-      "bytes": 823348,
-      "sha256": "9124df26d322c88dd21ce7ebacaa8d08a370c66db87acede4b41b5b835636e04"
+      "bytes": 1050848,
+      "sha256": "aae5a604226fe3a8fa87d298c593b7ed96d8194ecaab62f5534206b8f686d1ab"
     },
     {
       "file": "ruwordnet-common-04.js",
       "entries": 2500,
-      "bytes": 803027,
-      "sha256": "2d8f1dc037932c66d25ec00fdebca34c8cc95d0c076eaf6eb5db5463e8ba7dc1"
+      "bytes": 1030527,
+      "sha256": "617bfba020cb1b550388065c22072bb99fd3c128c34286ddbef370c2b1f0ad49"
     },
     {
       "file": "ruwordnet-common-05.js",
       "entries": 2500,
-      "bytes": 783005,
-      "sha256": "fc280d2f8cc5cccaab7158956d3b075b9358527b44544e54d8684ef93f7bcfb4"
+      "bytes": 1010505,
+      "sha256": "9682009fbb08a74aad83e768307503d33f59e326dd44cf42020059fa4fb1cad5"
     },
     {
       "file": "ruwordnet-common-06.js",
       "entries": 2500,
-      "bytes": 765436,
-      "sha256": "d6c3b2c90980c12df10f84492e3a448e51d33782933abb3a7b840eb345818fae"
+      "bytes": 992936,
+      "sha256": "87710b21b6fb2b9b79501c72b44d98ab85df1c92c68ae81f6015cba6d5b1bf55"
     },
     {
       "file": "ruwordnet-common-07.js",
       "entries": 2500,
-      "bytes": 728612,
-      "sha256": "5ea6031d178b8f4e1e8fb83b0ef59b8df77bae047b77b74f838f139d97760e72"
+      "bytes": 956112,
+      "sha256": "54a7c43e9b90eab34ea95f24c8fa538d1c4b4dfbe5f95037d307602fd362422e"
     },
     {
       "file": "ruwordnet-common-08.js",
       "entries": 2500,
-      "bytes": 808924,
-      "sha256": "8f36914caa2e5d427c53da1c399d0c89d85fce726d0200358e72e2623f364e44"
+      "bytes": 1036424,
+      "sha256": "1f744ee6381eb7c74504600b551979d0f3e0b501af87635fbe908d896d504261"
     },
     {
       "file": "ruwordnet-common-09.js",
       "entries": 2500,
-      "bytes": 751520,
-      "sha256": "e00363ee0d08e4f22d7ebbc17b481fdcf7ae9b11391ab2e2deee14f0a8bac322"
+      "bytes": 979020,
+      "sha256": "5d6629c7b7a824242e1ad39352b039ecca5a4b9f222aa33ed318bbb0553e9dda"
     },
     {
       "file": "ruwordnet-common-10.js",
       "entries": 1957,
-      "bytes": 619344,
-      "sha256": "ea5070dbf6c29788e24c77203e54ba3636adc0489600dea04013dbf99e49d1d9"
+      "bytes": 797431,
+      "sha256": "b57d75ec583922d22cdbcedc9bfd18bdf6dbe58a9c62c88613d61c323a59254d"
     },
     {
       "file": "proper-names-01.js",
       "entries": 2500,
-      "bytes": 608335,
-      "sha256": "b6e9d8b4c40aeeee6a7d63bc21aa20546ef4b1fd4593ef51288ae91c1279ec1d"
+      "bytes": 845835,
+      "sha256": "d72b8d5ae1f2f75e49e5dfe4b792ae81bddf40c607aa4466463544221a755a1d"
     },
     {
       "file": "proper-names-02.js",
       "entries": 2500,
-      "bytes": 608840,
-      "sha256": "451bfb0400379a99ebedb32388284d5f512f1d899f28b51dd8608ed539c4823f"
+      "bytes": 846340,
+      "sha256": "338ef2c2ff979e18f152a4b90bb0d6a3f2fd62f897058784096bdbeff5d8174e"
     },
     {
       "file": "geography-01.js",
       "entries": 2500,
-      "bytes": 653456,
-      "sha256": "1f95378296d6d78ad642fb7327a01c3475a345cc21ac48c9bb1e22a9fa175535"
+      "bytes": 1473895,
+      "sha256": "21e01eee3bb159e5ceccbabed8c8875840df590355b9058eb6ed18913e1fd3b3"
     },
     {
       "file": "geography-02.js",
       "entries": 2500,
-      "bytes": 574105,
-      "sha256": "ee0d210b5cc75a31015d834b5081d8233e383dabbe8f06314927df0b2b0640e5"
+      "bytes": 1475483,
+      "sha256": "2e2ba0517f0affd290c245f58aa97c20a6363281305e300b40a0e606a0e167b0"
     },
     {
       "file": "geography-03.js",
       "entries": 2500,
-      "bytes": 546021,
-      "sha256": "835f07539f791a19c19edcfa693991e720c1c9dab390220984165403fea07a71"
+      "bytes": 1470905,
+      "sha256": "a0779b96fb9786d2832e3bff55c57e0033e60f0973d2cee790000a8be4db7c08"
     },
     {
       "file": "geography-04.js",
-      "entries": 2500,
-      "bytes": 548236,
-      "sha256": "4642dfdd4e509229bf561ea26c5a726488f5bc0f89a2c8943d7d7010b478611b"
+      "entries": 2415,
+      "bytes": 1418187,
+      "sha256": "10fe789ec65f0f1d58736f6b953ffe3f230a367850817635ad6302ad59b046d3"
     },
     {
       "file": "countries-01.js",
-      "entries": 129,
-      "bytes": 29739,
-      "sha256": "dd4dbf08957574c674a1bdd894c7df3233af09233bbfd94bce6639e584555987"
+      "entries": 125,
+      "bytes": 57582,
+      "sha256": "2006d606158fae8cf66de537d293eb7f6dc5a4dab521549eb9576e1c04cacef9"
+    },
+    {
+      "file": "geographic-entities-01.js",
+      "entries": 1469,
+      "bytes": 921298,
+      "sha256": "d4434143f63c6747ff05161ea3aa56c9ceb9ca84332d54c5f44bc1f9dc94da9a"
     }
   ],
   "loader": {
     "file": "loader.js",
-    "entries": 17,
-    "bytes": 792,
-    "sha256": "70dad65d925ccc1ba2847037686fb50b7c6a6e159bdf57553c9225e8d0c58ad5"
+    "entries": 18,
+    "bytes": 820,
+    "sha256": "f43e4d616a37f03b197858b29ccb6bcaa8a96483e537c4c25ee6074731556fe5"
   }
 }

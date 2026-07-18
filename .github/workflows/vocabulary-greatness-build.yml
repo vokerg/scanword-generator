@@ -1,0 +1,121 @@
+name: Build vocabulary baseline 1.1 corpus
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - tools/build-bulk-lexicon*.py
+      - bulk-lexicon-runtime.js
+      - .github/workflows/vocabulary-greatness-build.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - tools/build-bulk-lexicon*.py
+      - bulk-lexicon-runtime.js
+      - .github/workflows/vocabulary-greatness-build.yml
+  workflow_dispatch:
+    inputs:
+      entities:
+        description: High-confidence natural and administrative entity target
+        required: true
+        default: "1500"
+
+concurrency:
+  group: vocabulary-baseline-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lexical tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install wordfreq pymorphy3 pymorphy3-dicts-ru Babel
+
+      - name: Download attributed source data
+        run: |
+          mkdir -p source-data generated/bulk-lexicon
+          curl --fail --location --retry 4 https://github.com/avidale/python-ruwordnet/releases/download/0.0.4/ruwordnet-2021.db --output source-data/ruwordnet-2021.db
+          curl --fail --location --retry 4 https://download.geonames.org/export/dump/cities15000.zip --output source-data/cities15000.zip
+          curl --fail --location --retry 4 https://download.geonames.org/export/dump/allCountries.zip --output source-data/allCountries.zip
+          curl --fail --location --retry 4 https://download.geonames.org/export/dump/alternateNamesV2.zip --output source-data/alternateNamesV2.zip
+          curl --fail --location --retry 4 https://download.geonames.org/export/dump/countryInfo.txt --output source-data/countryInfo.txt
+
+      - name: Build selected corpus v8
+        env:
+          ENTITY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.entities || '1500' }}
+        run: |
+          python -m py_compile tools/build-bulk-lexicon*.py
+          python tools/build-bulk-lexicon-v8.py \
+            --ruwordnet-db source-data/ruwordnet-2021.db \
+            --geonames-cities-zip source-data/cities15000.zip \
+            --geonames-features-zip source-data/allCountries.zip \
+            --geonames-alternates-zip source-data/alternateNamesV2.zip \
+            --country-info source-data/countryInfo.txt \
+            --out-dir generated/bulk-lexicon \
+            --common 35000 --names 5000 --geography 10000 \
+            --entities "${ENTITY_TARGET}" --chunk-size 2500 \
+            > generated/bulk-lexicon/build-report.json
+
+      - name: Validate generated corpus
+        run: |
+          for file in generated/bulk-lexicon/*.js; do node --check "$file"; done
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const manifest = JSON.parse(fs.readFileSync("generated/bulk-lexicon/manifest.json", "utf8"));
+          const total = manifest.actual.total.entries;
+          const entities = manifest.actual.entities.entries;
+          const generic = manifest.editorialDebt.genericTemplatePercent;
+          const preferred = manifest.preferredRussianNames?.geography?.preferredAvailable || 0;
+          if (manifest.version !== 8) throw new Error(`Unexpected corpus version: ${manifest.version}`);
+          if (total !== 40966) throw new Error(`Unexpected corpus size: ${total}`);
+          if (entities !== 1469) throw new Error(`Unexpected entity count: ${entities}`);
+          if (generic !== 13.84) throw new Error(`Unexpected generic-template share: ${generic}`);
+          if (preferred < 8996) throw new Error(`Preferred Russian mapping coverage regressed: ${preferred}`);
+          if (!manifest.admission?.dropsCollidingFallbackAliases) throw new Error("Alias collision policy is not active");
+          if (manifest.canonicalExamples?.["2028462"] !== "УЛАНБАТОР") throw new Error("Canonical override regression");
+          console.log(JSON.stringify({ total, entities, generic, preferred }, null, 2));
+          NODE
+
+      - name: Compare committed and generated manifests
+        run: |
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const committed = JSON.parse(fs.readFileSync("bulk-lexicon/manifest.json", "utf8"));
+          const generated = JSON.parse(fs.readFileSync("generated/bulk-lexicon/manifest.json", "utf8"));
+          for (const path of [
+            ["version"],
+            ["actual", "total", "entries"],
+            ["actual", "entities", "entries"],
+            ["editorialDebt", "genericTemplatePercent"],
+          ]) {
+            const read = (value) => path.reduce((cursor, key) => cursor?.[key], value);
+            if (read(committed) !== read(generated)) {
+              throw new Error(`Manifest mismatch at ${path.join(".")}: ${read(committed)} vs ${read(generated)}`);
+            }
+          }
+          NODE
+
+      - name: Publish build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocabulary-baseline-corpus-${{ github.sha }}
+          path: generated/bulk-lexicon/
+          if-no-files-found: error
+          retention-days: 30
