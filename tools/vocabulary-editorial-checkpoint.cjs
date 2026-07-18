@@ -8,6 +8,7 @@ const workerPath = path.join(__dirname, "benchmark-seed-v3.cjs");
 const runCount = Math.max(1, Number(process.argv[2]) || 10);
 const prefix = process.argv[3] || "vocabulary-editorial";
 const concurrency = Math.max(1, Number(process.env.SCANWORD_EDITORIAL_CONCURRENCY) || 1);
+const variantSearch = String(process.env.SCANWORD_EDITORIAL_VARIANT_SEARCH || "off").toLowerCase() === "on";
 const records = new Array(runCount);
 let cursor = 0;
 
@@ -15,7 +16,7 @@ function average(values) {
   return +(values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length)).toFixed(2);
 }
 
-function runVariant(seed, editorialTieBreak) {
+function runVariant(seed, editorialMode) {
   return new Promise((resolve, reject) => {
     const env = {
       ...process.env,
@@ -23,7 +24,8 @@ function runVariant(seed, editorialTieBreak) {
       SCANWORD_CATEGORY_BALANCE: "off",
       SCANWORD_VOCABULARY_PORTFOLIO: "on",
       SCANWORD_VOCABULARY_PORTFOLIO_MODE: "full",
-      SCANWORD_VOCABULARY_EDITORIAL_TIEBREAK: editorialTieBreak ? "on" : "off",
+      SCANWORD_VOCABULARY_EDITORIAL_TIEBREAK: editorialMode && variantSearch ? "on" : "off",
+      SCANWORD_SELECTED_GRID_CLUE_DISAMBIGUATION: editorialMode ? "on" : "off",
       SCANWORD_VOCABULARY_PORTFOLIO_LIMITS: "2500,3500",
       SCANWORD_CONSTRUCTION_MODE: "portfolio",
       SCANWORD_CLOSED_FILL: "diagnostic",
@@ -50,7 +52,7 @@ function runVariant(seed, editorialTieBreak) {
     let stderr = "";
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
-      reject(new Error(`Timed out: ${seed}/${editorialTieBreak ? "editorial" : "baseline"}`));
+      reject(new Error(`Timed out: ${seed}/${editorialMode ? "editorial" : "baseline"}`));
     }, 900_000);
     child.stdout.on("data", (chunk) => { stdout += chunk; });
     child.stderr.on("data", (chunk) => { stderr += chunk; });
@@ -74,6 +76,7 @@ function runVariant(seed, editorialTieBreak) {
 function describe(sample) {
   const portfolio = sample.constructionV2?.vocabularyPortfolio || {};
   const selected = portfolio.selected || {};
+  const disambiguation = sample.constructionV2?.clueDisambiguation || {};
   return {
     panels: Number(sample.panelCells || 0),
     answers: Number(sample.answers || 0),
@@ -89,6 +92,8 @@ function describe(sample) {
     distinctSources: Number(selected.distinctSources || 0),
     repeatedClueCount: Number(selected.repeatedClueCount || 0),
     repeatedClueKinds: Number(selected.repeatedClueKinds || 0),
+    changedClues: Number(disambiguation.changedClues || 0),
+    changedClueGroups: Number(disambiguation.changedGroups || 0),
     elapsedMs: Number(sample.elapsedMs || 0),
     sourceCorpusEntries: Number(sample.sourceCorpusEntries || 0),
     selectedLimit: portfolio.selectedLimit || null,
@@ -124,7 +129,7 @@ function summarize(key) {
   const result = { sourceCorpusEntries: Math.max(...values.map((value) => value.sourceCorpusEntries)) };
   for (const field of ["panels", "answers", "crossings", "rawLetterPercent", "formulaicShortCount", "editorialPenalty",
     "genericClueCount", "generatedClueCount", "factualTemplateCount", "properNameCount", "distinctCategories",
-    "distinctSources", "repeatedClueCount", "repeatedClueKinds", "elapsedMs"]) {
+    "distinctSources", "repeatedClueCount", "repeatedClueKinds", "changedClues", "changedClueGroups", "elapsedMs"]) {
     result[`average${field[0].toUpperCase()}${field.slice(1)}`] = average(values.map((value) => value[field]));
   }
   return result;
@@ -138,6 +143,7 @@ function summarize(key) {
     console.log(JSON.stringify({
       type: "summary",
       runs: records.length,
+      variantSearch,
       baseline,
       editorial,
       comparison: {
