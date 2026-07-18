@@ -1,32 +1,68 @@
 # Arrowword Generator
 
-A browser-based R&D prototype for generating Swedish-style crosswords (arrowwords / scanwords) on an exact A5 page.
+A browser-based generator for Swedish-style crosswords (arrowwords / scanwords) on an exact A5 page.
 
-## Current checkpoint: 0.9
+## Current milestone: vocabulary-first 1.0
 
-Version 0.9 raises the default 13 × 17 grid from the previous 78% quality floor to a strict **90% active-cell checkpoint** while keeping every answer in one connected component.
+The default 13 × 17 generator now uses a **39,586-entry attributed Russian source corpus** before construction. For each seed it builds and repairs candidates from deterministic 2,500- and 3,500-entry working sets, then selects the best valid grid panel-first.
+
+The complete promotion decision, benchmark, rollback controls and accepted debt are documented in [Milestone 1.0](docs/milestones/v1.0-vocabulary-first.md).
+
+Validated over 20 identical-seed release pairs against the old dictionary with the same editorial repair:
+
+| metric | old dictionary + repair | vocabulary portfolio + repair |
+| --- | ---: | ---: |
+| average residual panels | 7.05 | **5.30** |
+| average answers | 44.75 | **48.45** |
+| average crossings | 47.35 | **53.00** |
+| average answer-space coverage | 93.98% | **95.53%** |
+| average formulaic short answers | 0.40 | **0.15** |
+
+All 20 promoted candidates were structurally valid, used exact clues and contained one connected answer component.
 
 ## Research snapshots
 
-The production generator remains on the tested 0.9 path. The later closed-fill investigation is preserved separately as a documented, reproducible research checkpoint:
+The earlier closed-fill investigation is preserved separately as a documented, reproducible research checkpoint:
 
 - [Closed-fill research overview](research/closed-fill/README.md)
 - [Measured results](research/closed-fill/RESULTS.md)
 - [Architecture review](research/closed-fill/ARCHITECTURE.md)
 - [Experiment log](research/closed-fill/EXPERIMENT_LOG.md)
 
-The exact experimental implementation is pinned on `research/closed-fill-snapshot-2026-07-16` at commit `d1c12d8acca31edb3b38775db5166f4f5f59ce04`. It is not loaded by the production browser application.
+The exact closed-fill implementation is pinned on `research/closed-fill-snapshot-2026-07-16` at commit `d1c12d8acca31edb3b38775db5166f4f5f59ce04`.
+
+The vocabulary and editorial experiments are retained separately from the milestone snapshot:
+
+- [Vocabulary-first experiment program](research/vocabulary-first/README.md)
+- [39,586-entry checkpoint](research/vocabulary-first/STATUS-39586.md)
+- [Category-balance experiment](research/vocabulary-first/CATEGORY-BALANCE.md)
+- [Dictionary audit](research/vocabulary-first/AUDIT-39586.md)
+- [Lexical-quality experiments](research/lexical-quality/README.md)
+- branch `r-and-d/lexical-pareto-frontier`
+
+Negative results are retained rather than rewritten as successes: naive full-pool sampling, aggressive lexical placement penalties, pre-downstream Pareto selection, fixed category caps and narrow local CSP topologies.
+
+## Default pipeline
+
+```text
+load attributed source corpus
+-> derive 2,500- and 3,500-entry seed-specific working sets
+-> build connected structural candidates
+-> allocate exact clue footprints
+-> apply same-geometry editorial repair
+-> select panel-first
+-> validate all runs, crossings, clues and connectivity
+```
 
 The generator:
 
-- uses only reviewed Russian answers and human-readable clues;
-- supports answer lengths from 2 to 12 letters;
-- places answers algorithmically and validates every crossing;
+- validates every crossing;
 - rejects accidental horizontal and vertical letter runs;
+- keeps every answer in one connected component;
+- supports answer lengths from 2 to 12 letters;
 - supports right and down answers and dual arrow cells;
-- expands clue text into connected one-to-four-cell footprints when space is available;
+- expands clue text into connected one-to-four-cell footprints;
 - keeps every arrow anchor attached to the exact answer start;
-- uses no placeholder definitions or pseudo-words;
 - exports exact A5 SVG and JSON project files;
 - can reveal answers for visual validation.
 
@@ -34,64 +70,39 @@ The generator:
 
 Three separate measurements are reported:
 
-- **Active coverage** — letter cells, arrow cells, and real clue-footprint cells divided by the whole grid.
+- **Active coverage** — letter cells, arrow cells and real clue-footprint cells divided by the whole grid.
 - **Answer-space coverage** — letter cells divided by cells not occupied by clues.
 - **Residual panels** — cells that are neither answers nor real clues.
 
-This prevents a misleading single density number. Version 0.9 requires at least 90% active coverage, at least 65% answer-space coverage, and no more than 20 residual panels on the default A5 grid.
-
-## Multi-cell clue footprints
-
-Long definitions often do not fit legibly beside an arrow. The post-layout clue allocator now:
-
-1. finds connected panel footprints next to each arrow anchor;
-2. generates one-to-four-cell candidate shapes;
-3. runs deterministic randomized set-packing passes;
-4. prevents two clues from claiming the same cell;
-5. prefers footprints that consume small or isolated panel regions;
-6. renders the footprint as one outlined clue area.
-
-Each converted cell contains a real clue associated with a real answer. No cells are counted as active merely to inflate the metric.
+This prevents a misleading single density number.
 
 ## Structural invariants
 
 A generated grid is accepted only when:
 
-1. Every contiguous letter run of length two or more is exactly one assigned answer.
-2. Every letter belongs to at least one assigned answer.
-3. Crossing letters agree.
-4. An arrow cell contains at most one right arrow and one down arrow.
-5. Every external clue footprint points to an existing arrow and answer.
-6. Every used answer has a reviewed clue.
-7. The answer graph is one connected component.
-8. Residual non-answer areas are explicit panel cells, never blank answer cells.
+1. every contiguous letter run of length two or more is exactly one assigned answer;
+2. every letter belongs to at least one assigned answer;
+3. crossing letters agree;
+4. an arrow cell contains at most one right arrow and one down arrow;
+5. every clue footprint points to an existing arrow and answer;
+6. every used answer has an admitted exact clue;
+7. the answer graph is one connected component;
+8. residual areas are explicit panel cells, never blank answer cells.
 
-## Generation strategy
+## Corpus architecture
 
-Version 0.9 remains word-first but adds a coverage-oriented selection layer:
+The source corpus is auditable and categorized:
 
-1. build one connected answer graph;
-2. continue dense valid placements after the requested minimum is reached;
-3. allocate multi-cell clue footprints over remaining panel regions;
-4. score valid candidates by active coverage, answer-space coverage, residual panels, intersections, and clue sharing;
-5. stop early on a preferred result, continue to 120 attempts for the mandatory checkpoint, and extend to 240 attempts only when necessary.
+- 4,358 common nouns;
+- 20,099 specialist nouns;
+- 2,798 given names;
+- 2,087 surnames;
+- 115 patronymics;
+- 9,830 cities;
+- 170 capitals;
+- 129 countries.
 
-## Verified 40-seed results
-
-Local deterministic regression run on the default 13 × 17 grid:
-
-```text
-Answers:               41–50, average 44.08
-Active coverage:       91.0–95.0%, average 92.44%
-Answer-space coverage: 85.0–91.3%, average 87.14%
-Residual panels:       11–20, average 16.70
-Answer components:     exactly 1
-Crossings:             43–53, average 47.38
-Accidental runs:       0
-Fallback clues:        0
-```
-
-The GitHub Actions gate runs the same 40 deterministic seeds before the branch can be considered merge-ready.
+Every bulk entry retains its answer, clue, category, lexical-quality score, source, license and source identifier. The current audit reports zero invalid entries, zero normalized duplicates and 100% clue/source coverage. Generic template clues remain explicit editorial debt.
 
 ## Running locally
 
@@ -103,53 +114,46 @@ python3 -m http.server 8080
 
 Then open `http://localhost:8080`.
 
+The default browser path enables the vocabulary portfolio and editorial repair. Generation on the default grid currently averages roughly 21–25 seconds in the release gate environment.
+
+## Rollback and A/B controls
+
+```text
+SCANWORD_BULK_LEXICON=off             old construction dictionary
+SCANWORD_VOCABULARY_PORTFOLIO=off     single active working set
+SCANWORD_EDITORIAL_REPAIR=off         no same-geometry cleanup
+SCANWORD_CATEGORY_BALANCE=off         accepted 1.0 category policy
+SCANWORD_CONSTRUCTION_MODE=legacy     original construction path
+```
+
 ## Quality gates
 
 ```bash
-node tools/dictionary-audit.cjs
-node tools/benchmark.cjs
+node tools/bulk-lexicon-audit.cjs
+node tools/dictionary-count-v3.cjs
+node tools/vocabulary-release-checkpoint.cjs 20
 ```
 
-The benchmark rejects a result that:
+The release gate records source-corpus size, selected active limit, panels, answers, crossings, coverage, editorial metrics, runtime, category use and full structural validation.
 
-- fails structural validation;
-- contains fewer than 40 answers;
-- has less than 90% active coverage;
-- has less than 65% answer-space coverage;
-- has more than 20 residual panels;
-- contains more or fewer than one answer component;
-- externalizes fewer than 24 real clues;
-- uses fewer than 45 clue-footprint cells;
-- uses a fallback clue.
-
-## Files
+## Main files
 
 ```text
-index.html                 Browser interface
-styles.css                 Interface styling
-words.js                   Main Russian answer dictionary
-short-words.js             Three-letter compact answers
-clues.js                   Original clue dictionary
-extra-dictionary.js        Reviewed answer-and-clue expansion
-two-letter-words.js        Reviewed two-letter answers
-core.js                    Randomization and dictionary utilities
-dictionary-policy.js       Restricts generation to reviewed clues
-solver.js                  Connected word placement and clue-footprint allocation
-renderer.js                A5 SVG renderer with merged clue footprints
-ui.js                      Browser UI and JSON export
-tools/benchmark.cjs        40-seed coverage regression benchmark
-tools/dictionary-audit.cjs Dictionary validation and length audit
+index.html                          Browser defaults and script order
+bulk-lexicon-runtime.js             Corpus registration and deduplication
+bulk-lexicon/                       Generated categorized corpus and manifest
+core.js                             Working-set selection and dictionary utilities
+dictionary-policy.js                Dictionary admission policy
+solver.js                           Connected placement and validation
+construction-vocabulary-portfolio-v1.js
+                                    2,500/3,500 panel-first portfolio
+construction-editorial-repair-v3.js Same-geometry cleanup orchestration
+renderer.js                         A5 SVG renderer
+ui.js                               Browser UI and JSON export
+docs/milestones/                    Production milestone decisions
+research/                           Full experimental record
 ```
 
-## Why PDF is deferred
+## Known debt
 
-SVG already preserves exact A5 dimensions and prints without raster quality loss. PDF export will be added after clue typography, arrow placement, and the solution-page layout are stable.
-
-## Next milestones
-
-- replace the remaining residual panels through local closed-fill CSP patches;
-- raise the active checkpoint above 94%;
-- expand the reviewed lexicon into the low thousands;
-- add bent and offset arrow variants used by printed scanwords;
-- move long generation runs into a Web Worker;
-- add print-ready PDF and solution-page export.
+Vocabulary-first 1.0 does not claim zero-panel construction or publication-ready clue prose. The next milestone targets template-clue reduction, category diversity and shared-search runtime improvements without losing the 1.0 density frontier.
