@@ -1,21 +1,21 @@
 # AGENTS.md
 
-This file is the canonical operating guide for this repository. It applies to the repository root and every subdirectory unless a more specific `AGENTS.md` is added later.
+This file is the canonical operating guide for the repository root and every subdirectory unless a more specific `AGENTS.md` exists.
 
 ## Source of truth
 
-- `main` is the only long-lived development and release branch.
-- Production milestone decisions live in `docs/milestones/`.
+- `main` is the only long-lived development branch.
+- Accepted project baselines live in `docs/milestones/`.
 - Experiments, including negative results, live in `research/` and must remain reproducible from `main`.
-- Historical experiment commits are anchored in the `main` commit graph; a permanent research branch is not required.
-- Do not describe an experiment as production merely because its files are present in `main`. Production status is determined by browser defaults, load order, release gates and the latest milestone document.
+- A file being present in `main` does not by itself make a feature the browser default. Production behavior is determined by `index.html`, load order, feature flags and the latest milestone document.
+- The whole application is an evolving draft. Draft status permits rapid integration; it does not permit hidden debt, false metrics or weakened validation.
 
-## Current production milestone
+## Current project baseline
 
-Vocabulary-first 1.0 is the default pipeline:
+Vocabulary-first 1.1:
 
 ```text
-39,586-entry attributed corpus
+40,966-entry attributed corpus v8
 -> deterministic active sets at 2,500 and 3,500 entries
 -> complete construction and clue allocation
 -> same-geometry editorial repair
@@ -23,7 +23,11 @@ Vocabulary-first 1.0 is the default pipeline:
 -> complete validation
 ```
 
-The canonical evidence is `docs/milestones/v1.0-vocabulary-first.md`.
+Corpus policy includes preferred Russian GeoNames, collision-safe alias handling, 1,469 filtered non-city geographic entities and explicit generic/factual clue metadata.
+
+The browser default remains the full two-candidate portfolio. Adaptive early acceptance is available only through `SCANWORD_VOCABULARY_PORTFOLIO_MODE=adaptive`.
+
+Canonical decision: `docs/milestones/v1.1-vocabulary-greatness.md`.
 
 ## Runtime structure
 
@@ -31,11 +35,12 @@ The canonical evidence is `docs/milestones/v1.0-vocabulary-first.md`.
 
 `index.html` owns:
 
-- production feature flags;
+- default feature flags;
 - script load order;
-- default grid and UI values.
+- default grid and UI values;
+- user-visible corpus and pipeline description.
 
-Changing script order is an architectural change. The production wrapper order must remain:
+Changing script order is architectural. The wrapper order must remain:
 
 ```text
 base dictionaries and bulk corpus
@@ -50,47 +55,19 @@ base dictionaries and bulk corpus
 -> renderer and UI
 ```
 
-The vocabulary portfolio must wrap the already repaired single-candidate generator, so both active-set candidates are repaired before panel-first selection.
+The vocabulary portfolio wraps the repaired single-candidate generator, so every active-set candidate is repaired before selection.
 
 ### Production modules
 
-```text
-core.js
-```
+- `core.js`: normalization, indexing, deterministic randomness and active-set selection.
+- `dictionary-policy.js`: clue and lexical admission policy.
+- `solver.js`: base construction, crossings, scoring, metrics and complete validation.
+- `construction-*.js`: bounded construction, clue allocation, rollback and repair stages.
+- `construction-editorial-repair-v3.js`: final same-geometry cleanup.
+- `construction-vocabulary-portfolio-v1.js`: full/adaptive active-set portfolio.
+- `renderer.js`, `ui.js`: A5 SVG rendering, controls and export.
 
-Dictionary normalization, indexing utilities, deterministic randomization and seed-specific working-set selection.
-
-```text
-dictionary-policy.js
-```
-
-Admission policy for clues, lexical categories and generated corpus entries.
-
-```text
-solver.js
-```
-
-Base grid construction, crossing rules, scoring, metrics and complete validation.
-
-```text
-construction-*.js
-```
-
-Bounded construction, clue allocation, rollback and repair stages. Several retained research modules are not independent production claims; check `index.html` and the current milestone before treating a module as active.
-
-```text
-construction-editorial-repair-v3.js
-construction-vocabulary-portfolio-v1.js
-```
-
-The final production wrappers. Their relative load order is mandatory.
-
-```text
-renderer.js
-ui.js
-```
-
-A5 SVG rendering, browser controls and JSON/SVG export.
+Several retained modules are research artifacts. Check `index.html` and the current milestone before treating them as active defaults.
 
 ## Dictionary architecture
 
@@ -105,7 +82,7 @@ two-letter-words.js
 editorial-demand-*.js
 ```
 
-Use these for small, reviewed additions and targeted repair vocabulary.
+Use these for small reviewed additions and targeted repair vocabulary.
 
 ### Generated bulk corpus
 
@@ -116,111 +93,118 @@ bulk-lexicon/manifest.json
 bulk-lexicon/*.js
 ```
 
-The generated chunks are build artifacts. Do not hand-edit them.
+Generated chunks are build artifacts. Do not hand-edit them.
+
+The selected builder is `tools/build-bulk-lexicon-v8.py`. Earlier numbered builders are retained because they document rejected admission policies. `tools/build-bulk-lexicon-v9-diagnostic.py` is diagnostic research, not the selected generator.
 
 To change the bulk corpus:
 
-1. modify `tools/build-bulk-lexicon.py` or its documented source/filter policy;
-2. rebuild every chunk, the loader and the manifest together;
-3. run the corpus audit and dictionary count;
-4. inspect category and length distributions;
-5. run identical-seed density benchmarks;
-6. document source, license and editorial consequences.
+1. modify the selected builder or documented source/filter policy;
+2. rebuild every chunk, loader and manifest together;
+3. run corpus audit and dictionary count;
+4. inspect category, length, clue-kind and source distributions;
+5. run identical-seed density and editorial benchmarks;
+6. document sources, licenses, canonical-name handling and accepted debt.
 
 Every accepted entry must retain:
 
 - normalized answer;
 - usable clue;
-- lexical category;
-- quality score or tier;
+- lexical category and quality score;
 - source and license;
-- source identifier where available.
+- source identifier where available;
+- clue kind;
+- `genericTemplate` and `generatedTemplate` flags;
+- factual metadata when a clue was generated from source facts.
 
-Do not increase the corpus by adding unreviewable inflections, malformed abbreviations or entries without usable clues merely to raise a count.
+Do not increase corpus size with unreviewable inflections, malformed abbreviations, colliding aliases or entries without usable clues.
 
 ## Structural invariants
 
-Every accepted generated grid must satisfy all of the following:
+Every accepted grid must satisfy:
 
 1. Every contiguous letter run of length two or more is exactly one assigned answer.
 2. Every letter belongs to at least one assigned answer.
 3. Crossing letters agree.
-4. Every arrow and clue footprint resolves to an existing answer start.
+4. Every arrow and clue footprint resolves to an answer start.
 5. Every used answer has an admitted exact clue.
 6. The answer graph has exactly one connected component.
 7. No accidental runs, orphan letters or conflicting slots exist.
 8. Residual areas are explicit panels, never unassigned answer cells.
 
-Never weaken the complete validator to make a benchmark pass.
+Never weaken the complete validator to pass a benchmark.
 
 ## Objective hierarchy
 
-For the 1.0 production line, compare complete valid candidates in this order:
+Compare complete valid candidates lexicographically:
 
 1. fewer residual panels;
 2. more answers;
 3. more crossings;
 4. greater raw-letter coverage;
-5. lower editorial penalty and fewer formulaic short answers;
-6. higher existing solver score;
-7. deterministic tie-breakers.
+5. lower short-answer editorial penalty and fewer formulaic short answers;
+6. lower selected-grid clue debt, when an experiment explicitly measures it;
+7. higher existing solver score;
+8. deterministic tie-breakers.
 
-Do not replace this lexicographic policy with one opaque weighted score without a separately documented experiment and identical-seed A/B result.
+Source-aware or clue-aware metrics must not outrank structural density without a separately documented experiment.
 
 ## Feature flags and rollback
 
 ```text
 SCANWORD_BULK_LEXICON=off
 ```
-
 Use the former construction dictionary.
 
 ```text
 SCANWORD_VOCABULARY_PORTFOLIO=off
 ```
+Construct one active working set.
 
-Disable the 2,500/3,500 portfolio and construct one active working set.
+```text
+SCANWORD_VOCABULARY_PORTFOLIO_MODE=full|adaptive
+```
+Choose complete portfolio evaluation or conservative early acceptance.
 
 ```text
 SCANWORD_EDITORIAL_REPAIR=off
 ```
-
-Disable same-geometry lexical cleanup.
+Disable final same-geometry cleanup.
 
 ```text
 SCANWORD_CATEGORY_BALANCE=on
 ```
-
-Enable the retained, non-default category-cap experiment.
+Enable retained category-cap research.
 
 ```text
 SCANWORD_CONSTRUCTION_MODE=legacy
 ```
-
 Use the original construction path.
 
-Feature flags used for A/B tests must not silently change browser defaults.
+A/B flags must not silently change browser defaults.
 
 ## Required checks
 
-Minimum checks for dictionary or production-pipeline changes:
+Minimum dictionary or pipeline checks:
 
 ```bash
 node tools/bulk-lexicon-audit.cjs
 node tools/dictionary-count-v3.cjs
-node tools/vocabulary-release-checkpoint.cjs 20
+
+NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
+  node tools/vocabulary-release-checkpoint.cjs 20
 ```
 
-Also run syntax checks for every changed JavaScript or CommonJS file:
+For adaptive changes:
 
 ```bash
-node --check path/to/file.js
-node --check path/to/tool.cjs
+NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
+  node tools/vocabulary-adaptive-checkpoint.cjs 20
 ```
 
-For changes to a specific bounded stage, run its matching `tools/*-test.cjs` file before the release checkpoint.
+Also run `node --check` for every changed JavaScript/CommonJS file and the matching deterministic test for any bounded construction stage.
 
-A production promotion must verify:
+A baseline merge must record:
 
 - complete structural validity;
 - one connected component;
@@ -228,8 +212,9 @@ A production promotion must verify:
 - corpus counts and audit status;
 - browser defaults and script order;
 - identical-seed baseline and candidate metrics;
-- runtime change;
-- regressions by seed, not averages alone.
+- runtime;
+- per-seed regressions, not averages alone;
+- known uncompleted checkpoints.
 
 ## Research discipline
 
@@ -241,56 +226,50 @@ Every substantive experiment belongs in `research/` and should state:
 - acceptance criteria;
 - aggregate and per-seed regressions;
 - runtime;
-- examples of accepted changes;
+- examples and counterexamples;
 - negative result or limitation;
 - workflow run, artifact ID, digest and commit SHA when available.
 
-Keep failed approaches. Do not rewrite a negative experiment as though it were never attempted.
+Keep failed approaches. Do not rewrite negative evidence out of history.
 
-Prefer a new explicit pipeline stage over another global `generateBest` wrapper. When a wrapper is unavoidable, document its load-order contract and add a test that exercises real generation rather than only a synthetic fixture.
+Prefer an explicit pipeline stage over another global `generateBest` wrapper. When a wrapper is unavoidable, document its load-order contract and test real generation.
 
 ## Canonical directories
 
 ```text
-.github/workflows/       production gates and manual research reproduction
-bulk-lexicon/            generated corpus chunks, loader and manifest
-docs/milestones/         accepted release decisions and evidence
-research/closed-fill/    historical topology and clue-allocation work
-research/lexical-quality/ same-geometry lexical repair experiments
-research/vocabulary-first/ corpus expansion and active-set experiments
-tools/                   builders, audits, tests, reports and benchmarks
+.github/workflows/                    gates and research reproduction
+bulk-lexicon/                         generated chunks, loader and manifest
+docs/milestones/                      accepted project baselines
+research/closed-fill/                 topology and clue-allocation history
+research/lexical-quality/             same-geometry repair experiments
+research/vocabulary-first/            corpus and active-set history
+research/vocabulary-greatness-1.1/    truthful benchmark and corpus v8 ledger
+tools/                                builders, audits, tests and benchmarks
 ```
 
 ## Documentation rules
 
-- `README.md` describes the current production system and points to canonical documents.
-- `AGENTS.md` describes architecture, repository ownership and change procedure.
-- `docs/milestones/` records accepted production boundaries.
-- `research/` records experiments and must clearly distinguish tested observations from inference.
-- Metrics must include the baseline, sample size and validation boundary.
-- Do not claim zero-panel or publication-ready output unless a release gate explicitly proves it.
+- `README.md` describes the current project baseline.
+- `AGENTS.md` describes architecture, ownership and change procedure.
+- `docs/milestones/` records accepted boundaries and evidence.
+- `research/` records experiments and distinguishes observation from inference.
+- `index.html` user-visible counts and descriptions must match the committed corpus.
+- Metrics must include baseline, sample size and validation boundary.
+- Do not claim zero-panel or publication-ready output without explicit evidence.
 
-## Release process
+## Release and integration process
 
-1. Complete and document the experiment on a short-lived branch.
-2. Run the production release checkpoint on the exact candidate head.
-3. Update the relevant milestone document with metrics and debt.
+1. Complete and document a bounded experiment on a short-lived branch.
+2. Run the relevant checkpoint on the exact candidate head.
+3. Update README, AGENTS, milestone, research ledger and user-visible counts.
 4. Confirm browser defaults and wrapper order.
-5. Merge to `main` through a reviewed pull request or an explicit milestone commit.
-6. Run or verify the post-merge `main` gate.
-7. Anchor any historically important experiment heads in the `main` commit graph before deleting their branches.
-8. Delete merged short-lived branches once no open pull request uses them.
+5. Squash-merge to `main` when the accepted draft boundary is clear.
+6. Verify post-merge checks.
+7. Start the next investigation from updated `main` on a new branch.
+8. Delete obsolete branches when no workflow or open PR depends on them.
 
 ## Branch policy
 
-Only `main` should remain permanently.
-
-A non-`main` branch may be removed when:
-
-- its pull request is merged or closed;
-- its canonical conclusions and reproduction data are present in `main`;
-- any historically important head is reachable from `main` through the history-anchor commit;
-- no workflow or script fetches the branch name;
-- no open pull request uses it as a head or base.
+Only `main` should remain permanently. A branch may be removed when its PR is merged or closed, conclusions are documented in `main`, no workflow fetches the branch name and no open PR depends on it.
 
 Deleting a branch is not a substitute for documenting the experiment first.
