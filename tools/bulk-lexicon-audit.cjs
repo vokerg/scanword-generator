@@ -21,31 +21,41 @@ const categories = new Map();
 const sources = new Map();
 const licenses = new Map();
 const lengths = new Map();
+const clueKinds = new Map();
 const invalid = [];
 const missingSourceIds = new Map();
+const missingFacts = new Map();
 
-function clueFamily(clue) {
-  if (/^(Мужское|Женское|Личное) имя$/.test(clue)) return "generic-name";
-  if (clue === "Фамилия") return "generic-surname";
-  if (clue === "Отчество") return "generic-patronymic";
-  if (/^Город в /.test(clue) || /^Крупный город в /.test(clue)) return "generated-city";
-  if (/^Столица государства /.test(clue)) return "generated-capital";
-  if (/^Государство в /.test(clue)) return "generated-country";
-  return "dictionary-definition";
+function inferredClueKind(entry) {
+  if (entry.clueKind && entry.clueKind !== "unclassified") return entry.clueKind;
+  const clue = String(entry.clue || "").trim();
+  if (/^(Мужское|Женское|Личное) имя$/.test(clue) || clue === "Фамилия" || clue === "Отчество") return "generic-template";
+  if (/^(Город в |Крупный город в |Столица государства |Государство в )/.test(clue)) return "generic-template";
+  return "definition";
 }
 
-const clueFamilies = new Map();
+function isGenericTemplate(entry, clueKind) {
+  return entry.genericTemplate === true || clueKind === "generic-template";
+}
+
+function isGeneratedTemplate(entry, clueKind) {
+  if (entry.generatedTemplate === true) return true;
+  return clueKind === "generic-template" || clueKind === "descriptive-template";
+}
+
 for (const entry of entries) {
   const answer = normalize(entry.answer);
   const clue = String(entry.clue || "").trim();
+  const clueKind = inferredClueKind(entry);
   increment(answerCounts, answer);
   increment(clueCounts, clue);
   increment(categories, String(entry.category || "unknown"));
   increment(sources, String(entry.lexicalSource || "unknown"));
   increment(licenses, String(entry.license || "missing"));
   increment(lengths, String(answer.length));
-  increment(clueFamilies, clueFamily(clue));
+  increment(clueKinds, clueKind);
   if (!entry.sourceId) increment(missingSourceIds, String(entry.category || "unknown"));
+  if (clueKind === "descriptive-template" && !entry.clueFacts) increment(missingFacts, String(entry.category || "unknown"));
   if (!/^[А-Я]+$/.test(answer) || answer.length < 2 || answer.length > 12 || clue.length < 3 || !entry.hasExactClue) {
     invalid.push({ answer, clue, category: entry.category, source: entry.lexicalSource });
   }
@@ -53,29 +63,38 @@ for (const entry of entries) {
 
 const duplicateAnswers = [...answerCounts.entries()].filter(([, count]) => count > 1);
 const duplicateClues = [...clueCounts.entries()]
-  .filter(([clue, count]) => count > 1 && clueFamily(clue) === "dictionary-definition")
+  .filter(([clue, count]) => count > 1 && count >= 3)
   .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
   .slice(0, 30);
-const genericCount = [...clueFamilies.entries()]
-  .filter(([family]) => family !== "dictionary-definition")
-  .reduce((sum, [, count]) => sum + count, 0);
+const genericTemplateCount = entries.filter((entry) => isGenericTemplate(entry, inferredClueKind(entry))).length;
+const generatedTemplateCount = entries.filter((entry) => isGeneratedTemplate(entry, inferredClueKind(entry))).length;
+const descriptiveTemplateCount = entries.filter((entry) => inferredClueKind(entry) === "descriptive-template").length;
+const definitionCount = entries.filter((entry) => inferredClueKind(entry) === "definition").length;
+const percent = (count) => entries.length ? +((count / entries.length) * 100).toFixed(2) : 0;
 
 const report = {
-  type: "bulk-lexicon-audit",
+  type: "bulk-lexicon-audit-v3",
   entries: entries.length,
   uniqueAnswers: answerCounts.size,
   invalidEntries: invalid.length,
   duplicateAnswerCount: duplicateAnswers.length,
   exactClueCoveragePercent: entries.length ? +(((entries.length - invalid.length) / entries.length) * 100).toFixed(2) : 0,
-  genericClueEntries: genericCount,
-  genericCluePercent: entries.length ? +((genericCount / entries.length) * 100).toFixed(2) : 0,
+  genericTemplateEntries: genericTemplateCount,
+  genericTemplatePercent: percent(genericTemplateCount),
+  descriptiveTemplateEntries: descriptiveTemplateCount,
+  descriptiveTemplatePercent: percent(descriptiveTemplateCount),
+  generatedTemplateEntries: generatedTemplateCount,
+  generatedTemplatePercent: percent(generatedTemplateCount),
+  dictionaryDefinitionEntries: definitionCount,
+  dictionaryDefinitionPercent: percent(definitionCount),
   categories: sortedObject(categories),
   sources: sortedObject(sources),
   licenses: sortedObject(licenses),
   lengths: Object.fromEntries([...lengths.entries()].sort((a, b) => Number(a[0]) - Number(b[0]))),
-  clueFamilies: sortedObject(clueFamilies),
+  clueKinds: sortedObject(clueKinds),
   missingSourceIdsByCategory: sortedObject(missingSourceIds),
-  repeatedDictionaryClues: Object.fromEntries(duplicateClues),
+  descriptiveCluesMissingFactsByCategory: sortedObject(missingFacts),
+  repeatedClues: Object.fromEntries(duplicateClues),
   invalidSample: invalid.slice(0, 25),
   duplicateAnswerSample: duplicateAnswers.slice(0, 25),
 };
@@ -84,3 +103,4 @@ console.log(JSON.stringify(report, null, 2));
 
 if (invalid.length) throw new Error(`Bulk lexicon contains ${invalid.length} invalid entries`);
 if (duplicateAnswers.length) throw new Error(`Bulk lexicon contains ${duplicateAnswers.length} duplicate normalized answers`);
+if (missingFacts.size) throw new Error("Descriptive generated clues are missing source facts");
