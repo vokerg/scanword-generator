@@ -1,0 +1,98 @@
+name: Build vocabulary greatness 1.1 corpus
+
+on:
+  push:
+    branches:
+      - r-and-d/vocabulary-greatness-1.1
+    paths:
+      - tools/build-bulk-lexicon-v3.py
+      - .github/workflows/vocabulary-greatness-build.yml
+  workflow_dispatch:
+    inputs:
+      entities:
+        description: Natural and administrative entity target
+        required: true
+        default: "3000"
+
+concurrency:
+  group: vocabulary-greatness-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out research branch
+        uses: actions/checkout@v4
+        with:
+          ref: r-and-d/vocabulary-greatness-1.1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install lexical tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install wordfreq pymorphy3 pymorphy3-dicts-ru Babel
+
+      - name: Download attributed source data
+        run: |
+          mkdir -p source-data generated/bulk-lexicon
+          curl --fail --location --retry 4 \
+            https://github.com/avidale/python-ruwordnet/releases/download/0.0.4/ruwordnet-2021.db \
+            --output source-data/ruwordnet-2021.db
+          curl --fail --location --retry 4 \
+            https://download.geonames.org/export/dump/cities15000.zip \
+            --output source-data/cities15000.zip
+          curl --fail --location --retry 4 \
+            https://download.geonames.org/export/dump/allCountries.zip \
+            --output source-data/allCountries.zip
+          curl --fail --location --retry 4 \
+            https://download.geonames.org/export/dump/countryInfo.txt \
+            --output source-data/countryInfo.txt
+
+      - name: Build corpus v3
+        env:
+          ENTITY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.entities || '3000' }}
+        run: |
+          python -m py_compile tools/build-bulk-lexicon.py tools/build-bulk-lexicon-v3.py
+          python tools/build-bulk-lexicon-v3.py \
+            --ruwordnet-db source-data/ruwordnet-2021.db \
+            --geonames-cities-zip source-data/cities15000.zip \
+            --geonames-features-zip source-data/allCountries.zip \
+            --country-info source-data/countryInfo.txt \
+            --out-dir generated/bulk-lexicon \
+            --common 35000 \
+            --names 5000 \
+            --geography 10000 \
+            --entities "${ENTITY_TARGET}" \
+            --chunk-size 2500 \
+            | tee generated/bulk-lexicon/build-report.json
+
+      - name: Validate generated corpus
+        run: |
+          for file in generated/bulk-lexicon/*.js; do node --check "$file"; done
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const manifest = JSON.parse(fs.readFileSync("generated/bulk-lexicon/manifest.json", "utf8"));
+          const total = manifest.actual.total.entries;
+          const generic = manifest.editorialDebt.genericTemplatePercent;
+          if (total < 42000) throw new Error(`Corpus did not grow enough: ${total}`);
+          if (generic >= 20) throw new Error(`Generic-template debt remains too high: ${generic}%`);
+          console.log(JSON.stringify({ total, generic, editorialDebt: manifest.editorialDebt }, null, 2));
+          NODE
+
+      - name: Publish build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocabulary-greatness-corpus-${{ github.sha }}
+          path: generated/bulk-lexicon/
+          if-no-files-found: error
+          retention-days: 30
