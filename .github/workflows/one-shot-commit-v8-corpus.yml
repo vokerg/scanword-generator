@@ -1,17 +1,19 @@
 name: One-shot commit selected v8 corpus
 
 on:
-  push:
+  pull_request:
     branches:
-      - r-and-d/vocabulary-greatness-1.1-rebased
+      - main
     paths:
       - .github/workflows/one-shot-commit-v8-corpus.yml
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   build-and-commit:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
