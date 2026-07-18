@@ -30,4 +30,14 @@
     window.RUSSIAN_CLUES[word.toLowerCase().replaceAll("ё", "е")] = clue;
   }
   window.TWO_LETTER_WORDS = entries.map(([word]) => word);
+
+  // Browser paths load the generated corpus loader explicitly. Node research tools
+  // load two-letter-words.js directly; the environment switch enables true A/B runs.
+  const bulkDisabled = typeof process !== "undefined"
+    && String(process?.env?.SCANWORD_BULK_LEXICON || "on").toLowerCase() === "off";
+  if (typeof require === "function" && !bulkDisabled) {
+    if (!process.env.SCANWORD_ACTIVE_POOL_LIMIT) process.env.SCANWORD_ACTIVE_POOL_LIMIT = "3500";
+    require("./bulk-lexicon-runtime.js");
+    require("./bulk-lexicon/loader.js");
+  }
 })();

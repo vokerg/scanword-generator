@@ -10,11 +10,11 @@
   <main class="app-shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">ARROWORD GENERATOR · R&amp;D 0.9</p>
+        <p class="eyebrow">ARROWORD GENERATOR · VOCABULARY-FIRST 1.0</p>
         <h1>Dense, structurally valid arrowword grids</h1>
         <p class="lead">
-          Builds one connected answer graph, expands real clues into compact multi-cell footprints,
-          and rejects every accidental letter run before a result can be selected.
+          Builds one connected answer graph from a categorized Russian corpus, compares bounded seed-specific working
+          sets, and applies a same-geometry editorial cleanup before selecting the final grid.
         </p>
       </div>
       <div class="badge">A5<br />SVG + JSON</div>
@@ -26,7 +26,7 @@
 
         <label>
           Seed
-          <input id="seed" type="text" value="arrowword-rnd-009" />
+          <input id="seed" type="text" value="arrowword-vocabulary-first-001" />
         </label>
 
         <div class="field-row">
@@ -42,8 +42,8 @@
 
         <div class="field-row">
           <label>
-            Word pool
-            <input id="poolSize" type="number" min="100" max="1000" value="1000" />
+            Maximum working set
+            <input id="poolSize" type="number" min="1000" max="10000" value="3500" />
           </label>
           <label>
             Minimum answers
@@ -71,9 +71,9 @@
         <div id="stats" class="stats" aria-live="polite"></div>
 
         <div class="note">
-          <strong>90% coverage checkpoint:</strong> the solver searches adaptively from 24 to 240 seeded
-          attempts. A result must keep one connected answer component, at least 90% active cells,
-          at most 20 residual panels, and zero accidental letter runs.
+          <strong>Vocabulary-first 1.0:</strong> 39,586 attributed entries are available before construction. The default
+          pipeline compares 2,500- and 3,500-entry working sets panel-first, then removes avoidable formulaic short fill
+          without changing the selected geometry.
         </div>
       </aside>
 
@@ -98,14 +98,59 @@
     </section>
   </main>
 
+  <script>
+    window.SCANWORD_CONSTRUCTION_MODE = "portfolio";
+    window.SCANWORD_CLOSED_FILL = "diagnostic";
+    window.SCANWORD_PORTFOLIO_SELECTION = "panel-first";
+    window.SCANWORD_CATEGORY_BALANCE = "off";
+    window.SCANWORD_EDITORIAL_REPAIR = "on";
+    window.SCANWORD_VOCABULARY_PORTFOLIO = "on";
+    window.SCANWORD_VOCABULARY_PORTFOLIO_LIMITS = "2500,3500";
+  </script>
   <script src="words.js"></script>
   <script src="short-words.js"></script>
   <script src="clues.js"></script>
   <script src="extra-dictionary.js"></script>
   <script src="two-letter-words.js"></script>
+  <script src="bulk-lexicon-runtime.js"></script>
+  <script src="bulk-lexicon/loader.js"></script>
   <script src="core.js"></script>
   <script src="dictionary-policy.js"></script>
+  <script src="lexical-policy-v2.js"></script>
+  <script src="editorial-lexical-policy-v3.js"></script>
   <script src="solver.js"></script>
+  <script src="closed-fill.js"></script>
+  <script src="closed-fill-rollback.js"></script>
+  <script src="construction-v2-runtime.js"></script>
+  <script src="construction-v2.js"></script>
+  <script src="construction-victim.js"></script>
+  <script src="construction-victim-depth2.js"></script>
+  <script src="construction-portfolio.js"></script>
+  <script src="construction-polish.js"></script>
+  <script src="construction-clue-repack.js"></script>
+  <script src="construction-clue-adaptive.js"></script>
+  <script src="construction-clue-tail.js"></script>
+  <script src="construction-clue-reflow.js"></script>
+  <script src="construction-clue-pair-reflow.js"></script>
+  <script src="targeted-short-fill.js"></script>
+  <script src="construction-victim-targeted.js"></script>
+  <script src="construction-victim-targeted-demand.js"></script>
+  <script src="construction-victim-targeted-pair.js"></script>
+  <script src="construction-victim-targeted-cross.js"></script>
+  <script src="construction-victim-targeted-cross-rollback.js"></script>
+  <script src="construction-victim-targeted-cross-relaxed.js"></script>
+  <script src="construction-victim-targeted-cross-budget.js"></script>
+  <script src="construction-victim-targeted-exact.js"></script>
+  <script src="construction-guard.js"></script>
+  <script src="editorial-demand-lexicon-v3.js"></script>
+  <script src="editorial-demand-lexicon-supplement-v3.js"></script>
+  <script src="editorial-demand-short-lexicon-v3.js"></script>
+  <script src="editorial-demand-tail-lexicon-v3.js"></script>
+  <script src="construction-editorial-replace-v3.js"></script>
+  <script src="construction-editorial-pair-refit-v3.js"></script>
+  <script src="construction-editorial-bundle-refit-v3.js"></script>
+  <script src="construction-editorial-repair-v3.js"></script>
+  <script src="construction-vocabulary-portfolio-v1.js"></script>
   <script src="renderer.js"></script>
   <script src="ui.js"></script>
 </body>
