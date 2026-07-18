@@ -1,34 +1,68 @@
 # Arrowword Generator
 
-A browser-based R&D prototype for generating Swedish-style crosswords (arrowwords / scanwords) on an exact A5 page.
+A browser-based generator for Swedish-style crosswords (arrowwords / scanwords) on an exact A5 page.
 
-## Default research direction: vocabulary-first dense fill
+## Current milestone: vocabulary-first 1.0
 
-The main bottleneck is now treated as **lexical domain breadth**, not another round of placement coefficients.
+The default 13 × 17 generator now uses a **39,586-entry attributed Russian source corpus** before construction. For each seed it builds and repairs candidates from deterministic 2,500- and 3,500-entry working sets, then selects the best valid grid panel-first.
 
-The previous constructor had only 857 unique answers available before generation and 1,441 across construction plus post-generation repair. That is insufficient for a dense publication-style scanword: once two or three crossing letters are fixed, many slots have no compatible answer at all.
+The complete promotion decision, benchmark, rollback controls and accepted debt are documented in [Milestone 1.0](docs/milestones/v1.0-vocabulary-first.md).
 
-The active program therefore:
+Validated over 20 identical-seed release pairs against the old dictionary with the same editorial repair:
 
-1. builds a 15,000–50,000+ answer corpus with usable clues;
-2. loads that corpus before initial construction;
-3. includes ordinary nouns, names, surnames, geography and specialist vocabulary;
-4. assigns editorial tiers rather than pretending every valid word is equally desirable;
-5. benchmarks density, intersections, empty domains and runtime on identical seeds;
-6. keeps same-geometry editorial repair as a secondary cleanup stage.
+| metric | old dictionary + repair | vocabulary portfolio + repair |
+| --- | ---: | ---: |
+| average residual panels | 7.05 | **5.30** |
+| average answers | 44.75 | **48.45** |
+| average crossings | 47.35 | **53.00** |
+| average answer-space coverage | 93.98% | **95.53%** |
+| average formulaic short answers | 0.40 | **0.15** |
 
-The complete rationale, experiment history, source policy and staged targets are documented in [`research/vocabulary-first/README.md`](research/vocabulary-first/README.md).
+All 20 promoted candidates were structurally valid, used exact clues and contained one connected answer component.
 
-## Structural checkpoint
+## Research snapshots
+
+The earlier closed-fill investigation is preserved separately as a documented, reproducible research checkpoint:
+
+- [Closed-fill research overview](research/closed-fill/README.md)
+- [Measured results](research/closed-fill/RESULTS.md)
+- [Architecture review](research/closed-fill/ARCHITECTURE.md)
+- [Experiment log](research/closed-fill/EXPERIMENT_LOG.md)
+
+The exact closed-fill implementation is pinned on `research/closed-fill-snapshot-2026-07-16` at commit `d1c12d8acca31edb3b38775db5166f4f5f59ce04`.
+
+The vocabulary and editorial experiments are retained separately from the milestone snapshot:
+
+- [Vocabulary-first experiment program](research/vocabulary-first/README.md)
+- [39,586-entry checkpoint](research/vocabulary-first/STATUS-39586.md)
+- [Category-balance experiment](research/vocabulary-first/CATEGORY-BALANCE.md)
+- [Dictionary audit](research/vocabulary-first/AUDIT-39586.md)
+- [Lexical-quality experiments](research/lexical-quality/README.md)
+- branch `r-and-d/lexical-pareto-frontier`
+
+Negative results are retained rather than rewritten as successes: naive full-pool sampling, aggressive lexical placement penalties, pre-downstream Pareto selection, fixed category caps and narrow local CSP topologies.
+
+## Default pipeline
+
+```text
+load attributed source corpus
+-> derive 2,500- and 3,500-entry seed-specific working sets
+-> build connected structural candidates
+-> allocate exact clue footprints
+-> apply same-geometry editorial repair
+-> select panel-first
+-> validate all runs, crossings, clues and connectivity
+```
 
 The generator:
 
 - validates every crossing;
 - rejects accidental horizontal and vertical letter runs;
 - keeps every answer in one connected component;
+- supports answer lengths from 2 to 12 letters;
 - supports right and down answers and dual arrow cells;
 - expands clue text into connected one-to-four-cell footprints;
-- preserves exact arrow-to-answer attachment;
+- keeps every arrow anchor attached to the exact answer start;
 - exports exact A5 SVG and JSON project files;
 - can reveal answers for visual validation.
 
@@ -36,62 +70,39 @@ The generator:
 
 Three separate measurements are reported:
 
-- **Active coverage** — letter cells, arrow cells, and real clue-footprint cells divided by the whole grid.
+- **Active coverage** — letter cells, arrow cells and real clue-footprint cells divided by the whole grid.
 - **Answer-space coverage** — letter cells divided by cells not occupied by clues.
 - **Residual panels** — cells that are neither answers nor real clues.
 
 This prevents a misleading single density number.
 
-## Multi-cell clue footprints
-
-Long definitions often do not fit legibly beside an arrow. The post-layout clue allocator:
-
-1. finds connected panel footprints next to each arrow anchor;
-2. generates one-to-four-cell candidate shapes;
-3. runs deterministic randomized set-packing passes;
-4. prevents two clues from claiming the same cell;
-5. prefers footprints that consume small or isolated panel regions;
-6. renders the footprint as one outlined clue area.
-
-Each converted cell contains a real clue associated with a real answer. No cells are counted as active merely to inflate the metric.
-
 ## Structural invariants
 
 A generated grid is accepted only when:
 
-1. Every contiguous letter run of length two or more is exactly one assigned answer.
-2. Every letter belongs to at least one assigned answer.
-3. Crossing letters agree.
-4. An arrow cell contains at most one right arrow and one down arrow.
-5. Every external clue footprint points to an existing arrow and answer.
-6. Every used answer has a clue admitted by the active dictionary policy.
-7. The answer graph is one connected component.
-8. Residual non-answer areas are explicit panel cells, never blank answer cells.
+1. every contiguous letter run of length two or more is exactly one assigned answer;
+2. every letter belongs to at least one assigned answer;
+3. crossing letters agree;
+4. an arrow cell contains at most one right arrow and one down arrow;
+5. every clue footprint points to an existing arrow and answer;
+6. every used answer has an admitted exact clue;
+7. the answer graph is one connected component;
+8. residual areas are explicit panel cells, never blank answer cells.
 
-## Generation strategy
+## Corpus architecture
 
-The constructor remains word-first, but the default sequence is now:
+The source corpus is auditable and categorized:
 
-1. assemble the full categorized pre-construction lexicon;
-2. index candidates by length and letter patterns;
-3. build one connected answer graph;
-4. continue dense valid placements after the requested minimum is reached;
-5. allocate clue footprints over remaining panel regions;
-6. run bounded local repair for editorial cleanup;
-7. validate all structural and lexical invariants.
+- 4,358 common nouns;
+- 20,099 specialist nouns;
+- 2,798 given names;
+- 2,087 surnames;
+- 115 patronymics;
+- 9,830 cities;
+- 170 capitals;
+- 129 countries.
 
-## Research results retained
-
-The branch preserves all negative and positive experiments:
-
-- early lexical placement pressure reduced short fill but made the 40-answer checkpoint unreachable;
-- dense-only penalty sweeps preserved reachability but produced negligible lexical gains;
-- pre-downstream Pareto selection improved vocabulary but amplified downstream panel damage;
-- one-slot, pair and radius-two repair reduced formulaic answers without geometry loss;
-- demand-driven vocabulary additions reduced the 50-seed average formulaic count from 3.44 to 0.34;
-- panel and structural-short counts did not improve, confirming that repair alone is not the dense-fill solution.
-
-See [`research/lexical-quality/README.md`](research/lexical-quality/README.md) for the detailed experiment log.
+Every bulk entry retains its answer, clue, category, lexical-quality score, source, license and source identifier. The current audit reports zero invalid entries, zero normalized duplicates and 100% clue/source coverage. Generic template clues remain explicit editorial debt.
 
 ## Running locally
 
@@ -103,48 +114,46 @@ python3 -m http.server 8080
 
 Then open `http://localhost:8080`.
 
-## Quality gates
+The default browser path enables the vocabulary portfolio and editorial repair. Generation on the default grid currently averages roughly 21 seconds in the release benchmark.
 
-Current research tools include:
+## Rollback and A/B controls
 
-```bash
-node tools/dictionary-audit.cjs
-node tools/dictionary-count-v3.cjs
-node tools/benchmark.cjs
-node tools/editorial-replacement-checkpoint.cjs 50
+```text
+SCANWORD_BULK_LEXICON=off             old construction dictionary
+SCANWORD_VOCABULARY_PORTFOLIO=off     single active working set
+SCANWORD_EDITORIAL_REPAIR=off         no same-geometry cleanup
+SCANWORD_CATEGORY_BALANCE=off         accepted 1.0 category policy
+SCANWORD_CONSTRUCTION_MODE=legacy     original construction path
 ```
 
-Bulk-corpus gates additionally report:
+## Quality gates
 
-- unique pre-construction entries;
-- category and length distributions;
-- duplicate and clue failures;
-- slot-domain availability;
-- density and crossing deltas versus the closed-fill snapshot;
-- rare and specialist answer usage;
-- generation time and candidate lookup growth.
+```bash
+node tools/bulk-lexicon-audit.cjs
+node tools/dictionary-count-v3.cjs
+node tools/vocabulary-release-checkpoint.cjs 20
+```
+
+The release gate records source-corpus size, selected active limit, panels, answers, crossings, coverage, editorial metrics, runtime, category use and full structural validation.
 
 ## Main files
 
 ```text
-index.html                         Browser interface and script order
-words.js                           Original Russian answer dictionary
-short-words.js                     Three-letter compact answers
-clues.js                           Original clue dictionary
-extra-dictionary.js                Reviewed answer-and-clue expansion
-two-letter-words.js                Reviewed two-letter answers
-bulk-lexicon-runtime.js            Bulk corpus registration and deduplication
-bulk-lexicon/                      Generated categorized corpus chunks
-core.js                            Randomization and dictionary utilities
-dictionary-policy.js               Dictionary admission policy
-solver.js                          Connected placement and clue allocation
-construction-editorial-repair-v3.js Same-geometry cleanup pipeline
-renderer.js                        A5 SVG renderer
-ui.js                              Browser UI and JSON export
-research/vocabulary-first/         Primary research program
-research/lexical-quality/          Retained experiment history
+index.html                          Browser defaults and script order
+bulk-lexicon-runtime.js             Corpus registration and deduplication
+bulk-lexicon/                       Generated categorized corpus and manifest
+core.js                             Working-set selection and dictionary utilities
+dictionary-policy.js                Dictionary admission policy
+solver.js                           Connected placement and validation
+construction-vocabulary-portfolio-v1.js
+                                    2,500/3,500 panel-first portfolio
+construction-editorial-repair-v3.js Same-geometry cleanup orchestration
+renderer.js                         A5 SVG renderer
+ui.js                               Browser UI and JSON export
+docs/milestones/                    Production milestone decisions
+research/                           Full experimental record
 ```
 
-## Production boundary
+## Known debt
 
-The large corpus work remains on the research branch. Production `main` is unchanged until source licensing, editorial sampling, runtime and deterministic benchmarks are independently reviewable.
+Vocabulary-first 1.0 does not claim zero-panel construction or publication-ready clue prose. The next milestone targets template-clue reduction, category diversity and shared-search runtime improvements without losing the 1.0 density frontier.
