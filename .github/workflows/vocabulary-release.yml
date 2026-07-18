@@ -10,7 +10,6 @@ on:
   pull_request:
     branches:
       - main
-      - research/closed-fill-snapshot-2026-07-16
     paths:
       - index.html
       - bulk-lexicon-runtime.js
@@ -21,6 +20,7 @@ on:
       - editorial-demand-*.js
       - construction-vocabulary-portfolio-v1.js
       - construction-editorial-*-v3.js
+      - tools/node-benchmark-bootstrap-v1.cjs
       - tools/vocabulary-release-checkpoint.cjs
       - .github/workflows/vocabulary-release.yml
 
@@ -72,6 +72,7 @@ jobs:
           node --check editorial-lexical-policy-v3.js
           node --check construction-vocabulary-portfolio-v1.js
           node --check construction-editorial-repair-v3.js
+          node --check tools/node-benchmark-bootstrap-v1.cjs
           node --check tools/vocabulary-release-checkpoint.cjs
           for file in bulk-lexicon/*.js editorial-demand-*.js construction-editorial-*-v3.js; do
             node --check "$file"
@@ -103,9 +104,10 @@ jobs:
           }
           NODE
 
-      - name: Run end-to-end release A/B
+      - name: Run end-to-end release A/B with canonical Node bootstrap
         env:
           SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '20' }}
+          NODE_OPTIONS: --require=${{ github.workspace }}/tools/node-benchmark-bootstrap-v1.cjs
         run: |
           mkdir -p research-output
           node tools/vocabulary-release-checkpoint.cjs "${SEED_COUNT}" \
