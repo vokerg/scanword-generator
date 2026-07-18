@@ -9,10 +9,18 @@ on:
         default: "20"
   pull_request:
     branches:
+      - main
       - research/closed-fill-snapshot-2026-07-16
     paths:
+      - index.html
+      - bulk-lexicon-runtime.js
+      - bulk-lexicon/**
+      - core.js
+      - dictionary-policy.js
+      - editorial-lexical-policy-v3.js
+      - editorial-demand-*.js
       - construction-vocabulary-portfolio-v1.js
-      - construction-editorial-repair-v3.js
+      - construction-editorial-*-v3.js
       - tools/vocabulary-release-checkpoint.cjs
       - .github/workflows/vocabulary-release.yml
 
@@ -56,11 +64,44 @@ jobs:
         with:
           node-version: 22
 
-      - name: Validate release-candidate syntax
+      - name: Validate milestone runtime and browser defaults
         run: |
+          node --check bulk-lexicon-runtime.js
+          node --check core.js
+          node --check dictionary-policy.js
+          node --check editorial-lexical-policy-v3.js
           node --check construction-vocabulary-portfolio-v1.js
           node --check construction-editorial-repair-v3.js
           node --check tools/vocabulary-release-checkpoint.cjs
+          for file in bulk-lexicon/*.js editorial-demand-*.js construction-editorial-*-v3.js; do
+            node --check "$file"
+          done
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const html = fs.readFileSync("index.html", "utf8");
+          for (const expected of [
+            'window.SCANWORD_CONSTRUCTION_MODE = "portfolio"',
+            'window.SCANWORD_EDITORIAL_REPAIR = "on"',
+            'window.SCANWORD_VOCABULARY_PORTFOLIO = "on"',
+            'window.SCANWORD_VOCABULARY_PORTFOLIO_LIMITS = "2500,3500"',
+          ]) {
+            if (!html.includes(expected)) throw new Error(`Missing browser default: ${expected}`);
+          }
+          const orderedScripts = [
+            "editorial-lexical-policy-v3.js",
+            "construction-editorial-replace-v3.js",
+            "construction-editorial-pair-refit-v3.js",
+            "construction-editorial-bundle-refit-v3.js",
+            "construction-editorial-repair-v3.js",
+            "construction-vocabulary-portfolio-v1.js",
+          ];
+          let previous = -1;
+          for (const script of orderedScripts) {
+            const position = html.indexOf(`src="${script}"`);
+            if (position < 0 || position <= previous) throw new Error(`Invalid browser script order near ${script}`);
+            previous = position;
+          }
+          NODE
 
       - name: Run end-to-end release A/B
         env:
