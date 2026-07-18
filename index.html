@@ -10,11 +10,11 @@
   <main class="app-shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">ARROWORD GENERATOR · VOCABULARY-FIRST R&amp;D</p>
+        <p class="eyebrow">ARROWORD GENERATOR · VOCABULARY-FIRST 1.0</p>
         <h1>Dense, structurally valid arrowword grids</h1>
         <p class="lead">
-          Builds one connected answer graph from a large categorized Russian corpus, derives a balanced seed-specific
-          working set, and rejects every accidental letter run before selection.
+          Builds one connected answer graph from a categorized Russian corpus, compares bounded seed-specific working
+          sets, and applies a same-geometry editorial cleanup before selecting the final grid.
         </p>
       </div>
       <div class="badge">A5<br />SVG + JSON</div>
@@ -42,7 +42,7 @@
 
         <div class="field-row">
           <label>
-            Active working set
+            Maximum working set
             <input id="poolSize" type="number" min="1000" max="10000" value="3500" />
           </label>
           <label>
@@ -71,8 +71,9 @@
         <div id="stats" class="stats" aria-live="polite"></div>
 
         <div class="note">
-          <strong>Vocabulary-first R&amp;D:</strong> the complete generated corpus is loaded before placement. Each seed
-          receives a length-balanced 3,500-word working set; local editorial repair remains a secondary cleanup stage.
+          <strong>Vocabulary-first 1.0:</strong> 39,586 attributed entries are available before construction. The default
+          pipeline compares 2,500- and 3,500-entry working sets panel-first, then removes avoidable formulaic short fill
+          without changing the selected geometry.
         </div>
       </aside>
 
@@ -97,6 +98,15 @@
     </section>
   </main>
 
+  <script>
+    window.SCANWORD_CONSTRUCTION_MODE = "portfolio";
+    window.SCANWORD_CLOSED_FILL = "diagnostic";
+    window.SCANWORD_PORTFOLIO_SELECTION = "panel-first";
+    window.SCANWORD_CATEGORY_BALANCE = "off";
+    window.SCANWORD_EDITORIAL_REPAIR = "on";
+    window.SCANWORD_VOCABULARY_PORTFOLIO = "on";
+    window.SCANWORD_VOCABULARY_PORTFOLIO_LIMITS = "2500,3500";
+  </script>
   <script src="words.js"></script>
   <script src="short-words.js"></script>
   <script src="clues.js"></script>
@@ -107,6 +117,7 @@
   <script src="core.js"></script>
   <script src="dictionary-policy.js"></script>
   <script src="lexical-policy-v2.js"></script>
+  <script src="editorial-lexical-policy-v3.js"></script>
   <script src="solver.js"></script>
   <script src="closed-fill.js"></script>
   <script src="closed-fill-rollback.js"></script>
@@ -131,6 +142,15 @@
   <script src="construction-victim-targeted-cross-budget.js"></script>
   <script src="construction-victim-targeted-exact.js"></script>
   <script src="construction-guard.js"></script>
+  <script src="editorial-demand-lexicon-v3.js"></script>
+  <script src="editorial-demand-lexicon-supplement-v3.js"></script>
+  <script src="editorial-demand-short-lexicon-v3.js"></script>
+  <script src="editorial-demand-tail-lexicon-v3.js"></script>
+  <script src="construction-editorial-replace-v3.js"></script>
+  <script src="construction-editorial-pair-refit-v3.js"></script>
+  <script src="construction-editorial-bundle-refit-v3.js"></script>
+  <script src="construction-editorial-repair-v3.js"></script>
+  <script src="construction-vocabulary-portfolio-v1.js"></script>
   <script src="renderer.js"></script>
   <script src="ui.js"></script>
 </body>
