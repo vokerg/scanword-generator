@@ -1,0 +1,104 @@
+name: Vocabulary greatness 1.1
+
+on:
+  push:
+    branches:
+      - r-and-d/vocabulary-greatness-1.1
+    paths:
+      - tools/node-benchmark-bootstrap-v1.cjs
+      - tools/build-bulk-lexicon-v3.py
+      - tools/bulk-lexicon-audit.cjs
+      - tools/vocabulary-adaptive-checkpoint.cjs
+      - construction-vocabulary-portfolio-v1.js
+      - bulk-lexicon-runtime.js
+      - bulk-lexicon/**
+      - research/vocabulary-greatness-1.1/**
+      - .github/workflows/vocabulary-greatness-1.1.yml
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: Identical-seed comparison pairs
+        required: true
+        default: "10"
+
+concurrency:
+  group: vocabulary-greatness-1.1-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  canonical-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      NODE_OPTIONS: --require=${{ github.workspace }}/tools/node-benchmark-bootstrap-v1.cjs
+      SCANWORD_PORTFOLIO_ATTEMPTS: 240
+      SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
+      SCANWORD_EDITORIAL_REPAIR: "on"
+      SCANWORD_CONSTRUCTION_MODE: portfolio
+      SCANWORD_VOCABULARY_PORTFOLIO: "on"
+      SCANWORD_VOCABULARY_PORTFOLIO_LIMITS: 2500,3500
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate JavaScript
+        run: |
+          node --check tools/node-benchmark-bootstrap-v1.cjs
+          node --check construction-vocabulary-portfolio-v1.js
+          node --check bulk-lexicon-runtime.js
+          node --check tools/bulk-lexicon-audit.cjs
+
+      - name: Audit current corpus
+        run: node tools/bulk-lexicon-audit.cjs | tee corpus-audit.json
+
+      - name: Prove browser-equivalent benchmark bootstrap
+        env:
+          SCANWORD_BULK_LEXICON: "on"
+        run: |
+          node tools/benchmark-seed-v3.cjs vocabulary-greatness-bootstrap \
+            | tee bootstrap.json
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const sample = JSON.parse(fs.readFileSync("bootstrap.json", "utf8").trim().split(/\r?\n/).at(-1));
+          if (sample.sourceCorpusEntries < 39000) throw new Error(`Bulk corpus not loaded: ${sample.sourceCorpusEntries}`);
+          const portfolio = sample.constructionV2?.vocabularyPortfolio;
+          if (!portfolio || portfolio.candidates?.length !== 2) throw new Error("Vocabulary portfolio did not run");
+          if (!sample.validation?.valid || sample.components !== 1 || !sample.exactCluesOnly) throw new Error("Canonical runtime failed validation");
+          console.log(JSON.stringify({
+            sourceCorpusEntries: sample.sourceCorpusEntries,
+            poolEntries: sample.poolEntries,
+            selectedLimit: portfolio.selectedLimit,
+            panels: sample.panelCells,
+            answers: sample.answers,
+            crossings: sample.crossings,
+            elapsedMs: sample.elapsedMs,
+          }, null, 2));
+          NODE
+
+      - name: Run short truthful release comparison
+        env:
+          SEEDS: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '3' }}
+          SCANWORD_RELEASE_CONCURRENCY: 1
+        run: |
+          mkdir -p research-output
+          node tools/vocabulary-release-checkpoint.cjs "${SEEDS}" vocabulary-greatness-truth \
+            | tee "research-output/truth-${SEEDS}.jsonl"
+
+      - name: Publish evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocabulary-greatness-${{ github.sha }}
+          path: |
+            corpus-audit.json
+            bootstrap.json
+            research-output/
+          if-no-files-found: warn
