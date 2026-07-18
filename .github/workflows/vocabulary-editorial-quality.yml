@@ -1,0 +1,78 @@
+name: Selected-grid editorial quality
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - construction-vocabulary-editorial-tiebreak-v1.js
+      - tools/node-benchmark-bootstrap-v1.cjs
+      - tools/node-editorial-bootstrap-v1.cjs
+      - tools/vocabulary-editorial-checkpoint.cjs
+      - tools/vocabulary-editorial-tiebreak-test.cjs
+      - research/selected-grid-editorial-quality-1.2/**
+      - .github/workflows/vocabulary-editorial-quality.yml
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: Identical-seed baseline/editorial pairs
+        required: true
+        default: "20"
+
+concurrency:
+  group: vocabulary-editorial-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SCANWORD_EDITORIAL_CONCURRENCY: 1
+      SCANWORD_PORTFOLIO_ATTEMPTS: 240
+      SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
+      SCANWORD_VICTIM_BASES: 8
+      SCANWORD_VICTIM_VARIANTS: 6
+      SCANWORD_TARGETED_VICTIM_REGIONS: 3
+      SCANWORD_TARGETED_VICTIM_WORDS: 4
+      SCANWORD_TARGETED_VICTIM_DEPTH: 2
+      SCANWORD_TARGETED_EXACT_VARIANTS: 4
+      SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
+      SCANWORD_REPACK_NODES: 600000
+      SCANWORD_REPACK_BRANCH: 24
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate editorial research runtime
+        run: |
+          node --check construction-vocabulary-editorial-tiebreak-v1.js
+          node --check tools/node-editorial-bootstrap-v1.cjs
+          node --check tools/vocabulary-editorial-checkpoint.cjs
+          node --check tools/vocabulary-editorial-tiebreak-test.cjs
+          node tools/vocabulary-editorial-tiebreak-test.cjs
+
+      - name: Compare baseline and editorial selection
+        env:
+          NODE_OPTIONS: --require=${{ github.workspace }}/tools/node-benchmark-bootstrap-v1.cjs --require=${{ github.workspace }}/tools/node-editorial-bootstrap-v1.cjs
+          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '3' }}
+        run: |
+          mkdir -p research-output
+          node tools/vocabulary-editorial-checkpoint.cjs "${SEED_COUNT}" \
+            | tee "research-output/vocabulary-editorial-${SEED_COUNT}.jsonl"
+
+      - name: Publish comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocabulary-editorial-${{ github.sha }}
+          path: research-output/
+          if-no-files-found: error
