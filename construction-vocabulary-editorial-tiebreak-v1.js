@@ -130,6 +130,12 @@
     }
   }
 
+  function annotateSelected(result) {
+    const selected = result?.constructionV2?.vocabularyPortfolio?.selected;
+    if (selected) Object.assign(selected, clueMetrics(result.placed || []));
+    return result;
+  }
+
   function generate(...args) {
     const configured = limits();
     const candidates = configured.map((activeLimit) => {
@@ -158,7 +164,7 @@
     return selected.result;
   }
 
-  solver.generateBest = (...args) => enabled() ? generate(...args) : previousGenerateBest(...args);
+  solver.generateBest = (...args) => enabled() ? generate(...args) : annotateSelected(previousGenerateBest(...args));
   Object.assign(solver, {
     generateVocabularyEditorialPortfolioV1: generate,
     compareVocabularyEditorialCandidatesV1: compare,
