@@ -32,7 +32,11 @@ Entry = v6.Entry
 def load_preferred_russian_names(zip_path: Path) -> dict[str, dict]:
     selected: dict[str, tuple[float, dict]] = {}
     with zipfile.ZipFile(zip_path) as archive:
-        txt_name = next(name for name in archive.namelist() if name.endswith(".txt"))
+        txt_name = next(
+            name
+            for name in archive.namelist()
+            if Path(name).name.startswith("alternateNamesV2") and name.endswith(".txt")
+        )
         with archive.open(txt_name) as stream:
             for raw in stream:
                 fields = raw.decode("utf-8", errors="ignore").rstrip("\n").split("\t")
