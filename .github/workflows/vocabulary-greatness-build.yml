@@ -54,13 +54,13 @@ jobs:
           curl --fail --location --retry 4 https://download.geonames.org/export/dump/alternateNamesV2.zip --output source-data/alternateNamesV2.zip
           curl --fail --location --retry 4 https://download.geonames.org/export/dump/countryInfo.txt --output source-data/countryInfo.txt
 
-      - name: Build selected corpus v8
+      - name: Build selected corpus v8 for diagnosis
         env:
           ENTITY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.entities || '1500' }}
         run: |
           set -o pipefail
           python -m py_compile tools/build-bulk-lexicon*.py
-          python tools/build-bulk-lexicon-v8.py \
+          python tools/build-bulk-lexicon-v9-diagnostic.py \
             --ruwordnet-db source-data/ruwordnet-2021.db \
             --geonames-cities-zip source-data/cities15000.zip \
             --geonames-features-zip source-data/allCountries.zip \
@@ -76,7 +76,21 @@ jobs:
           for file in generated/bulk-lexicon/*.js; do node --check "$file"; done
           node - <<'NODE'
           const fs = require("node:fs");
+          const path = require("node:path");
           const manifest = JSON.parse(fs.readFileSync("generated/bulk-lexicon/manifest.json", "utf8"));
+          global.window = global;
+          window.RUSSIAN_WORDS = [];
+          window.RUSSIAN_CLUES = {};
+          window.RUSSIAN_LEXICAL_META = {};
+          require(path.resolve("bulk-lexicon-runtime.js"));
+          for (const file of fs.readdirSync("generated/bulk-lexicon").filter((name) => name.endsWith(".js") && name !== "loader.js").sort()) {
+            require(path.resolve("generated/bulk-lexicon", file));
+          }
+          const bySource = new Map((window.ScanwordBulkLexiconV1?.state?.entries || []).map((entry) => [String(entry.sourceId || ""), entry.answer]));
+          const mismatches = Object.entries(manifest.canonicalExamples || {})
+            .map(([sourceId, expected]) => ({ sourceId, expected, actual: bySource.get(sourceId) || null }))
+            .filter((item) => item.actual !== item.expected);
+          fs.writeFileSync("generated/bulk-lexicon/canonical-diagnostics.json", JSON.stringify({ mismatches }, null, 2));
           const total = manifest.actual.total.entries;
           const generic = manifest.editorialDebt.genericTemplatePercent;
           const entities = manifest.actual.entities.entries;
@@ -86,7 +100,7 @@ jobs:
           if (generic >= 20) throw new Error(`Generic-template debt remains too high: ${generic}%`);
           if (preferred < 5000) throw new Error(`Preferred Russian city-name coverage too low: ${preferred}`);
           if (!manifest.admission?.dropsCollidingFallbackAliases) throw new Error("Alias collision policy is not active");
-          if (manifest.canonicalExamples?.["2028462"] !== "УЛАНБАТОР") throw new Error("Canonical override regression");
+          if (mismatches.length) throw new Error(`Canonical geography mismatches: ${JSON.stringify(mismatches)}`);
           console.log(JSON.stringify({ total, entities, generic, preferred, admission: manifest.admission, editorialDebt: manifest.editorialDebt }, null, 2));
           NODE
 
