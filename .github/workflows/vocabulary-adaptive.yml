@@ -28,7 +28,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      NODE_OPTIONS: --require=${{ github.workspace }}/tools/node-benchmark-bootstrap-v1.cjs
       SCANWORD_ADAPTIVE_CONCURRENCY: 2
       SCANWORD_PORTFOLIO_ATTEMPTS: 240
       SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
@@ -64,6 +63,7 @@ jobs:
 
       - name: Compare full and adaptive portfolios
         env:
+          NODE_OPTIONS: --require=${{ github.workspace }}/tools/node-benchmark-bootstrap-v1.cjs
           SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '10' }}
         run: |
           mkdir -p research-output
