@@ -6,12 +6,14 @@ on:
       - r-and-d/vocabulary-greatness-1.1
     paths:
       - tools/build-bulk-lexicon-v3.py
+      - tools/build-bulk-lexicon-v4.py
       - .github/workflows/vocabulary-greatness-build.yml
   pull_request:
     branches:
       - main
     paths:
       - tools/build-bulk-lexicon-v3.py
+      - tools/build-bulk-lexicon-v4.py
       - .github/workflows/vocabulary-greatness-build.yml
   workflow_dispatch:
     inputs:
@@ -61,12 +63,15 @@ jobs:
             https://download.geonames.org/export/dump/countryInfo.txt \
             --output source-data/countryInfo.txt
 
-      - name: Build corpus v3
+      - name: Build corpus v4
         env:
           ENTITY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.entities || '3000' }}
         run: |
-          python -m py_compile tools/build-bulk-lexicon.py tools/build-bulk-lexicon-v3.py
-          python tools/build-bulk-lexicon-v3.py \
+          python -m py_compile \
+            tools/build-bulk-lexicon.py \
+            tools/build-bulk-lexicon-v3.py \
+            tools/build-bulk-lexicon-v4.py
+          python tools/build-bulk-lexicon-v4.py \
             --ruwordnet-db source-data/ruwordnet-2021.db \
             --geonames-cities-zip source-data/cities15000.zip \
             --geonames-features-zip source-data/allCountries.zip \
@@ -87,9 +92,11 @@ jobs:
           const manifest = JSON.parse(fs.readFileSync("generated/bulk-lexicon/manifest.json", "utf8"));
           const total = manifest.actual.total.entries;
           const generic = manifest.editorialDebt.genericTemplatePercent;
+          const entities = manifest.actual.entities.entries;
           if (total < 42000) throw new Error(`Corpus did not grow enough: ${total}`);
+          if (entities < 2500) throw new Error(`Entity expansion too small: ${entities}`);
           if (generic >= 20) throw new Error(`Generic-template debt remains too high: ${generic}%`);
-          console.log(JSON.stringify({ total, generic, editorialDebt: manifest.editorialDebt }, null, 2));
+          console.log(JSON.stringify({ total, entities, generic, editorialDebt: manifest.editorialDebt }, null, 2));
           NODE
 
       - name: Publish build evidence
