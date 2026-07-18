@@ -23,6 +23,11 @@
     return [...new Set(parsed.length ? parsed : [2500, 3500])];
   }
 
+  function variantCount() {
+    const parsed = Number(option("SCANWORD_VOCABULARY_EDITORIAL_VARIANTS", 1));
+    return Math.max(1, Math.min(4, Number.isFinite(parsed) ? Math.floor(parsed) : 1));
+  }
+
   function metadata(answer) {
     const key = String(answer || "").trim().toLowerCase().replaceAll("ё", "е");
     return window.RUSSIAN_LEXICAL_META?.[key] || {};
@@ -66,9 +71,10 @@
     };
   }
 
-  function summarize(result, activeLimit, elapsedMs) {
+  function summarize(result, activeLimit, elapsedMs, origin = "candidate") {
     const editorial = policy?.summarize?.(result.placed || []) || {};
     return {
+      origin,
       activeLimit,
       elapsedMs,
       panels: Number(result.panelCells || 0),
@@ -102,6 +108,42 @@
       || b.distinctSources - a.distinctSources
       || b.score - a.score
       || a.activeLimit - b.activeLimit;
+  }
+
+  function structuralNonRegression(candidate, baseline) {
+    return candidate.validationValid
+      && candidate.components === 1
+      && candidate.panels <= baseline.panels
+      && candidate.answers >= baseline.answers
+      && candidate.crossings >= baseline.crossings
+      && candidate.rawLetterPercent >= baseline.rawLetterPercent
+      && candidate.editorialPenalty <= baseline.editorialPenalty
+      && candidate.formulaicShortCount <= baseline.formulaicShortCount;
+  }
+
+  function editorialParetoImprovement(candidate, baseline) {
+    const noWorse = candidate.repeatedClueCount <= baseline.repeatedClueCount
+      && candidate.genericClueCount <= baseline.genericClueCount
+      && candidate.properNameCount <= baseline.properNameCount
+      && candidate.distinctCategories >= baseline.distinctCategories
+      && candidate.distinctSources >= baseline.distinctSources;
+    const strictlyBetter = candidate.repeatedClueCount < baseline.repeatedClueCount
+      || candidate.genericClueCount < baseline.genericClueCount
+      || candidate.properNameCount < baseline.properNameCount
+      || candidate.distinctCategories > baseline.distinctCategories
+      || candidate.distinctSources > baseline.distinctSources;
+    return noWorse && strictlyBetter;
+  }
+
+  function comparePareto(first, second) {
+    const a = first.summary;
+    const b = second.summary;
+    return a.repeatedClueCount - b.repeatedClueCount
+      || a.genericClueCount - b.genericClueCount
+      || a.properNameCount - b.properNameCount
+      || b.distinctCategories - a.distinctCategories
+      || b.distinctSources - a.distinctSources
+      || compare(first, second);
   }
 
   function runSingle(activeLimit, args) {
@@ -138,26 +180,50 @@
 
   function generate(...args) {
     const configured = limits();
-    const candidates = configured.map((activeLimit) => {
-      const started = Date.now();
-      const result = runSingle(activeLimit, args);
-      return { result, summary: summarize(result, activeLimit, Date.now() - started) };
-    });
-    const ranked = [...candidates].sort(compare);
+    const variants = variantCount();
+    const baselineStarted = Date.now();
+    const baselineResult = annotateSelected(previousGenerateBest(...args));
+    const baselineLimit = baselineResult?.constructionV2?.vocabularyPortfolio?.selectedLimit || configured[0];
+    const baseline = {
+      result: baselineResult,
+      summary: summarize(baselineResult, baselineLimit, Date.now() - baselineStarted, "baseline"),
+    };
+    const candidates = [baseline];
+
+    for (let variant = 1; variant <= variants; variant += 1) {
+      for (const activeLimit of configured) {
+        const variantArgs = [...args];
+        variantArgs[0] = `${String(args[0] || "seed")}::editorial-v1:${variant}:${activeLimit}`;
+        const started = Date.now();
+        const result = runSingle(activeLimit, variantArgs);
+        candidates.push({
+          result,
+          summary: summarize(result, activeLimit, Date.now() - started, `variant-${variant}`),
+        });
+      }
+    }
+
+    const eligible = candidates.filter((candidate) => candidate === baseline
+      || (structuralNonRegression(candidate.summary, baseline.summary)
+        && editorialParetoImprovement(candidate.summary, baseline.summary)));
+    const ranked = [...eligible].sort(comparePareto);
     const selected = ranked[0];
     selected.result.constructionV2 = {
       ...(selected.result.constructionV2 || {}),
       vocabularyPortfolio: {
-        mode: "panel-first-active-set-portfolio-v1-editorial-tiebreak",
+        mode: "panel-first-active-set-portfolio-v1-editorial-pareto",
         evaluationMode: "full",
         editorialTieBreak: true,
+        editorialVariants: variants,
         limits: configured,
         evaluatedLimits: configured,
         skippedLimits: [],
         fastPathAccepted: false,
+        baseline: baseline.summary,
+        eligibleCandidates: eligible.length,
         selectedLimit: selected.summary.activeLimit,
         selected: selected.summary,
-        candidates: ranked.map((candidate) => candidate.summary),
+        candidates: candidates.map((candidate) => candidate.summary),
         totalCandidateElapsedMs: candidates.reduce((sum, candidate) => sum + candidate.summary.elapsedMs, 0),
       },
     };
@@ -168,6 +234,8 @@
   Object.assign(solver, {
     generateVocabularyEditorialPortfolioV1: generate,
     compareVocabularyEditorialCandidatesV1: compare,
+    isVocabularyEditorialStructuralNonRegressionV1: structuralNonRegression,
+    isVocabularyEditorialParetoImprovementV1: editorialParetoImprovement,
     summarizeSelectedGridCluesV1: clueMetrics,
     vocabularyEditorialTieBreakEnabledV1: enabled,
     __vocabularyEditorialTieBreakV1Installed: true,
