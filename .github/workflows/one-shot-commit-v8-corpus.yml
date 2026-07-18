@@ -9,49 +9,41 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: write
 
 jobs:
   build-and-commit:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 20
     steps:
       - name: Check out research branch
         uses: actions/checkout@v4
         with:
           ref: r-and-d/vocabulary-greatness-1.1-rebased
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Download validated v8 corpus artifact
+        uses: actions/download-artifact@v4
         with:
-          python-version: "3.12"
+          name: vocabulary-greatness-corpus-452df58fdf844c30ba6b489602247795d04716ad
+          path: generated/bulk-lexicon
+          repository: vokerg/scanword-generator
+          run-id: 29641316116
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Install lexical tooling
+      - name: Verify selected corpus checkpoint
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install wordfreq pymorphy3 pymorphy3-dicts-ru Babel
-
-      - name: Download attributed source data
-        run: |
-          mkdir -p source-data generated/bulk-lexicon
-          curl --fail --location --retry 4 https://github.com/avidale/python-ruwordnet/releases/download/0.0.4/ruwordnet-2021.db --output source-data/ruwordnet-2021.db
-          curl --fail --location --retry 4 https://download.geonames.org/export/dump/cities15000.zip --output source-data/cities15000.zip
-          curl --fail --location --retry 4 https://download.geonames.org/export/dump/allCountries.zip --output source-data/allCountries.zip
-          curl --fail --location --retry 4 https://download.geonames.org/export/dump/alternateNamesV2.zip --output source-data/alternateNamesV2.zip
-          curl --fail --location --retry 4 https://download.geonames.org/export/dump/countryInfo.txt --output source-data/countryInfo.txt
-
-      - name: Build selected corpus
-        run: |
-          python -m py_compile tools/build-bulk-lexicon*.py
-          python tools/build-bulk-lexicon-v8.py \
-            --ruwordnet-db source-data/ruwordnet-2021.db \
-            --geonames-cities-zip source-data/cities15000.zip \
-            --geonames-features-zip source-data/allCountries.zip \
-            --geonames-alternates-zip source-data/alternateNamesV2.zip \
-            --country-info source-data/countryInfo.txt \
-            --out-dir generated/bulk-lexicon \
-            --common 35000 --names 5000 --geography 10000 --entities 1500 --chunk-size 2500
+          for file in generated/bulk-lexicon/*.js; do node --check "$file"; done
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const manifest = JSON.parse(fs.readFileSync("generated/bulk-lexicon/manifest.json", "utf8"));
+          if (manifest.version !== 8) throw new Error(`Unexpected corpus version: ${manifest.version}`);
+          if (manifest.actual.total.entries !== 40966) throw new Error(`Unexpected corpus size: ${manifest.actual.total.entries}`);
+          if (manifest.actual.entities.entries !== 1469) throw new Error(`Unexpected entity count: ${manifest.actual.entities.entries}`);
+          if (manifest.editorialDebt.genericTemplatePercent !== 13.84) throw new Error("Unexpected editorial-debt checkpoint");
+          if (manifest.canonicalExamples?.["2028462"] !== "УЛАНБАТОР") throw new Error("Canonical override regression");
+          NODE
 
       - name: Commit generated corpus and retire this workflow
         run: |
