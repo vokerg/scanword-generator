@@ -5,21 +5,13 @@ on:
     branches:
       - r-and-d/vocabulary-greatness-1.1
     paths:
-      - tools/build-bulk-lexicon-v3.py
-      - tools/build-bulk-lexicon-v4.py
-      - tools/build-bulk-lexicon-v5.py
-      - tools/build-bulk-lexicon-v6.py
-      - tools/build-bulk-lexicon-v7.py
+      - tools/build-bulk-lexicon*.py
       - .github/workflows/vocabulary-greatness-build.yml
   pull_request:
     branches:
       - main
     paths:
-      - tools/build-bulk-lexicon-v3.py
-      - tools/build-bulk-lexicon-v4.py
-      - tools/build-bulk-lexicon-v5.py
-      - tools/build-bulk-lexicon-v6.py
-      - tools/build-bulk-lexicon-v7.py
+      - tools/build-bulk-lexicon*.py
       - .github/workflows/vocabulary-greatness-build.yml
   workflow_dispatch:
     inputs:
@@ -72,18 +64,12 @@ jobs:
             https://download.geonames.org/export/dump/countryInfo.txt \
             --output source-data/countryInfo.txt
 
-      - name: Build corpus v7
+      - name: Build selected corpus v8
         env:
           ENTITY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.entities || '1500' }}
         run: |
-          python -m py_compile \
-            tools/build-bulk-lexicon.py \
-            tools/build-bulk-lexicon-v3.py \
-            tools/build-bulk-lexicon-v4.py \
-            tools/build-bulk-lexicon-v5.py \
-            tools/build-bulk-lexicon-v6.py \
-            tools/build-bulk-lexicon-v7.py
-          python tools/build-bulk-lexicon-v7.py \
+          python -m py_compile tools/build-bulk-lexicon*.py
+          python tools/build-bulk-lexicon-v8.py \
             --ruwordnet-db source-data/ruwordnet-2021.db \
             --geonames-cities-zip source-data/cities15000.zip \
             --geonames-features-zip source-data/allCountries.zip \
@@ -107,12 +93,15 @@ jobs:
           const generic = manifest.editorialDebt.genericTemplatePercent;
           const entities = manifest.actual.entities.entries;
           const preferred = manifest.preferredRussianNames?.geography?.preferredAvailable || 0;
+          const collisionFallbacks = (manifest.preferredRussianNames?.geography?.collisionFallbacks || 0)
+            + (manifest.preferredRussianNames?.entities?.collisionFallbacks || 0);
           if (total < 40500) throw new Error(`Corpus did not retain enough breadth: ${total}`);
           if (entities < 1000) throw new Error(`High-confidence entity expansion too small: ${entities}`);
           if (generic >= 20) throw new Error(`Generic-template debt remains too high: ${generic}%`);
           if (preferred < 5000) throw new Error(`Preferred Russian city-name coverage too low: ${preferred}`);
-          if (!manifest.admission?.usesPreferredRussianGeoNames) throw new Error("Preferred Russian GeoNames are not active");
-          if (!manifest.admission?.generatedCluesAvoidInflection) throw new Error("Stable factual clue format is not active");
+          if (collisionFallbacks !== 0) throw new Error(`Fallback aliases still survive collisions: ${collisionFallbacks}`);
+          if (!manifest.admission?.dropsCollidingFallbackAliases) throw new Error("Alias collision policy is not active");
+          if (manifest.canonicalExamples?.["2028462"] !== "УЛАНБАТОР") throw new Error("Canonical override regression");
           console.log(JSON.stringify({ total, entities, generic, preferred, admission: manifest.admission, editorialDebt: manifest.editorialDebt }, null, 2));
           NODE
 
