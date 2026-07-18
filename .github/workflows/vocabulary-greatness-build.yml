@@ -9,6 +9,7 @@ on:
       - tools/build-bulk-lexicon-v4.py
       - tools/build-bulk-lexicon-v5.py
       - tools/build-bulk-lexicon-v6.py
+      - tools/build-bulk-lexicon-v7.py
       - .github/workflows/vocabulary-greatness-build.yml
   pull_request:
     branches:
@@ -18,6 +19,7 @@ on:
       - tools/build-bulk-lexicon-v4.py
       - tools/build-bulk-lexicon-v5.py
       - tools/build-bulk-lexicon-v6.py
+      - tools/build-bulk-lexicon-v7.py
       - .github/workflows/vocabulary-greatness-build.yml
   workflow_dispatch:
     inputs:
@@ -64,10 +66,13 @@ jobs:
             https://download.geonames.org/export/dump/allCountries.zip \
             --output source-data/allCountries.zip
           curl --fail --location --retry 4 \
+            https://download.geonames.org/export/dump/alternateNamesV2.zip \
+            --output source-data/alternateNamesV2.zip
+          curl --fail --location --retry 4 \
             https://download.geonames.org/export/dump/countryInfo.txt \
             --output source-data/countryInfo.txt
 
-      - name: Build corpus v6
+      - name: Build corpus v7
         env:
           ENTITY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.entities || '1500' }}
         run: |
@@ -76,11 +81,13 @@ jobs:
             tools/build-bulk-lexicon-v3.py \
             tools/build-bulk-lexicon-v4.py \
             tools/build-bulk-lexicon-v5.py \
-            tools/build-bulk-lexicon-v6.py
-          python tools/build-bulk-lexicon-v6.py \
+            tools/build-bulk-lexicon-v6.py \
+            tools/build-bulk-lexicon-v7.py
+          python tools/build-bulk-lexicon-v7.py \
             --ruwordnet-db source-data/ruwordnet-2021.db \
             --geonames-cities-zip source-data/cities15000.zip \
             --geonames-features-zip source-data/allCountries.zip \
+            --geonames-alternates-zip source-data/alternateNamesV2.zip \
             --country-info source-data/countryInfo.txt \
             --out-dir generated/bulk-lexicon \
             --common 35000 \
@@ -99,12 +106,14 @@ jobs:
           const total = manifest.actual.total.entries;
           const generic = manifest.editorialDebt.genericTemplatePercent;
           const entities = manifest.actual.entities.entries;
+          const preferred = manifest.preferredRussianNames?.geography?.preferredAvailable || 0;
           if (total < 40500) throw new Error(`Corpus did not retain enough breadth: ${total}`);
           if (entities < 1000) throw new Error(`High-confidence entity expansion too small: ${entities}`);
           if (generic >= 20) throw new Error(`Generic-template debt remains too high: ${generic}%`);
-          if (!manifest.admission?.usesSurfaceAlternateClusters) throw new Error("Surface-name clustering is not active");
+          if (preferred < 5000) throw new Error(`Preferred Russian city-name coverage too low: ${preferred}`);
+          if (!manifest.admission?.usesPreferredRussianGeoNames) throw new Error("Preferred Russian GeoNames are not active");
           if (!manifest.admission?.generatedCluesAvoidInflection) throw new Error("Stable factual clue format is not active");
-          console.log(JSON.stringify({ total, entities, generic, admission: manifest.admission, editorialDebt: manifest.editorialDebt }, null, 2));
+          console.log(JSON.stringify({ total, entities, generic, preferred, admission: manifest.admission, editorialDebt: manifest.editorialDebt }, null, 2));
           NODE
 
       - name: Publish build evidence
