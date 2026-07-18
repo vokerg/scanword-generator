@@ -20,6 +20,11 @@ on:
         description: Identical-seed baseline/editorial pairs
         required: true
         default: "20"
+      variant_search:
+        description: Search extra deterministic grids before clue disambiguation
+        required: true
+        type: boolean
+        default: false
       variants:
         description: Extra deterministic variants per active limit
         required: true
@@ -73,6 +78,7 @@ jobs:
         env:
           NODE_OPTIONS: --require=${{ github.workspace }}/tools/node-benchmark-bootstrap-v1.cjs --require=${{ github.workspace }}/tools/node-editorial-bootstrap-v1.cjs
           SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '3' }}
+          SCANWORD_EDITORIAL_VARIANT_SEARCH: ${{ github.event_name == 'workflow_dispatch' && inputs.variant_search && 'on' || 'off' }}
           SCANWORD_VOCABULARY_EDITORIAL_VARIANTS: ${{ github.event_name == 'workflow_dispatch' && inputs.variants || '1' }}
         run: |
           mkdir -p research-output
