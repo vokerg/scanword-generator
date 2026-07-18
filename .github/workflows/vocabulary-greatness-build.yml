@@ -7,6 +7,12 @@ on:
     paths:
       - tools/build-bulk-lexicon-v3.py
       - .github/workflows/vocabulary-greatness-build.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - tools/build-bulk-lexicon-v3.py
+      - .github/workflows/vocabulary-greatness-build.yml
   workflow_dispatch:
     inputs:
       entities:
@@ -15,7 +21,7 @@ on:
         default: "3000"
 
 concurrency:
-  group: vocabulary-greatness-build-${{ github.ref }}
+  group: vocabulary-greatness-build-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -26,10 +32,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - name: Check out research branch
+      - name: Check out candidate
         uses: actions/checkout@v4
-        with:
-          ref: r-and-d/vocabulary-greatness-1.1
 
       - name: Set up Python
         uses: actions/setup-python@v5
