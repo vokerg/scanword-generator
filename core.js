@@ -49,6 +49,144 @@
     return String(value).trim().toUpperCase().replaceAll("Ё", "Е");
   }
 
+  function environmentOption(name, fallback) {
+    const raw = typeof process !== "undefined" ? process?.env?.[name] : window[name];
+    return raw == null || raw === "" ? fallback : raw;
+  }
+
+  function numericOption(name, fallback) {
+    const value = Number(environmentOption(name, fallback));
+    return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+  }
+
+  function lexicalMetadata(answer) {
+    const key = answer.toLowerCase().replaceAll("ё", "е");
+    return window.RUSSIAN_LEXICAL_META?.[key] || {};
+  }
+
+  function lexicalCategory(entry) {
+    return lexicalMetadata(entry.answer).category || "core-reviewed";
+  }
+
+  function categoryPreference(category) {
+    if (category === "common-noun") return 8;
+    if (category === "country") return 4;
+    if (category === "capital") return 3;
+    if (category === "specialist-noun") return 0;
+    if (category === "given-name") return -2;
+    if (category === "city") return -4;
+    if (category === "surname" || category === "patronymic") return -5;
+    return 4;
+  }
+
+  function rankBucket(entries, random) {
+    return entries.map((entry) => {
+      const metadata = lexicalMetadata(entry.answer);
+      const quality = Number(metadata.lexicalQuality || (entry.answer.length >= 4 ? 80 : 68));
+      const category = metadata.category || null;
+      return {
+        entry,
+        rank: quality + categoryPreference(category) + random() * 18,
+      };
+    }).sort((a, b) => b.rank - a.rank || a.entry.answer.localeCompare(b.entry.answer));
+  }
+
+  function categoryBalanceEnabled() {
+    return String(environmentOption("SCANWORD_CATEGORY_BALANCE", "off")).toLowerCase() === "on";
+  }
+
+  function categoryCap(category, limit) {
+    const shares = {
+      "specialist-noun": 0.35,
+      "given-name": 0.06,
+      surname: 0.03,
+      patronymic: 0.01,
+      city: 0.05,
+      capital: 0.012,
+      country: 0.012,
+    };
+    return shares[category] == null ? Infinity : Math.max(8, Math.ceil(limit * shares[category]));
+  }
+
+  function selectBalancedWorkingSet(entries, requestedCount, random) {
+    const total = entries.length;
+    const defaultLimit = total > 5000 ? 5000 : total;
+    const limit = Math.min(requestedCount, total, numericOption("SCANWORD_ACTIVE_POOL_LIMIT", defaultLimit));
+    if (total <= limit) return shuffle(entries, random);
+
+    const shares = new Map([
+      [2, 0.04], [3, 0.15], [4, 0.18], [5, 0.21], [6, 0.18],
+      [7, 0.13], [8, 0.07], [9, 0.025], [10, 0.012], [11, 0.006], [12, 0.003],
+    ]);
+    const byLength = new Map();
+    for (const entry of entries) {
+      const length = entry.answer.length;
+      if (!byLength.has(length)) byLength.set(length, []);
+      byLength.get(length).push(entry);
+    }
+
+    const balanceCategories = categoryBalanceEnabled();
+    const selected = [];
+    const selectedAnswers = new Set();
+    const categoryCounts = new Map();
+
+    function addEntry(entry, bypassCategoryCap = false) {
+      if (selectedAnswers.has(entry.answer)) return false;
+      const category = lexicalCategory(entry);
+      if (balanceCategories && !bypassCategoryCap) {
+        const count = categoryCounts.get(category) || 0;
+        if (count >= categoryCap(category, limit)) return false;
+      }
+      selected.push(entry);
+      selectedAnswers.add(entry.answer);
+      categoryCounts.set(category, (categoryCounts.get(category) || 0) + 1);
+      return true;
+    }
+
+    for (let length = 2; length <= 12; length += 1) {
+      const bucket = rankBucket(byLength.get(length) || [], random);
+      let quota = Math.floor(limit * (shares.get(length) || 0));
+      if (length === 2 || length === 3) quota = Math.max(quota, bucket.length);
+      let added = 0;
+      for (const item of bucket) {
+        if (addEntry(item.entry, length <= 3)) added += 1;
+        if (added >= Math.min(quota, bucket.length)) break;
+      }
+    }
+
+    if (selected.length < limit) {
+      const remainder = rankBucket(entries.filter((entry) => !selectedAnswers.has(entry.answer)), random);
+      for (const item of remainder) {
+        addEntry(item.entry, false);
+        if (selected.length >= limit) break;
+      }
+    }
+
+    // Category caps are editorial preferences, not hard feasibility constraints.
+    if (selected.length < limit) {
+      const relaxed = rankBucket(entries.filter((entry) => !selectedAnswers.has(entry.answer)), random);
+      for (const item of relaxed) {
+        addEntry(item.entry, true);
+        if (selected.length >= limit) break;
+      }
+    }
+
+    const result = shuffle(selected.slice(0, limit), random).map((entry, index) => ({ ...entry, id: index + 1 }));
+    window.SCANWORD_LAST_POOL_SELECTION = {
+      sourceEntries: total,
+      requestedCount,
+      activeEntries: result.length,
+      categoryBalance: balanceCategories ? "on" : "off",
+      lengths: Object.fromEntries([...new Set(result.map((entry) => entry.answer.length))]
+        .sort((a, b) => a - b)
+        .map((length) => [length, result.filter((entry) => entry.answer.length === length).length])),
+      categories: Object.fromEntries([...new Set(result.map(lexicalCategory))]
+        .sort()
+        .map((category) => [category, result.filter((entry) => lexicalCategory(entry) === category).length])),
+    };
+    return result;
+  }
+
   function generateWordPool(count, random) {
     const source = Array.isArray(window.RUSSIAN_WORDS) ? window.RUSSIAN_WORDS : [];
     const clues = window.RUSSIAN_CLUES || {};
@@ -70,9 +208,11 @@
       });
     }
 
-    const exact = shuffle(unique.filter((entry) => entry.hasExactClue), random);
-    const fallback = shuffle(unique.filter((entry) => !entry.hasExactClue), random);
-    return [...exact, ...fallback].slice(0, Math.min(count, unique.length));
+    const exact = unique.filter((entry) => entry.hasExactClue);
+    const fallback = unique.filter((entry) => !entry.hasExactClue);
+    const requested = Math.min(count, unique.length);
+    if (exact.length > 5000) return selectBalancedWorkingSet(exact, requested, random);
+    return [...shuffle(exact, random), ...shuffle(fallback, random)].slice(0, requested);
   }
 
   function createMask(rows, cols, random, densityPercent) {
@@ -161,14 +301,12 @@
 
     for (const refs of usage.values()) {
       if (refs.length < 2) continue;
-      for (const ref of refs) {
-        for (const other of refs) {
-          if (ref.slotIndex === other.slotIndex) continue;
-          slots[ref.slotIndex].crossings.push({
-            slotIndex: other.slotIndex,
-            ownPosition: ref.position,
-            otherPosition: other.position,
-          });
+      for (let a = 0; a < refs.length; a += 1) {
+        for (let b = a + 1; b < refs.length; b += 1) {
+          const first = refs[a];
+          const second = refs[b];
+          slots[first.slotIndex].crossings.push({ otherSlotId: slots[second.slotIndex].id, ownPosition: first.position, otherPosition: second.position });
+          slots[second.slotIndex].crossings.push({ otherSlotId: slots[first.slotIndex].id, ownPosition: second.position, otherPosition: first.position });
         }
       }
     }
@@ -176,195 +314,5 @@
     return slots;
   }
 
-  function cellKey(row, col) {
-    return `${row}:${col}`;
-  }
-
-  function slotEndBarrierKey(mask, slot) {
-    const { dr, dc } = DIRECTIONS[slot.direction];
-    const last = slot.cells[slot.cells.length - 1];
-    const row = last.row + dr;
-    const col = last.col + dc;
-    if (row < 0 || row >= mask.length || col < 0 || col >= mask[0].length || !mask[row][col]) return null;
-    return cellKey(row, col);
-  }
-
-  function connectedComponentCount(keys) {
-    if (!keys.size) return 0;
-    const remaining = new Set(keys);
-    let components = 0;
-
-    while (remaining.size) {
-      components += 1;
-      const start = remaining.values().next().value;
-      remaining.delete(start);
-      const queue = [start];
-
-      while (queue.length) {
-        const current = queue.pop();
-        const [row, col] = current.split(":").map(Number);
-        for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-          const next = cellKey(row + dr, col + dc);
-          if (!remaining.has(next)) continue;
-          remaining.delete(next);
-          queue.push(next);
-        }
-      }
-    }
-
-    return components;
-  }
-
-  function analyzeAssignments(mask, slots, assignments) {
-    const occupiedCounts = new Map();
-    const usedClueKeys = new Set();
-    const structuralClueKeys = new Set();
-    let exactClues = 0;
-
-    for (const [slotIndex, entry] of assignments.entries()) {
-      const slot = slots[slotIndex];
-      if (!slot) continue;
-      if (entry.hasExactClue) exactClues += 1;
-
-      const clueKey = cellKey(slot.clueRow, slot.clueCol);
-      usedClueKeys.add(clueKey);
-      structuralClueKeys.add(clueKey);
-
-      const endBarrier = slotEndBarrierKey(mask, slot);
-      if (endBarrier) structuralClueKeys.add(endBarrier);
-
-      for (const cell of slot.cells) {
-        const key = cellKey(cell.row, cell.col);
-        occupiedCounts.set(key, (occupiedCounts.get(key) || 0) + 1);
-      }
-    }
-
-    const occupiedKeys = new Set(occupiedCounts.keys());
-    const visibleKeys = new Set([...occupiedKeys, ...structuralClueKeys]);
-    const intersections = [...occupiedCounts.values()].filter((count) => count > 1).length;
-
-    const clueDirections = new Map();
-    for (const slotIndex of assignments.keys()) {
-      const slot = slots[slotIndex];
-      const key = cellKey(slot.clueRow, slot.clueCol);
-      if (!clueDirections.has(key)) clueDirections.set(key, new Set());
-      clueDirections.get(key).add(slot.direction);
-    }
-    const doubles = [...clueDirections.values()].filter((directions) => directions.size > 1).length;
-
-    let minRow = 0;
-    let maxRow = mask.length - 1;
-    let minCol = 0;
-    let maxCol = mask[0].length - 1;
-
-    if (visibleKeys.size) {
-      const coordinates = [...visibleKeys].map((key) => key.split(":").map(Number));
-      minRow = Math.min(...coordinates.map(([row]) => row));
-      maxRow = Math.max(...coordinates.map(([row]) => row));
-      minCol = Math.min(...coordinates.map(([, col]) => col));
-      maxCol = Math.max(...coordinates.map(([, col]) => col));
-    }
-
-    const rows = maxRow - minRow + 1;
-    const cols = maxCol - minCol + 1;
-    const area = rows * cols;
-    const visibleCells = visibleKeys.size;
-    const answerArea = Math.max(1, area - structuralClueKeys.size);
-    const emptyCells = Math.max(0, area - visibleCells);
-    const blankClues = [...structuralClueKeys].filter((key) => !usedClueKeys.has(key)).length;
-    const components = connectedComponentCount(visibleKeys);
-
-    return {
-      occupiedCounts,
-      occupiedKeys,
-      usedClueKeys,
-      structuralClueKeys,
-      visibleKeys,
-      exactClues,
-      intersections,
-      doubles,
-      blankClues,
-      components,
-      minRow,
-      maxRow,
-      minCol,
-      maxCol,
-      rows,
-      cols,
-      area,
-      emptyCells,
-      fillRatio: area ? visibleCells / area : 0,
-      answerCoverage: occupiedKeys.size / answerArea,
-      clueUsage: structuralClueKeys.size ? usedClueKeys.size / structuralClueKeys.size : 0,
-    };
-  }
-
-  function compactSolution(mask, slots, assignments) {
-    const metrics = analyzeAssignments(mask, slots, assignments);
-    if (!assignments.size) return { mask, slots: [], assignments: new Map(), metrics, offset: { row: 0, col: 0 } };
-
-    const compactMask = Array.from({ length: metrics.rows }, () => Array(metrics.cols).fill(false));
-    for (const key of metrics.structuralClueKeys) {
-      const [row, col] = key.split(":").map(Number);
-      compactMask[row - metrics.minRow][col - metrics.minCol] = true;
-    }
-
-    const compactSlots = [];
-    const compactAssignments = new Map();
-    const ordered = [...assignments.entries()].sort((a, b) => slots[a[0]].id - slots[b[0]].id);
-
-    ordered.forEach(([slotIndex, entry], newIndex) => {
-      const slot = slots[slotIndex];
-      compactSlots.push({
-        ...slot,
-        id: newIndex + 1,
-        clueRow: slot.clueRow - metrics.minRow,
-        clueCol: slot.clueCol - metrics.minCol,
-        cells: slot.cells.map((cell) => ({
-          row: cell.row - metrics.minRow,
-          col: cell.col - metrics.minCol,
-        })),
-        crossings: [],
-      });
-      compactAssignments.set(newIndex, entry);
-    });
-
-    return {
-      mask: compactMask,
-      slots: compactSlots,
-      assignments: compactAssignments,
-      metrics,
-      offset: { row: metrics.minRow, col: metrics.minCol },
-    };
-  }
-
-  function templatePotentialMetrics(mask, slots) {
-    const clueCount = mask.flat().filter(Boolean).length;
-    const usefulClues = new Set();
-    const potentialLetters = new Set();
-    for (const slot of slots) {
-      usefulClues.add(cellKey(slot.clueRow, slot.clueCol));
-      slot.cells.forEach((cell) => potentialLetters.add(cellKey(cell.row, cell.col)));
-    }
-    const area = mask.length * mask[0].length;
-    return {
-      clueCount,
-      orphanClues: Math.max(0, clueCount - usefulClues.size),
-      potentialCoverage: area ? (usefulClues.size + potentialLetters.size) / area : 0,
-    };
-  }
-
-  window.ScanwordCore = {
-    DIRECTIONS,
-    makeRandom,
-    shuffle,
-    generateWordPool,
-    createMask,
-    extractSlots,
-    cellKey,
-    slotEndBarrierKey,
-    analyzeAssignments,
-    compactSolution,
-    templatePotentialMetrics,
-  };
+  window.ScanwordCore = { DIRECTIONS, makeRandom, randomInt, shuffle, normalizeWord, generateWordPool, createMask, extractSlots };
 })();
