@@ -1,0 +1,120 @@
+name: Vocabulary portfolio release candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: Number of identical-seed end-to-end A/B pairs
+        required: true
+        default: "20"
+  pull_request:
+    branches:
+      - main
+      - research/closed-fill-snapshot-2026-07-16
+    paths:
+      - index.html
+      - bulk-lexicon-runtime.js
+      - bulk-lexicon/**
+      - core.js
+      - dictionary-policy.js
+      - editorial-lexical-policy-v3.js
+      - editorial-demand-*.js
+      - construction-vocabulary-portfolio-v1.js
+      - construction-editorial-*-v3.js
+      - tools/vocabulary-release-checkpoint.cjs
+      - .github/workflows/vocabulary-release.yml
+
+concurrency:
+  group: vocabulary-release-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  release-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SCANWORD_RELEASE_CONCURRENCY: 2
+      SCANWORD_PORTFOLIO_PANEL_SLACK: 1
+      SCANWORD_PORTFOLIO_ATTEMPTS: 240
+      SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
+      SCANWORD_VICTIM_BASES: 8
+      SCANWORD_VICTIM_VARIANTS: 6
+      SCANWORD_TARGETED_VICTIM_REGIONS: 3
+      SCANWORD_TARGETED_VICTIM_WORDS: 4
+      SCANWORD_TARGETED_VICTIM_DEPTH: 2
+      SCANWORD_TARGETED_EXACT_VARIANTS: 4
+      SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
+      SCANWORD_REPACK_NODES: 600000
+      SCANWORD_REPACK_BRANCH: 24
+      SCANWORD_EDITORIAL_PAIR_DOMAIN: 80
+      SCANWORD_EDITORIAL_PAIR_CANDIDATES: 600
+      SCANWORD_EDITORIAL_BUNDLE_DOMAIN: 100
+      SCANWORD_EDITORIAL_BUNDLE_NODES: 50000
+      SCANWORD_EDITORIAL_BUNDLE_SOLUTIONS: 24
+      SCANWORD_EDITORIAL_BUNDLE_VARIANTS: 24
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate milestone runtime and browser defaults
+        run: |
+          node --check bulk-lexicon-runtime.js
+          node --check core.js
+          node --check dictionary-policy.js
+          node --check editorial-lexical-policy-v3.js
+          node --check construction-vocabulary-portfolio-v1.js
+          node --check construction-editorial-repair-v3.js
+          node --check tools/vocabulary-release-checkpoint.cjs
+          for file in bulk-lexicon/*.js editorial-demand-*.js construction-editorial-*-v3.js; do
+            node --check "$file"
+          done
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const html = fs.readFileSync("index.html", "utf8");
+          for (const expected of [
+            'window.SCANWORD_CONSTRUCTION_MODE = "portfolio"',
+            'window.SCANWORD_EDITORIAL_REPAIR = "on"',
+            'window.SCANWORD_VOCABULARY_PORTFOLIO = "on"',
+            'window.SCANWORD_VOCABULARY_PORTFOLIO_LIMITS = "2500,3500"',
+          ]) {
+            if (!html.includes(expected)) throw new Error(`Missing browser default: ${expected}`);
+          }
+          const orderedScripts = [
+            "editorial-lexical-policy-v3.js",
+            "construction-editorial-replace-v3.js",
+            "construction-editorial-pair-refit-v3.js",
+            "construction-editorial-bundle-refit-v3.js",
+            "construction-editorial-repair-v3.js",
+            "construction-vocabulary-portfolio-v1.js",
+          ];
+          let previous = -1;
+          for (const script of orderedScripts) {
+            const position = html.indexOf(`src="${script}"`);
+            if (position < 0 || position <= previous) throw new Error(`Invalid browser script order near ${script}`);
+            previous = position;
+          }
+          NODE
+
+      - name: Run end-to-end release A/B
+        env:
+          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '20' }}
+        run: |
+          mkdir -p research-output
+          node tools/vocabulary-release-checkpoint.cjs "${SEED_COUNT}" \
+            | tee research-output/vocabulary-release-${SEED_COUNT}.jsonl
+
+      - name: Publish release-candidate output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocabulary-release-${{ github.sha }}
+          path: research-output/
+          if-no-files-found: error

@@ -1,0 +1,74 @@
+name: Vocabulary active-set comparison with repair
+
+on:
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: Number of identical seeds
+        required: true
+        default: "10"
+  push:
+    branches:
+      - r-and-d/lexical-pareto-frontier
+    paths:
+      - core.js
+      - construction-editorial-repair-v3.js
+      - tools/vocabulary-active-repair-checkpoint.cjs
+      - .github/workflows/vocabulary-active-repair.yml
+
+concurrency:
+  group: vocabulary-active-repair-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  active-repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SCANWORD_ACTIVE_REPAIR_CONCURRENCY: 2
+      SCANWORD_PORTFOLIO_PANEL_SLACK: 1
+      SCANWORD_PORTFOLIO_ATTEMPTS: 240
+      SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
+      SCANWORD_VICTIM_BASES: 8
+      SCANWORD_VICTIM_VARIANTS: 6
+      SCANWORD_TARGETED_VICTIM_REGIONS: 3
+      SCANWORD_TARGETED_VICTIM_WORDS: 4
+      SCANWORD_TARGETED_VICTIM_DEPTH: 2
+      SCANWORD_TARGETED_EXACT_VARIANTS: 4
+      SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
+      SCANWORD_REPACK_NODES: 600000
+      SCANWORD_REPACK_BRANCH: 24
+      SCANWORD_EDITORIAL_PAIR_DOMAIN: 80
+      SCANWORD_EDITORIAL_PAIR_CANDIDATES: 600
+      SCANWORD_EDITORIAL_BUNDLE_DOMAIN: 100
+      SCANWORD_EDITORIAL_BUNDLE_NODES: 50000
+      SCANWORD_EDITORIAL_BUNDLE_SOLUTIONS: 24
+      SCANWORD_EDITORIAL_BUNDLE_VARIANTS: 24
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run repaired active-set comparison
+        env:
+          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '10' }}
+        run: |
+          mkdir -p research-output
+          node --check tools/vocabulary-active-repair-checkpoint.cjs
+          node tools/vocabulary-active-repair-checkpoint.cjs "${SEED_COUNT}" \
+            | tee research-output/vocabulary-active-repair-${SEED_COUNT}.jsonl
+
+      - name: Publish active-set output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocabulary-active-repair-${{ github.sha }}
+          path: research-output/
+          if-no-files-found: error

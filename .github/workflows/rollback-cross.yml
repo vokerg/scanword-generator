@@ -1,0 +1,37 @@
+name: Rollback cross gate
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rollback-cross:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test rollback-assisted direct cross
+        run: node tools/construction-victim-targeted-cross-rollback-test.cjs
+      - name: Test rollback-aware crossing pair search
+        run: node tools/construction-victim-targeted-cross-relaxed-test.cjs
+      - name: Test bounded weak-fill rollback cross policy
+        run: node tools/construction-victim-targeted-cross-budget-test.cjs
+      - name: Probe real rollback-cross tail seed
+        run: node tools/construction-real-cross-probe.cjs construction-checkpoint-40 | tee rollback-cross-seed40.jsonl
+      - name: Publish real rollback-cross probe
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-cross-seed40
+          path: rollback-cross-seed40.jsonl
+          if-no-files-found: warn

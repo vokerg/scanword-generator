@@ -13,14 +13,16 @@ for (const file of [
   "core.js",
   "dictionary-policy.js",
   "lexical-policy-v2.js",
+  "editorial-lexical-policy-v3.js",
   "solver.js",
+  "construction-lexical-placement-v3.js",
   "closed-fill.js",
   "closed-fill-rollback.js",
   "construction-v2-runtime.js",
   "construction-v2.js",
   "construction-victim.js",
   "construction-victim-depth2.js",
-  "construction-portfolio.js",
+  "construction-portfolio-v3.js",
   "construction-polish.js",
   "construction-clue-repack.js",
   "construction-clue-adaptive.js",
@@ -37,6 +39,10 @@ for (const file of [
   "construction-victim-targeted-cross-budget.js",
   "construction-victim-targeted-exact.js",
   "construction-guard.js",
+  "construction-editorial-replace-v3.js",
+  "construction-editorial-pair-refit-v3.js",
+  "construction-editorial-bundle-refit-v3.js",
+  "construction-editorial-repair-v3.js",
 ]) {
   require(path.join(root, file));
 }
@@ -47,7 +53,9 @@ if (!seed) throw new Error("A seed argument is required.");
 const started = Date.now();
 const result = window.ScanwordSolver.generateBest(seed, window.RUSSIAN_WORDS.length, 17, 13, 30, 27);
 const placedById = new Map(result.placed.map((word) => [word.id, word]));
+const poolByAnswer = new Map((result.pool || []).map((entry) => [entry.answer, entry]));
 const extractedRegions = window.ScanwordClosedFill?.extractResidualRegions?.(result) || [];
+const editorialPolicy = window.ScanwordEditorialLexicalPolicyV3;
 const OFFSETS = [
   [-1, -1], [-1, 0], [-1, 1],
   [0, -1], [0, 1],
@@ -102,6 +110,41 @@ const residualRegionDetails = extractedRegions.map((region) => {
   };
 });
 
+const lexicalEntries = result.placed.map((word) => {
+  const metadata = poolByAnswer.get(word.answer) || {};
+  const answer = String(word.answer || "");
+  const lexicalQuality = Number(word.lexicalQuality || metadata.lexicalQuality || (answer.length >= 4 ? 80 : 65));
+  const weakFill = Boolean(word.weakFill || metadata.weakFill);
+  const editorial = editorialPolicy.classify(answer, { ...metadata, ...word });
+  return {
+    answer,
+    length: answer.length,
+    weakFill,
+    lexicalQuality,
+    lexicalSource: word.lexicalSource || metadata.lexicalSource || null,
+    lexicalCategory: word.lexicalCategory || metadata.lexicalCategory || "core-reviewed",
+    lexicalLicense: word.lexicalLicense || metadata.lexicalLicense || null,
+    lexicalSourceId: word.lexicalSourceId || metadata.lexicalSourceId || null,
+    placementAdjustment: Number(word.lexicalPlacementAdjustment || 0),
+    editorialTier: editorial.editorialTier,
+    editorialWeak: editorial.editorialWeak,
+    editorialQuality: editorial.editorialQuality,
+    editorialPenalty: editorial.editorialPenalty,
+    formulaicShort: editorial.formulaicShort,
+    specialistShort: editorial.specialistShort,
+    commonShort: editorial.commonShort,
+  };
+});
+const weakEntries = lexicalEntries.filter((entry) => entry.weakFill);
+const lexicalPenalty = lexicalEntries.reduce(
+  (total, entry) => total + Math.max(0, 80 - entry.lexicalQuality) + (entry.weakFill ? 20 : 0),
+  0,
+);
+const averageLexicalQuality = lexicalEntries.length
+  ? +(lexicalEntries.reduce((total, entry) => total + entry.lexicalQuality, 0) / lexicalEntries.length).toFixed(2)
+  : 0;
+const editorialSummary = editorialPolicy.summarize(result.placed);
+
 console.log(JSON.stringify({
   seed,
   elapsedMs: Date.now() - started,
@@ -125,10 +168,35 @@ console.log(JSON.stringify({
   candidateChecks: result.candidateChecks,
   candidateLookups: result.candidateLookups,
   poolEntries: result.poolEntries,
+  sourceCorpusEntries: window.ScanwordBulkLexiconV1?.state?.entries?.length || 0,
+  poolSelection: window.SCANWORD_LAST_POOL_SELECTION || null,
   exactCluesOnly: result.placed.every((entry) => entry.hasExactClue),
   coverageCheckpointPassed: Boolean(result.coverageCheckpoint?.passed),
   constructionMode: result.mode || result.constructionV2?.mode || "legacy",
   constructionV2: result.constructionV2 || null,
+  lexicalPlacementMode: process.env.SCANWORD_LEXICAL_PLACEMENT || "off",
+  editorialRepairMode: process.env.SCANWORD_EDITORIAL_REPAIR || "off",
+  editorialReplacementMode: process.env.SCANWORD_EDITORIAL_REPLACE || "off",
+  editorialPairRefitMode: process.env.SCANWORD_EDITORIAL_PAIR_REFIT || "off",
+  editorialBundleRefitMode: process.env.SCANWORD_EDITORIAL_BUNDLE_REFIT || "off",
+  cumulativePlacementAdjustment: lexicalEntries.reduce((total, entry) => total + entry.placementAdjustment, 0),
+  weakFillCount: weakEntries.length,
+  weakAnswers: weakEntries.map((entry) => entry.answer).sort(),
+  twoLetterCount: editorialSummary.twoLetterCount,
+  commonShortCount: editorialSummary.commonShortCount,
+  specialistShortCount: editorialSummary.specialistShortCount,
+  formulaicShortCount: editorialSummary.formulaicShortCount,
+  editorialWeakCount: editorialSummary.editorialWeakCount,
+  editorialPenalty: editorialSummary.editorialPenalty,
+  formulaicAnswers: editorialSummary.formulaicAnswers,
+  specialistAnswers: editorialSummary.specialistAnswers,
+  shortAnswerCount: lexicalEntries.filter((entry) => entry.length <= 3).length,
+  lexicalPenalty,
+  averageLexicalQuality,
+  minimumLexicalQuality: lexicalEntries.length
+    ? Math.min(...lexicalEntries.map((entry) => entry.lexicalQuality))
+    : 0,
+  lexicalEntries,
   closedFillMode: result.closedFill?.mode || "unavailable",
   closedFillError: result.closedFill?.error || result.closedFill?.rollbackError || null,
   closedFillRegionsAttempted: result.closedFill?.regionsAttempted || 0,
