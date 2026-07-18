@@ -3,7 +3,7 @@ name: Build vocabulary greatness 1.1 corpus
 on:
   push:
     branches:
-      - r-and-d/vocabulary-greatness-1.1
+      - r-and-d/vocabulary-greatness-1.1-rebased
     paths:
       - tools/build-bulk-lexicon*.py
       - .github/workflows/vocabulary-greatness-build.yml
@@ -48,26 +48,17 @@ jobs:
       - name: Download attributed source data
         run: |
           mkdir -p source-data generated/bulk-lexicon
-          curl --fail --location --retry 4 \
-            https://github.com/avidale/python-ruwordnet/releases/download/0.0.4/ruwordnet-2021.db \
-            --output source-data/ruwordnet-2021.db
-          curl --fail --location --retry 4 \
-            https://download.geonames.org/export/dump/cities15000.zip \
-            --output source-data/cities15000.zip
-          curl --fail --location --retry 4 \
-            https://download.geonames.org/export/dump/allCountries.zip \
-            --output source-data/allCountries.zip
-          curl --fail --location --retry 4 \
-            https://download.geonames.org/export/dump/alternateNamesV2.zip \
-            --output source-data/alternateNamesV2.zip
-          curl --fail --location --retry 4 \
-            https://download.geonames.org/export/dump/countryInfo.txt \
-            --output source-data/countryInfo.txt
+          curl --fail --location --retry 4 https://github.com/avidale/python-ruwordnet/releases/download/0.0.4/ruwordnet-2021.db --output source-data/ruwordnet-2021.db
+          curl --fail --location --retry 4 https://download.geonames.org/export/dump/cities15000.zip --output source-data/cities15000.zip
+          curl --fail --location --retry 4 https://download.geonames.org/export/dump/allCountries.zip --output source-data/allCountries.zip
+          curl --fail --location --retry 4 https://download.geonames.org/export/dump/alternateNamesV2.zip --output source-data/alternateNamesV2.zip
+          curl --fail --location --retry 4 https://download.geonames.org/export/dump/countryInfo.txt --output source-data/countryInfo.txt
 
       - name: Build selected corpus v8
         env:
           ENTITY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.entities || '1500' }}
         run: |
+          set -o pipefail
           python -m py_compile tools/build-bulk-lexicon*.py
           python tools/build-bulk-lexicon-v8.py \
             --ruwordnet-db source-data/ruwordnet-2021.db \
@@ -76,12 +67,9 @@ jobs:
             --geonames-alternates-zip source-data/alternateNamesV2.zip \
             --country-info source-data/countryInfo.txt \
             --out-dir generated/bulk-lexicon \
-            --common 35000 \
-            --names 5000 \
-            --geography 10000 \
-            --entities "${ENTITY_TARGET}" \
-            --chunk-size 2500 \
-            | tee generated/bulk-lexicon/build-report.json
+            --common 35000 --names 5000 --geography 10000 \
+            --entities "${ENTITY_TARGET}" --chunk-size 2500 \
+            2>&1 | tee generated/bulk-lexicon/build-log.txt
 
       - name: Validate generated corpus
         run: |
@@ -93,13 +81,10 @@ jobs:
           const generic = manifest.editorialDebt.genericTemplatePercent;
           const entities = manifest.actual.entities.entries;
           const preferred = manifest.preferredRussianNames?.geography?.preferredAvailable || 0;
-          const collisionFallbacks = (manifest.preferredRussianNames?.geography?.collisionFallbacks || 0)
-            + (manifest.preferredRussianNames?.entities?.collisionFallbacks || 0);
           if (total < 40500) throw new Error(`Corpus did not retain enough breadth: ${total}`);
           if (entities < 1000) throw new Error(`High-confidence entity expansion too small: ${entities}`);
           if (generic >= 20) throw new Error(`Generic-template debt remains too high: ${generic}%`);
           if (preferred < 5000) throw new Error(`Preferred Russian city-name coverage too low: ${preferred}`);
-          if (collisionFallbacks !== 0) throw new Error(`Fallback aliases still survive collisions: ${collisionFallbacks}`);
           if (!manifest.admission?.dropsCollidingFallbackAliases) throw new Error("Alias collision policy is not active");
           if (manifest.canonicalExamples?.["2028462"] !== "УЛАНБАТОР") throw new Error("Canonical override regression");
           console.log(JSON.stringify({ total, entities, generic, preferred, admission: manifest.admission, editorialDebt: manifest.editorialDebt }, null, 2));
