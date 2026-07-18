@@ -2,7 +2,6 @@
 set -euo pipefail
 
 SCOPE="${1:-smoke}"
-SNAPSHOT_BRANCH="research/closed-fill-snapshot-2026-07-16"
 SNAPSHOT_SHA="d1c12d8acca31edb3b38775db5166f4f5f59ce04"
 ROOT="$(git rev-parse --show-toplevel)"
 WORKTREE="${TMPDIR:-/tmp}/scanword-closed-fill-$$"
@@ -24,11 +23,20 @@ trap cleanup EXIT
 
 mkdir -p "${OUTPUT_DIR}"
 
-echo "Fetching immutable research snapshot..."
-git -C "${ROOT}" fetch --quiet origin "${SNAPSHOT_BRANCH}"
-FETCHED_SHA="$(git -C "${ROOT}" rev-parse FETCH_HEAD)"
-if [[ "${FETCHED_SHA}" != "${SNAPSHOT_SHA}" ]]; then
-  echo "Snapshot branch moved: expected ${SNAPSHOT_SHA}, got ${FETCHED_SHA}" >&2
+echo "Fetching main history containing the anchored research snapshot..."
+if git -C "${ROOT}" rev-parse --is-shallow-repository | grep -qx true; then
+  git -C "${ROOT}" fetch --quiet --unshallow origin main
+else
+  git -C "${ROOT}" fetch --quiet origin main
+fi
+
+if ! git -C "${ROOT}" cat-file -e "${SNAPSHOT_SHA}^{commit}" 2>/dev/null; then
+  echo "Snapshot commit ${SNAPSHOT_SHA} is not available from main history." >&2
+  exit 1
+fi
+
+if ! git -C "${ROOT}" merge-base --is-ancestor "${SNAPSHOT_SHA}" origin/main; then
+  echo "Snapshot commit ${SNAPSHOT_SHA} is not anchored in origin/main." >&2
   exit 1
 fi
 
