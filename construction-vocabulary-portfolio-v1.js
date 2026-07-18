@@ -7,18 +7,27 @@
 
   const previousGenerateBest = solver.generateBest.bind(solver);
 
+  function environmentOption(name, fallback) {
+    const raw = typeof process !== "undefined" ? process?.env?.[name] : window[name];
+    return raw == null || raw === "" ? fallback : raw;
+  }
+
+  function numericOption(name, fallback) {
+    const value = Number(environmentOption(name, fallback));
+    return Number.isFinite(value) ? value : fallback;
+  }
+
   function modeFromEnvironment() {
-    if (typeof process !== "undefined" && process?.env?.SCANWORD_VOCABULARY_PORTFOLIO) {
-      return process.env.SCANWORD_VOCABULARY_PORTFOLIO;
-    }
-    return window.SCANWORD_VOCABULARY_PORTFOLIO || "off";
+    return String(environmentOption("SCANWORD_VOCABULARY_PORTFOLIO", "off"));
+  }
+
+  function portfolioMode() {
+    const mode = String(environmentOption("SCANWORD_VOCABULARY_PORTFOLIO_MODE", "full")).toLowerCase();
+    return mode === "adaptive" ? "adaptive" : "full";
   }
 
   function configuredLimits() {
-    const raw = typeof process !== "undefined"
-      ? process?.env?.SCANWORD_VOCABULARY_PORTFOLIO_LIMITS
-      : window.SCANWORD_VOCABULARY_PORTFOLIO_LIMITS;
-    const parsed = String(raw || "2500,3500")
+    const parsed = String(environmentOption("SCANWORD_VOCABULARY_PORTFOLIO_LIMITS", "2500,3500"))
       .split(",")
       .map(Number)
       .filter((value) => Number.isFinite(value) && value >= 500)
@@ -26,10 +35,21 @@
     return [...new Set(parsed.length ? parsed : [2500, 3500])];
   }
 
-  function summarize(result, activeLimit) {
+  function adaptiveThresholds() {
+    return {
+      maxPanels: numericOption("SCANWORD_VOCABULARY_FAST_MAX_PANELS", 4),
+      minAnswers: numericOption("SCANWORD_VOCABULARY_FAST_MIN_ANSWERS", 47),
+      minCrossings: numericOption("SCANWORD_VOCABULARY_FAST_MIN_CROSSINGS", 50),
+      maxEditorialPenalty: numericOption("SCANWORD_VOCABULARY_FAST_MAX_EDITORIAL_PENALTY", 430),
+      maxFormulaicShort: numericOption("SCANWORD_VOCABULARY_FAST_MAX_FORMULAIC", 0),
+    };
+  }
+
+  function summarize(result, activeLimit, elapsedMs) {
     const editorial = policy?.summarize?.(result.placed || []) || {};
     return {
       activeLimit,
+      elapsedMs,
       panels: Number(result.panelCells || 0),
       answers: Number(result.placed?.length || 0),
       crossings: Number(result.intersections || 0),
@@ -58,6 +78,16 @@
       || a.activeLimit - b.activeLimit;
   }
 
+  function qualifiesForAdaptiveFastPath(summary, thresholds = adaptiveThresholds()) {
+    return summary.validationValid
+      && summary.components === 1
+      && summary.panels <= thresholds.maxPanels
+      && summary.answers >= thresholds.minAnswers
+      && summary.crossings >= thresholds.minCrossings
+      && summary.editorialPenalty <= thresholds.maxEditorialPenalty
+      && summary.formulaicShortCount <= thresholds.maxFormulaicShort;
+  }
+
   function withActiveLimit(limit, callback) {
     if (typeof process !== "undefined") {
       const previous = process.env.SCANWORD_ACTIVE_POOL_LIMIT;
@@ -80,20 +110,41 @@
 
   function generateVocabularyPortfolio(...args) {
     const limits = configuredLimits();
-    const candidates = limits.map((limit) => {
+    const mode = portfolioMode();
+    const thresholds = adaptiveThresholds();
+    const candidates = [];
+    let fastPathAccepted = false;
+
+    for (let index = 0; index < limits.length; index += 1) {
+      const limit = limits[index];
+      const started = Date.now();
       const result = withActiveLimit(limit, () => previousGenerateBest(...args));
-      return { result, summary: summarize(result, limit) };
-    });
-    candidates.sort(compareCandidates);
-    const selected = candidates[0];
+      const summary = summarize(result, limit, Date.now() - started);
+      candidates.push({ result, summary });
+      if (mode === "adaptive" && index === 0 && qualifiesForAdaptiveFastPath(summary, thresholds)) {
+        fastPathAccepted = true;
+        break;
+      }
+    }
+
+    const ranked = [...candidates].sort(compareCandidates);
+    const selected = ranked[0];
     selected.result.constructionV2 = {
       ...(selected.result.constructionV2 || {}),
       vocabularyPortfolio: {
-        mode: "panel-first-active-set-portfolio-v1",
+        mode: mode === "adaptive"
+          ? "panel-first-active-set-portfolio-v1-adaptive"
+          : "panel-first-active-set-portfolio-v1",
+        evaluationMode: mode,
         limits,
+        evaluatedLimits: candidates.map((candidate) => candidate.summary.activeLimit),
+        skippedLimits: limits.filter((limit) => !candidates.some((candidate) => candidate.summary.activeLimit === limit)),
+        fastPathAccepted,
+        thresholds: mode === "adaptive" ? thresholds : null,
         selectedLimit: selected.summary.activeLimit,
         selected: selected.summary,
-        candidates: candidates.map((candidate) => candidate.summary),
+        candidates: ranked.map((candidate) => candidate.summary),
+        totalCandidateElapsedMs: candidates.reduce((sum, candidate) => sum + candidate.summary.elapsedMs, 0),
       },
     };
     return selected.result;
@@ -107,6 +158,8 @@
   Object.assign(solver, {
     generateVocabularyPortfolioV1: generateVocabularyPortfolio,
     compareVocabularyPortfolioCandidatesV1: compareCandidates,
+    qualifiesForAdaptiveVocabularyFastPathV1: qualifiesForAdaptiveFastPath,
+    vocabularyAdaptiveThresholdsV1: adaptiveThresholds,
     __vocabularyPortfolioV1Installed: true,
   });
 })();
