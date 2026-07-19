@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "status": "pending",
+  "baselineId": "v8-production-1.1-browser-equivalent",
+  "baseCommit": "87dc59c1b47bcee9846bb1f8243f552fd5d2038b",
+  "corpus": {
+    "manifest": "bulk-lexicon/manifest.json",
+    "version": 8,
+    "entries": 40966,
+    "manifestDigest": null
+  },
+  "configuration": {
+    "path": "research/baselines/v8-production-1.1/config.json",
+    "digest": "sha256:3ea1f06d13e80f9c3d00a338fee54ee8389f84a76b7745e276105c8c6b4ebdb7"
+  },
+  "seedSets": [
+    {
+      "name": "development",
+      "path": "research/baselines/seed-sets/development-20.json",
+      "count": 20,
+      "digest": "sha256:f92d4c78707d77c23375850c4f2103dd14b2cfaa617ae2dba6eb4252e7f20695"
+    },
+    {
+      "name": "promotion",
+      "path": "research/baselines/seed-sets/promotion-50.json",
+      "count": 50,
+      "digest": "sha256:ad75c867ebfcac8a8490a05356d73d4f34f7e17efd199088b341f59d30b7e6d8"
+    },
+    {
+      "name": "stability",
+      "path": "research/baselines/seed-sets/stability-100.json",
+      "count": 100,
+      "digest": "sha256:a22673633a3384d2ffeb0c9047a58373b8a313e2807651db7ec052a8f2629ad2"
+    }
+  ],
+  "commands": [
+    "SCANWORD_BASELINE_ENFORCE=1 node tools/v8-baseline-checkpoint.cjs development",
+    "SCANWORD_BASELINE_ENFORCE=1 node tools/v8-baseline-checkpoint.cjs promotion",
+    "SCANWORD_BASELINE_ENFORCE=1 node tools/v8-baseline-checkpoint.cjs stability"
+  ],
+  "evidence": null
+}
