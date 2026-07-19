@@ -1,6 +1,6 @@
 # Phase 0 — Research preservation and repository integrity
 
-Status: **IN PROGRESS**  
+Status: **ACCEPTED RESEARCH**  
 Date: **2026-07-19**  
 Branch: `r-and-d/phase-0-research-archive`  
 Baseline main commit audited: `f33233519e3e6902bf2eae9c97c4affb83ffab25`
@@ -71,13 +71,30 @@ Historical branch names remain chronology labels unless `research/archive-manife
 
 ## Evidence
 
-The first closed-fill-only gate succeeded in GitHub Actions run `29699963724` and produced artifact `8446148249`, digest:
+The initial closed-fill-only gate succeeded in GitHub Actions run `29699963724` and exposed the additional vocabulary Git references.
+
+The expanded repository-wide gate succeeded on commit `111368ecac9e8b0f00281d2bb0b62fc25795a4c2`:
 
 ```text
-sha256:9606b723bcfc0cb6fff431069c31a70bd800f29e7a23b09f5d3375492436f0f1
+workflow run: 29700185366
+artifact id:  8446213822
+artifact:     research-archive-smoke-d1c12d8acca31edb3b38775db5166f4f5f59ce04
+digest:       sha256:cb58449544563552a4a28d5b17a7f2aee0d34f1c3bb243ebf9dd3645ac7d5104
 ```
 
-That run exposed the additional vocabulary Git references. The expanded repository-wide gate must complete successfully before this phase returns to `ACCEPTED RESEARCH`.
+Successful checks:
+
+- JavaScript and shell syntax;
+- fresh depth-1 clone;
+- explicit fetch of every required archive ref;
+- exact archive-tip verification;
+- required ancestor verification;
+- availability of every documented 40-character commit;
+- deterministic closed-fill primitive tests;
+- real seed-40 probe;
+- artifact publication.
+
+The rollback-cross production gate also passed on the same commit in run `29700185347`.
 
 ## Reproduction
 
@@ -87,6 +104,6 @@ node tools/research-reference-audit.cjs
 bash research/closed-fill/reproduce.sh smoke
 ```
 
-## Decision boundary
+## Decision
 
-Do not merge until the expanded archive-integrity workflow is green on the exact PR head. No solver, corpus, browser-default or generation behavior is changed by this phase.
+Phase 0 is accepted as research and ready for review and squash merge after the final unchanged production quality gate is green on the exact PR head. No solver, corpus, browser-default or generation behavior is changed by this phase. Phase 1 must start from updated `main` only after this PR is merged.
