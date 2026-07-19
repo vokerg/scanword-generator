@@ -1,6 +1,6 @@
 # Phase 0 — Research preservation and repository integrity
 
-Status: **IN PROGRESS**  
+Status: **ACCEPTED RESEARCH**  
 Date: **2026-07-19**  
 Branch: `r-and-d/phase-0-research-archive`  
 Baseline main commit audited: `f33233519e3e6902bf2eae9c97c4affb83ffab25`
@@ -53,6 +53,29 @@ Historical branch names remain chronology labels unless a manifest explicitly ma
 - The repository reference audit reports no missing required refs or commits.
 - Production solver behavior is unchanged.
 
+## Evidence
+
+GitHub Actions run `29699963724` completed successfully on PR #12.
+
+Successful steps:
+
+- JavaScript and shell syntax checks;
+- fresh depth-1 clone;
+- explicit archive-ref fetch;
+- exact snapshot SHA verification;
+- deterministic closed-fill primitive tests;
+- real seed-40 probe;
+- repository historical-reference audit;
+- artifact publication.
+
+Artifact:
+
+```text
+id:     8446148249
+name:   closed-fill-smoke-d1c12d8acca31edb3b38775db5166f4f5f59ce04
+digest: sha256:9606b723bcfc0cb6fff431069c31a70bd800f29e7a23b09f5d3375492436f0f1
+```
+
 ## Reproduction
 
 ```bash
@@ -61,6 +84,6 @@ node tools/research-reference-audit.cjs
 bash research/closed-fill/reproduce.sh smoke
 ```
 
-## Pending evidence
+## Decision
 
-The pull-request workflow must complete successfully before this phase is marked `ACCEPTED RESEARCH`. No solver or browser-default code is changed by this phase.
+Phase 0 is accepted as research and is ready for review and squash merge. No solver or browser-default code is changed by this phase. Phase 1 must start from updated `main` only after this PR is merged.
