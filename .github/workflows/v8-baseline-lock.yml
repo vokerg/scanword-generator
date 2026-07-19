@@ -1,0 +1,80 @@
+name: V8 baseline lock
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - research/baselines/**
+      - tools/node-baseline-bootstrap-v1.cjs
+      - tools/v8-baseline-checkpoint.cjs
+      - tools/v8-baseline-test.cjs
+      - .github/workflows/v8-baseline-lock.yml
+  workflow_dispatch:
+
+concurrency:
+  group: v8-baseline-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate locked baseline contract
+        run: |
+          node --check tools/node-baseline-bootstrap-v1.cjs
+          node --check tools/v8-baseline-checkpoint.cjs
+          node --check tools/v8-baseline-test.cjs
+          node tools/v8-baseline-test.cjs
+
+  benchmark:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        set:
+          - development
+          - promotion
+          - stability
+    env:
+      SCANWORD_BASELINE_CONCURRENCY: 2
+      SCANWORD_BASELINE_ENFORCE: 1
+      SCANWORD_BASELINE_SEED_TIMEOUT_MS: 900000
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run locked ${{ matrix.set }} checkpoint
+        run: |
+          mkdir -p "research-output/v8-baseline/${{ matrix.set }}"
+          node tools/v8-baseline-checkpoint.cjs \
+            "${{ matrix.set }}" \
+            "research-output/v8-baseline/${{ matrix.set }}" \
+            | tee "research-output/v8-baseline/${{ matrix.set }}/console.jsonl"
+
+      - name: Publish ${{ matrix.set }} evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v8-baseline-${{ matrix.set }}-${{ github.sha }}
+          path: research-output/v8-baseline/${{ matrix.set }}/
+          if-no-files-found: error
