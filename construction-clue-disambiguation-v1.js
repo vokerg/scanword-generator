@@ -8,6 +8,7 @@
   }
 
   const previousGenerateBest = solver.generateBest.bind(solver);
+  const vowels = new Set(["А", "Е", "Е", "И", "О", "У", "Ы", "Э", "Ю", "Я"]);
   const categoryLabels = {
     "given-name": "Имя",
     surname: "Фамилия",
@@ -60,6 +61,11 @@
   function categoryLabel(word, meta) {
     const original = cleanLabel(word.clue);
     const category = String(meta.category || word.lexicalCategory || "");
+    if (category === "given-name") {
+      if (/мужское имя/i.test(original)) return "М. имя";
+      if (/женское имя/i.test(original)) return "Ж. имя";
+      return "Имя";
+    }
     if (categoryLabels[category]) return categoryLabels[category];
     const firstField = cleanLabel(original.split(/[;,]/)[0]);
     return firstField && firstField.length <= 28 ? firstField : "Ответ";
@@ -154,15 +160,28 @@
     }).sort((a, b) => b.diversity - a.diversity || a.index - b.index);
   }
 
+  function letterClassPattern(answer) {
+    return [...String(answer || "")].map((char) => vowels.has(char) ? "Г" : "С").join("-");
+  }
+
   function patternCandidates(word, label, group) {
     const answer = String(word.answer || "");
     const length = answer.length;
-    const candidates = [{
-      text: `${label}, ${length} букв`,
-      kind: "compact-description",
-      source: "answer-length",
+    const candidates = [];
+    if (new Set(answer).size < length) {
+      candidates.push({
+        text: `${label} с повтором`,
+        kind: "letter-class-pattern",
+        source: "answer-repeated-letter",
+        revealedLetters: 0,
+      });
+    }
+    candidates.push({
+      text: `${label}: ${letterClassPattern(answer)}`,
+      kind: "letter-class-pattern",
+      source: "answer-vowel-consonant-pattern",
       revealedLetters: 0,
-    }];
+    });
 
     for (const { index } of distinguishingPositions(answer, group)) {
       const char = answer[index];
@@ -175,7 +194,7 @@
       });
     }
 
-    if (length >= 7 && answer[0] && answer.at(-1)) {
+    if (length >= 8 && answer[0] && answer.at(-1)) {
       candidates.push({
         text: `${label}: ${answer[0]}…${answer.at(-1)}`,
         kind: "letter-pattern-hint",
@@ -190,11 +209,11 @@
     const normalizedAnswer = lettersOnly(answer);
     const normalizedClue = lettersOnly(candidate.text);
     const length = normalizedAnswer.length;
-    const allowedLetters = length <= 2 ? 0 : length <= 6 ? 1 : 2;
+    const allowedLetters = length <= 3 ? 0 : length <= 7 ? 1 : 2;
     const revealedLetters = Number(candidate.revealedLetters || 0);
     const revealFraction = length ? revealedLetters / length : 0;
     const exposesAnswer = Boolean(normalizedAnswer && normalizedClue.includes(normalizedAnswer));
-    const overRevealing = revealedLetters > allowedLetters || revealFraction > 0.34 || exposesAnswer;
+    const overRevealing = revealedLetters > allowedLetters || revealFraction > 0.25 || exposesAnswer;
     return {
       revealedLetters,
       revealFraction: +revealFraction.toFixed(3),
