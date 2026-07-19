@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "status": "active",
+  "auditedDate": "2026-07-19",
+  "mainRef": "refs/remotes/origin/main",
+  "auditedMainCommit": "f33233519e3e6902bf2eae9c97c4affb83ffab25",
+  "policy": {
+    "historicalBranchNamesAreLabelsUnlessListed": true,
+    "requiredRefsMustResolveExactly": true,
+    "everyDocumentedCommitMustBeFetchable": true,
+    "archiveRefsAreImmutableByPolicy": true
+  },
+  "requiredRefs": [
+    {
+      "name": "closed-fill-history",
+      "ref": "refs/heads/research/archive-closed-fill-2026-07-16",
+      "commit": "d1c12d8acca31edb3b38775db5166f4f5f59ce04",
+      "contains": [
+        "a50c2c25642032cd4c3a9df13580bf5ea9e916a4",
+        "17ba4687ffc94af80cd51c11738e8b4396a03b9f",
+        "d1c12d8acca31edb3b38775db5166f4f5f59ce04"
+      ]
+    },
+    {
+      "name": "vocabulary-first-line",
+      "ref": "refs/heads/research/archive-vocabulary-first-line-2026-07-17",
+      "commit": "192bd78fbb94c1f2e67816ade5ae94e0aacd8d1c",
+      "contains": [
+        "87a2d2bb5dfc4933d295aa6bd738cc359ca0712f",
+        "53957dc8518d5fa1632e6c749ec6b56d2a234acb",
+        "5d383ae65df2a58b3ed264af07b145c4bb414c92",
+        "192bd78fbb94c1f2e67816ade5ae94e0aacd8d1c"
+      ]
+    },
+    {
+      "name": "vocabulary-naive-full-pool-test-merge",
+      "ref": "refs/heads/research/archive-vocabulary-naive-full-pool-2026-07-17",
+      "commit": "f28ffbbd5b16163bbb14be42b2c091af45602bbb",
+      "contains": [
+        "f28ffbbd5b16163bbb14be42b2c091af45602bbb"
+      ]
+    },
+    {
+      "name": "vocabulary-balanced-5000-test-merge",
+      "ref": "refs/heads/research/archive-vocabulary-balanced-5000-2026-07-17",
+      "commit": "15dd6b349f96fe6d3a572ee54ad3922b02dede76",
+      "contains": [
+        "15dd6b349f96fe6d3a572ee54ad3922b02dede76"
+      ]
+    },
+    {
+      "name": "vocabulary-pool-sweep-test-merge",
+      "ref": "refs/heads/research/archive-vocabulary-pool-sweep-2026-07-17",
+      "commit": "7e3a9163e998d2e7cad1c0756488104739d42c9c",
+      "contains": [
+        "7e3a9163e998d2e7cad1c0756488104739d42c9c"
+      ]
+    },
+    {
+      "name": "vocabulary-confirmation-test-merge",
+      "ref": "refs/heads/research/archive-vocabulary-confirmation-2026-07-17",
+      "commit": "4304e64f11a0184be5b00c6c42d09d47659fbf0f",
+      "contains": [
+        "4304e64f11a0184be5b00c6c42d09d47659fbf0f"
+      ]
+    },
+    {
+      "name": "vocabulary-confirmation-39586-test-merge",
+      "ref": "refs/heads/research/archive-vocabulary-confirmation-39586-2026-07-17",
+      "commit": "ec0337e792466e08a1d1b44121db5d88792adba0",
+      "contains": [
+        "ec0337e792466e08a1d1b44121db5d88792adba0"
+      ]
+    },
+    {
+      "name": "phase-0-accepted-evidence",
+      "ref": "refs/heads/research/archive-phase-0-evidence-2026-07-19",
+      "commit": "111368ecac9e8b0f00281d2bb0b62fc25795a4c2",
+      "contains": [
+        "111368ecac9e8b0f00281d2bb0b62fc25795a4c2"
+      ]
+    }
+  ]
+}

@@ -1,10 +1,19 @@
-name: Closed-fill research snapshot
+name: Research archive integrity
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - research/archive-manifest.json
+      - research/closed-fill/**
+      - research/phase-0-research-archive/**
+      - tools/research-reference-audit.cjs
+      - .github/workflows/research-closed-fill.yml
   workflow_dispatch:
     inputs:
       scope:
-        description: Reproduction scope
+        description: Closed-fill reproduction scope
         required: true
         default: smoke
         type: choice
@@ -21,66 +30,39 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
+      SNAPSHOT_REF: research/archive-closed-fill-2026-07-16
       SNAPSHOT_SHA: d1c12d8acca31edb3b38775db5166f4f5f59ce04
+      REPRO_SCOPE: ${{ github.event_name == 'workflow_dispatch' && inputs.scope || 'smoke' }}
     steps:
-      - name: Check out immutable research snapshot
+      - name: Check out preservation tooling
         uses: actions/checkout@v4
         with:
-          ref: d1c12d8acca31edb3b38775db5166f4f5f59ce04
-
-      - name: Verify snapshot SHA
-        run: test "$(git rev-parse HEAD)" = "${SNAPSHOT_SHA}"
+          fetch-depth: 1
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Create output directory
-        run: mkdir -p research-output
-
-      - name: Run deterministic research tests
+      - name: Validate preservation tooling
         run: |
-          node tools/closed-fill-test.cjs
-          node tools/construction-victim-targeted-cross-rollback-test.cjs
-          node tools/construction-victim-targeted-cross-relaxed-test.cjs
-          node tools/construction-victim-targeted-cross-budget-test.cjs
+          node --check tools/research-reference-audit.cjs
+          bash -n research/closed-fill/reproduce.sh
+          bash -n research/closed-fill/fresh-clone-smoke.sh
 
-      - name: Probe real seed 40
-        if: inputs.scope == 'smoke'
-        run: |
-          SCANWORD_TAIL_SEEDS=40 \
-            node tools/construction-tail-probe.cjs \
-            | tee research-output/seed-40.jsonl
-
-      - name: Run fixed 15-seed tail
-        if: inputs.scope == 'tail' || inputs.scope == 'full'
-        run: |
-          node tools/construction-tail-probe.cjs \
-            | tee research-output/tail-15.jsonl
-
-      - name: Run enforced 100-seed checkpoint
-        if: inputs.scope == 'full'
+      - name: Verify all archives from a fresh shallow clone
         env:
-          SCANWORD_CHECKPOINT_ENFORCE: 1
-          SCANWORD_CHECKPOINT_CONCURRENCY: 2
-          SCANWORD_ZERO_PANEL_PASS: 1
-          SCANWORD_PORTFOLIO_ATTEMPTS: 240
-          SCANWORD_REPACK_NODES: 600000
-          SCANWORD_REPACK_BRANCH: 24
-          SCANWORD_TARGETED_VICTIM_REGIONS: 3
-          SCANWORD_TARGETED_VICTIM_WORDS: 4
-          SCANWORD_TARGETED_VICTIM_DEPTH: 2
-          SCANWORD_TARGETED_EXACT_VARIANTS: 4
-          SCANWORD_TARGETED_EXACT_REPACK_NODES: 120000
-        run: |
-          node tools/construction-checkpoint.cjs 100 \
-            | tee research-output/checkpoint-100.jsonl
+          SCANWORD_TOOLING_REF: ${{ github.head_ref || github.ref_name }}
+        run: bash research/closed-fill/fresh-clone-smoke.sh
 
-      - name: Publish reproduction output
+      - name: Run requested extended closed-fill scope
+        if: env.REPRO_SCOPE != 'smoke'
+        run: bash research/closed-fill/reproduce.sh "${REPRO_SCOPE}"
+
+      - name: Publish preservation output
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: closed-fill-${{ inputs.scope }}-${{ env.SNAPSHOT_SHA }}
+          name: research-archive-${{ env.REPRO_SCOPE }}-${{ env.SNAPSHOT_SHA }}
           path: research-output/
           if-no-files-found: warn

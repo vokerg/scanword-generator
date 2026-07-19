@@ -2,10 +2,13 @@
 set -euo pipefail
 
 SCOPE="${1:-smoke}"
+SNAPSHOT_REF="${SCANWORD_CLOSED_FILL_ARCHIVE_REF:-research/archive-closed-fill-2026-07-16}"
 SNAPSHOT_SHA="d1c12d8acca31edb3b38775db5166f4f5f59ce04"
 ROOT="$(git rev-parse --show-toplevel)"
 WORKTREE="${TMPDIR:-/tmp}/scanword-closed-fill-$$"
 OUTPUT_DIR="${SCANWORD_RESEARCH_OUTPUT:-${ROOT}/research-output/closed-fill}"
+REMOTE_REF="refs/heads/${SNAPSHOT_REF}"
+LOCAL_REF="refs/remotes/origin/${SNAPSHOT_REF}"
 
 case "${SCOPE}" in
   smoke|tail|full) ;;
@@ -23,20 +26,22 @@ trap cleanup EXIT
 
 mkdir -p "${OUTPUT_DIR}"
 
-echo "Fetching main history containing the anchored research snapshot..."
-if git -C "${ROOT}" rev-parse --is-shallow-repository | grep -qx true; then
-  git -C "${ROOT}" fetch --quiet --unshallow origin main
-else
-  git -C "${ROOT}" fetch --quiet origin main
-fi
+echo "Fetching durable closed-fill archive ref ${REMOTE_REF}..."
+git -C "${ROOT}" fetch \
+  --quiet \
+  --no-tags \
+  --depth=1000 \
+  origin \
+  "+${REMOTE_REF}:${LOCAL_REF}"
 
-if ! git -C "${ROOT}" cat-file -e "${SNAPSHOT_SHA}^{commit}" 2>/dev/null; then
-  echo "Snapshot commit ${SNAPSHOT_SHA} is not available from main history." >&2
+ACTUAL_REF_SHA="$(git -C "${ROOT}" rev-parse "${LOCAL_REF}^{commit}")"
+if [[ "${ACTUAL_REF_SHA}" != "${SNAPSHOT_SHA}" ]]; then
+  echo "Archive ref ${REMOTE_REF} resolved to ${ACTUAL_REF_SHA}, expected ${SNAPSHOT_SHA}." >&2
   exit 1
 fi
 
-if ! git -C "${ROOT}" merge-base --is-ancestor "${SNAPSHOT_SHA}" origin/main; then
-  echo "Snapshot commit ${SNAPSHOT_SHA} is not anchored in origin/main." >&2
+if ! git -C "${ROOT}" cat-file -e "${SNAPSHOT_SHA}^{commit}" 2>/dev/null; then
+  echo "Snapshot commit ${SNAPSHOT_SHA} was not fetched from ${REMOTE_REF}." >&2
   exit 1
 fi
 
@@ -99,4 +104,7 @@ case "${SCOPE}" in
 esac
 
 echo
-printf 'Closed-fill research reproduction complete.\nSnapshot: %s\nOutput:   %s\n' "${SNAPSHOT_SHA}" "${OUTPUT_DIR}"
+printf 'Closed-fill research reproduction complete.\nArchive:  %s\nSnapshot: %s\nOutput:   %s\n' \
+  "${SNAPSHOT_REF}" \
+  "${SNAPSHOT_SHA}" \
+  "${OUTPUT_DIR}"
