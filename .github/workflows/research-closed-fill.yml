@@ -1,10 +1,11 @@
-name: Closed-fill research snapshot
+name: Research archive integrity
 
 on:
   pull_request:
     branches:
       - main
     paths:
+      - research/archive-manifest.json
       - research/closed-fill/**
       - research/phase-0-research-archive/**
       - tools/research-reference-audit.cjs
@@ -12,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       scope:
-        description: Reproduction scope
+        description: Closed-fill reproduction scope
         required: true
         default: smoke
         type: choice
@@ -49,19 +50,19 @@ jobs:
           bash -n research/closed-fill/reproduce.sh
           bash -n research/closed-fill/fresh-clone-smoke.sh
 
-      - name: Verify archive ref from a fresh shallow clone
+      - name: Verify all archives from a fresh shallow clone
         env:
           SCANWORD_TOOLING_REF: ${{ github.head_ref || github.ref_name }}
         run: bash research/closed-fill/fresh-clone-smoke.sh
 
-      - name: Run requested extended reproduction scope
+      - name: Run requested extended closed-fill scope
         if: env.REPRO_SCOPE != 'smoke'
         run: bash research/closed-fill/reproduce.sh "${REPRO_SCOPE}"
 
-      - name: Publish reproduction output
+      - name: Publish preservation output
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: closed-fill-${{ env.REPRO_SCOPE }}-${{ env.SNAPSHOT_SHA }}
+          name: research-archive-${{ env.REPRO_SCOPE }}-${{ env.SNAPSHOT_SHA }}
           path: research-output/
           if-no-files-found: warn
