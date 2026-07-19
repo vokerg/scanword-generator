@@ -71,6 +71,14 @@
       "contains": [
         "ec0337e792466e08a1d1b44121db5d88792adba0"
       ]
+    },
+    {
+      "name": "phase-0-accepted-evidence",
+      "ref": "refs/heads/research/archive-phase-0-evidence-2026-07-19",
+      "commit": "111368ecac9e8b0f00281d2bb0b62fc25795a4c2",
+      "contains": [
+        "111368ecac9e8b0f00281d2bb0b62fc25795a4c2"
+      ]
     }
   ]
 }
