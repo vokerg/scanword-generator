@@ -22,6 +22,13 @@ window.ScanwordSolver = { generateBest: () => ({ placed: [], constructionV2: {} 
 require(path.resolve(__dirname, "..", "construction-selected-grid-clue-metrics-v1.js"));
 require(path.resolve(__dirname, "..", "construction-clue-disambiguation-v1.js"));
 
+const unsafeShortHint = window.ScanwordSolver.selectedGridClueRevealPolicyV1("УФА", {
+  text: "Река на У",
+  revealedLetters: 1,
+});
+assert.equal(unsafeShortHint.overRevealing, true);
+assert.equal(unsafeShortHint.allowedLetters, 0);
+
 const placed = [
   { id: 1, answer: "АННА", clue: "Женское имя", direction: "right", clueRow: 0, clueCol: 0, startRow: 0, startCol: 1, cells: [{ row: 0, col: 1 }] },
   { id: 2, answer: "АЛИНА", clue: "Женское имя", direction: "down", clueRow: 0, clueCol: 2, startRow: 1, startCol: 2, cells: [{ row: 1, col: 2 }] },
@@ -67,8 +74,9 @@ assert.equal(new Set(clueTexts.slice(3).map((clue) => clue.toLowerCase())).size,
 assert.ok(result.placed.find((word) => word.answer === "УФА").clue.includes("Башкортостан"));
 for (const change of report.changes) {
   const answerLength = String(change.answer).length;
-  if (answerLength <= 6) assert.ok(change.revealedLetters <= 1);
-  assert.ok(change.revealFraction <= 0.34);
+  if (answerLength <= 3) assert.equal(change.revealedLetters, 0);
+  if (answerLength <= 7) assert.ok(change.revealedLetters <= 1);
+  assert.ok(change.revealFraction <= 0.25);
   const word = result.placed.find((entry) => Number(entry.id) === Number(change.slotId));
   const cellClue = result.grid[word.clueRow][word.clueCol].clues.find((item) => Number(item.slotId) === Number(word.id));
   assert.equal(cellClue.text, word.clue);
