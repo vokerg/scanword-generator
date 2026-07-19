@@ -18,6 +18,8 @@ The closed-fill documentation claimed that snapshot commit
 
 The first repository-wide audit then found additional 40-character Git commit references embedded in vocabulary-first artifact names. These were not random artifact identifiers: each resolves to a real Git commit. Five are GitHub-generated pull-request test merge commits. Because those merge commits are mutually divergent, preserving only the latest research branch head would not preserve their exact artifact provenance.
 
+The final self-check also proved that an evidence SHA cited by a phase report must itself have a durable ref. A shallow clone correctly rejected the cited but then-unanchored Phase 0 evidence head. The evidence head is now archived explicitly rather than exempted from the audit.
+
 ## Implemented preservation boundary
 
 The canonical machine-readable inventory is:
@@ -37,6 +39,7 @@ Durable refs:
 | `research/archive-vocabulary-pool-sweep-2026-07-17` | `7e3a9163e998d2e7cad1c0756488104739d42c9c` | Exact active-pool sweep test merge used by the artifact |
 | `research/archive-vocabulary-confirmation-2026-07-17` | `4304e64f11a0184be5b00c6c42d09d47659fbf0f` | Exact vocabulary confirmation test merge used by the artifact |
 | `research/archive-vocabulary-confirmation-39586-2026-07-17` | `ec0337e792466e08a1d1b44121db5d88792adba0` | Exact 39,586-entry confirmation test merge |
+| `research/archive-phase-0-evidence-2026-07-19` | `111368ecac9e8b0f00281d2bb0b62fc25795a4c2` | Exact successful repository-wide preservation evidence head |
 
 The vocabulary-first line ref also preserves these documented ancestors:
 
@@ -73,7 +76,7 @@ Historical branch names remain chronology labels unless `research/archive-manife
 
 The initial closed-fill-only gate succeeded in GitHub Actions run `29699963724` and exposed the additional vocabulary Git references.
 
-The expanded repository-wide gate succeeded on commit `111368ecac9e8b0f00281d2bb0b62fc25795a4c2`:
+The expanded repository-wide gate succeeded on the archived Phase 0 evidence head:
 
 ```text
 workflow run: 29700185366
@@ -94,7 +97,7 @@ Successful checks:
 - real seed-40 probe;
 - artifact publication.
 
-The rollback-cross production gate also passed on the same commit in run `29700185347`.
+The rollback-cross production gate also passed on the same evidence head in run `29700185347`.
 
 ## Reproduction
 
