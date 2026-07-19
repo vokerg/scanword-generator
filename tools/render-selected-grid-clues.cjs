@@ -6,8 +6,11 @@ const path = require("node:path");
 const root = path.resolve(__dirname, "..");
 const seed = process.argv[2] || "selected-grid-clues-sample";
 const output = path.resolve(process.argv[3] || path.join(root, "research-output", "selected-grid-clues.svg"));
+const extension = path.extname(output) || ".svg";
+const stem = output.slice(0, -extension.length);
+const beforeOutput = `${stem}-before${extension}`;
+const afterOutput = `${stem}-after${extension}`;
 
-global.window = global;
 Object.assign(process.env, {
   SCANWORD_BULK_LEXICON: "on",
   SCANWORD_CATEGORY_BALANCE: "off",
@@ -18,12 +21,14 @@ Object.assign(process.env, {
   SCANWORD_EDITORIAL_REPAIR: "on",
 });
 
+global.window = global;
 const originalArgv1 = process.argv[1];
 process.argv[1] = path.join(__dirname, "benchmark-seed-v3.cjs");
 require(path.join(__dirname, "node-benchmark-bootstrap-v1.cjs"));
 process.argv[1] = originalArgv1;
 require(path.join(root, "construction-selected-grid-clue-metrics-v1.js"));
 require(path.join(root, "construction-clue-disambiguation-v1.js"));
+require(path.join(root, "renderer.js"));
 
 const solver = window.ScanwordSolver;
 process.env.SCANWORD_SELECTED_GRID_CLUE_DISAMBIGUATION = "off";
@@ -31,7 +36,9 @@ const baseline = solver.generateBest(seed, window.RUSSIAN_WORDS.length, 17, 13, 
 process.env.SCANWORD_SELECTED_GRID_CLUE_DISAMBIGUATION = "on";
 const editorial = solver.generateBest(seed, window.RUSSIAN_WORDS.length, 17, 13, 30, 27);
 
-if (!baseline?.validation?.valid || !editorial?.validation?.valid) throw new Error("Sample generation failed validation");
+if (!baseline?.validation?.valid || !editorial?.validation?.valid) {
+  throw new Error("Sample generation failed validation");
+}
 const baselineMetrics = baseline.constructionV2?.selectedGridClues || {};
 const editorialMetrics = editorial.constructionV2?.selectedGridClues || {};
 if (baselineMetrics.answerSignature !== editorialMetrics.answerSignature
@@ -46,6 +53,11 @@ for (const word of editorial.placed || []) {
   if (changedSlots.has(Number(word.id))) changedCells.add(`${word.clueRow}:${word.clueCol}`);
 }
 
+const baselineA5 = window.ScanwordRenderer.renderSvg(baseline, false);
+const editorialA5 = window.ScanwordRenderer.renderSvg(editorial, false);
+const baselineEllipses = (baselineA5.match(/…/g) || []).length;
+const editorialEllipses = (editorialA5.match(/…/g) || []).length;
+
 const rows = editorial.grid.length;
 const cols = Math.max(...editorial.grid.map((row) => row.length));
 const cellSize = 40;
@@ -53,7 +65,10 @@ const margin = 34;
 const header = 96;
 const sideWidth = 710;
 const width = margin * 2 + cols * cellSize + sideWidth;
-const listLines = Math.max(8, changes.reduce((sum, change) => sum + Math.max(2, Math.ceil((String(change.from).length + String(change.to).length) / 48)), 0));
+const listLines = Math.max(8, changes.reduce(
+  (sum, change) => sum + Math.max(2, Math.ceil((String(change.from).length + String(change.to).length) / 48)),
+  0,
+));
 const height = Math.max(header + margin + rows * cellSize + 48, header + 70 + listLines * 22);
 
 const esc = (value) => String(value ?? "")
@@ -91,7 +106,7 @@ const svg = [];
 svg.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`);
 svg.push(`<rect width="100%" height="100%" fill="#f8fafc"/>`);
 svg.push(`<text x="${margin}" y="36" font-family="Arial, DejaVu Sans, sans-serif" font-size="24" font-weight="700" fill="#0f172a">Selected-grid clue disambiguation</text>`);
-svg.push(`<text x="${margin}" y="66" font-family="Arial, DejaVu Sans, sans-serif" font-size="14" fill="#475569">seed: ${esc(seed)} · ответы и геометрия идентичны · повторные generic clues: ${baselineMetrics.repeatedGenericClueCount} → ${editorialMetrics.repeatedGenericClueCount}</text>`);
+svg.push(`<text x="${margin}" y="66" font-family="Arial, DejaVu Sans, sans-serif" font-size="14" fill="#475569">seed: ${esc(seed)} · ответы и геометрия идентичны · repeated generic: ${baselineMetrics.repeatedGenericClueCount} → ${editorialMetrics.repeatedGenericClueCount} · renderer ellipses: ${baselineEllipses} → ${editorialEllipses}</text>`);
 
 for (let row = 0; row < rows; row += 1) {
   for (let col = 0; col < cols; col += 1) {
@@ -137,18 +152,24 @@ if (!changes.length) {
   }
 }
 
-svg.push(`<text x="${margin}" y="${height - 18}" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" fill="#64748b">Жёлтые стрелочные клетки получили новую подсказку; буквы, ответы, панели и пересечения не менялись.</text>`);
+svg.push(`<text x="${margin}" y="${height - 18}" font-family="Arial, DejaVu Sans, sans-serif" font-size="12" fill="#64748b">A5 renderer output is saved separately as -before.svg and -after.svg for real clue-footprint inspection.</text>`);
 svg.push("</svg>");
 
 fs.mkdirSync(path.dirname(output), { recursive: true });
+fs.writeFileSync(beforeOutput, baselineA5, "utf8");
+fs.writeFileSync(afterOutput, editorialA5, "utf8");
 fs.writeFileSync(output, svg.join("\n"), "utf8");
 console.log(JSON.stringify({
   seed,
   output,
+  beforeOutput,
+  afterOutput,
   valid: editorial.validation.valid,
   changedClues: changes.length,
   repeatedGenericBefore: baselineMetrics.repeatedGenericClueCount,
   repeatedGenericAfter: editorialMetrics.repeatedGenericClueCount,
+  rendererEllipsesBefore: baselineEllipses,
+  rendererEllipsesAfter: editorialEllipses,
   answerSignatureStable: baselineMetrics.answerSignature === editorialMetrics.answerSignature,
   geometrySignatureStable: baselineMetrics.geometrySignature === editorialMetrics.geometrySignature,
 }));
