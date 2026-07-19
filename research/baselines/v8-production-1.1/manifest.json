@@ -1,17 +1,26 @@
 {
   "schemaVersion": 1,
-  "status": "pending",
+  "status": "accepted",
   "baselineId": "v8-production-1.1-browser-equivalent",
   "baseCommit": "87dc59c1b47bcee9846bb1f8243f552fd5d2038b",
+  "evidenceCommit": "3590819c6aad7e8b8178b5106dcb15b61722e8a0",
+  "evidenceRef": "refs/heads/research/archive-phase-2-baseline-evidence-2026-07-19",
   "corpus": {
     "manifest": "bulk-lexicon/manifest.json",
     "version": 8,
     "entries": 40966,
-    "manifestDigest": null
+    "manifestDigest": "sha256:10f84f4ba9e06704f213106851d8d5ee48183b1a3dd744604d9be7a5c347c892"
   },
   "configuration": {
     "path": "research/baselines/v8-production-1.1/config.json",
     "digest": "sha256:3ea1f06d13e80f9c3d00a338fee54ee8389f84a76b7745e276105c8c6b4ebdb7"
+  },
+  "environment": {
+    "nodeVersion": "v22.23.1",
+    "platform": "linux",
+    "architecture": "x64",
+    "concurrency": 2,
+    "percentileMethod": "nearest-rank"
   },
   "seedSets": [
     {
@@ -38,5 +47,103 @@
     "SCANWORD_BASELINE_ENFORCE=1 node tools/v8-baseline-checkpoint.cjs promotion",
     "SCANWORD_BASELINE_ENFORCE=1 node tools/v8-baseline-checkpoint.cjs stability"
   ],
-  "evidence": null
+  "workflowRun": 29705221147,
+  "sets": {
+    "development": {
+      "artifactId": 8447723720,
+      "artifactName": "v8-baseline-development-3590819c6aad7e8b8178b5106dcb15b61722e8a0",
+      "artifactDigest": "sha256:abce1c9f880c4956516da9b2ddf2491aee184d28adc02eac98656906c9f2bcb5",
+      "environmentDigest": "sha256:197298300924c06aff6d5eb35bf33fe73dc8977d03acfbcd1c03e216e4e5b719",
+      "files": {
+        "perSeed": "sha256:f206b1f3de552de54a7d376d08104d68173107248cc4ba87245e765448ad299b",
+        "aggregate": "sha256:7520d7ff79ec151e08c6bbd6f74254b0b931b912142282eb4ee9cdd738210739",
+        "environment": "sha256:b7a0a62cd862f2063049648858bfb13fe93c6b7144c3ec98e47437537b020218"
+      },
+      "summary": {
+        "validSeeds": 20,
+        "runs": 20,
+        "averagePanels": 5.3,
+        "maximumPanels": 7,
+        "zeroPanelRate": 0,
+        "averageAnswers": 47.45,
+        "averageCrossings": 51.7,
+        "averageAnswerPercent": 95.5,
+        "averageRawLetterPercent": 50.64,
+        "medianRuntimeMs": 25969,
+        "p95RuntimeMs": 28645,
+        "maximumRuntimeMs": 28803,
+        "averageTwoLetterCount": 5.2,
+        "averageFormulaicShortCount": 0,
+        "averageSelectedGridClueDebt": 15.35,
+        "averageProperNameShare": 0.28
+      }
+    },
+    "promotion": {
+      "artifactId": 8447785216,
+      "artifactName": "v8-baseline-promotion-3590819c6aad7e8b8178b5106dcb15b61722e8a0",
+      "artifactDigest": "sha256:525f634eb458156197a0305c9cd875529d6fbfadf833c707b6bb89bb88d78fbc",
+      "environmentDigest": "sha256:88a8a1862f22d1a68e0cbbd469e37021603bb0f725237090767e45c47753b997",
+      "files": {
+        "perSeed": "sha256:b97834f43f3231373c8982feb5cc69afe6ef68297b4c5bcd92cfdfa44f8602c8",
+        "aggregate": "sha256:1ea18d65dd6b39d174268abe6613cae7f4674efa266a9c02de2640def0788fa5",
+        "environment": "sha256:1a2c7fe7e2cacb0f54ed429685b2c7382860b6689a9a966242a35d61d956506d"
+      },
+      "summary": {
+        "validSeeds": 50,
+        "runs": 50,
+        "averagePanels": 5.1,
+        "maximumPanels": 8,
+        "zeroPanelRate": 0,
+        "averageAnswers": 47.7,
+        "averageCrossings": 51.96,
+        "averageAnswerPercent": 95.67,
+        "averageRawLetterPercent": 50.59,
+        "medianRuntimeMs": 26316.5,
+        "p95RuntimeMs": 28824,
+        "maximumRuntimeMs": 29964,
+        "averageTwoLetterCount": 5.34,
+        "averageFormulaicShortCount": 0.02,
+        "averageSelectedGridClueDebt": 13.82,
+        "averageProperNameShare": 0.26
+      }
+    },
+    "stability": {
+      "artifactId": 8447877774,
+      "artifactName": "v8-baseline-stability-3590819c6aad7e8b8178b5106dcb15b61722e8a0",
+      "artifactDigest": "sha256:443eca6248d04b2c57f5cc62af4597609b25597fb8d2d7a0362c4c8d1f8c66d2",
+      "environmentDigest": "sha256:6922ef8db394a2ac3b0b3cef2b7c9a7a9454325937fd74f7f9ce4c1ad34e5a00",
+      "files": {
+        "perSeed": "sha256:53e7c1dfd1b39ab9729bb1a3c693b927cc4921265aa01b71fed40151595df3f6",
+        "aggregate": "sha256:cac50439aed2d1f379187ac0a0e22b33740e54219dbb6dd135c229c530d6a8ab",
+        "environment": "sha256:d257353e3f4d550059b037dc7497dae4abb2d07f3e3fe05055b04c9d83456d51"
+      },
+      "summary": {
+        "validSeeds": 100,
+        "runs": 100,
+        "averagePanels": 4.82,
+        "maximumPanels": 8,
+        "zeroPanelRate": 0,
+        "averageAnswers": 48.45,
+        "averageCrossings": 52.78,
+        "averageAnswerPercent": 95.92,
+        "averageRawLetterPercent": 50.97,
+        "medianRuntimeMs": 25319.5,
+        "p95RuntimeMs": 27721,
+        "maximumRuntimeMs": 29045,
+        "averageTwoLetterCount": 5.85,
+        "averageFormulaicShortCount": 0.04,
+        "averageSelectedGridClueDebt": 13.16,
+        "averageProperNameShare": 0.26
+      }
+    }
+  },
+  "validity": {
+    "totalSeeds": 170,
+    "validSeeds": 170,
+    "invalidSeeds": 0,
+    "disconnectedSeeds": 0,
+    "fallbackClueSeeds": 0,
+    "coverageCheckpointFailureSeeds": 0,
+    "workerFailures": 0
+  }
 }
