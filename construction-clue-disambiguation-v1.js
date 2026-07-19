@@ -60,9 +60,6 @@
   function categoryLabel(word, meta) {
     const original = cleanLabel(word.clue);
     const category = String(meta.category || word.lexicalCategory || "");
-    if (category === "given-name" && /имя/i.test(original) && original.length <= 32) return original;
-    if (category === "surname" && /фамил/i.test(original) && original.length <= 32) return original;
-    if (category === "patronymic" && /отчеств/i.test(original) && original.length <= 32) return original;
     if (categoryLabels[category]) return categoryLabels[category];
     const firstField = cleanLabel(original.split(/[;,]/)[0]);
     return firstField && firstField.length <= 28 ? firstField : "Ответ";
@@ -171,21 +168,11 @@
       const char = answer[index];
       if (!char) continue;
       candidates.push({
-        text: index === 0 ? `${label} на ${char}` : `${label}: ${index + 1}-я буква — ${char}`,
+        text: index === 0 ? `${label} на ${char}` : `${label}: ${index + 1}-я — ${char}`,
         kind: "letter-pattern-hint",
         source: `answer-position-${index}`,
         revealedLetters: 1,
       });
-      if (length >= 5) {
-        candidates.push({
-          text: index === 0
-            ? `${label}, ${length} букв, на ${char}`
-            : `${label}, ${length} букв; ${index + 1}-я — ${char}`,
-          kind: "letter-pattern-hint",
-          source: `answer-length-position-${index}`,
-          revealedLetters: 1,
-        });
-      }
     }
 
     if (length >= 7 && answer[0] && answer.at(-1)) {
