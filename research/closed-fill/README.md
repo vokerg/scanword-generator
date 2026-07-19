@@ -21,7 +21,13 @@ The exact tested implementation is the historical commit:
 d1c12d8acca31edb3b38775db5166f4f5f59ce04
 ```
 
-That commit is anchored in the `main` commit graph. Reproduction therefore does not depend on a permanent research branch.
+That commit is **not** an ancestor of current `main`: the research documentation was squash-merged, so the historical implementation and the accepted production line have independent Git histories. Exact reproduction is preserved by the durable archive ref:
+
+```text
+refs/heads/research/archive-closed-fill-2026-07-16
+```
+
+The archive ref must resolve to the exact snapshot SHA. Reproduction scripts and CI fetch that ref explicitly and fail if it moves. The archive also contains the documented production checkpoint `a50c2c25642032cd4c3a9df13580bf5ea9e916a4` and checkpoint-A commit `17ba4687ffc94af80cd51c11738e8b4396a03b9f` in its ancestry.
 
 The package provides:
 
@@ -31,7 +37,9 @@ The package provides:
 - an architecture review and next-step proposal;
 - a machine-readable manifest;
 - a local reproduction script;
-- a manual GitHub Actions workflow that checks out the exact snapshot SHA.
+- a fresh shallow-clone smoke test;
+- a repository-wide historical-reference audit;
+- a GitHub Actions workflow that verifies the archive ref and exact snapshot SHA.
 
 The snapshot is historical. Vocabulary-first 1.0 later promoted a larger corpus and selected parts of the repair pipeline to production.
 
@@ -147,7 +155,19 @@ bash research/closed-fill/reproduce.sh tail
 bash research/closed-fill/reproduce.sh full
 ```
 
-The script fetches `main`, verifies that the historical snapshot commit is reachable from it, and creates a detached temporary worktree at the exact SHA.
+The script fetches `research/archive-closed-fill-2026-07-16`, verifies that it resolves to the exact historical snapshot SHA, and creates a detached temporary worktree at that commit. It does not assume the snapshot is part of `main` history.
+
+To prove the process from a newly created shallow clone:
+
+```bash
+bash research/closed-fill/fresh-clone-smoke.sh
+```
+
+To inventory documented commit and branch references and verify required archive coverage:
+
+```bash
+node tools/research-reference-audit.cjs
+```
 
 The same checks are available through:
 
@@ -160,8 +180,9 @@ The same checks are available through:
 - [`RESULTS.md`](RESULTS.md) — metrics, evidence and quality limits.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — approaches, failure modes and proposed solver design.
 - [`EXPERIMENT_LOG.md`](EXPERIMENT_LOG.md) — chronological record.
-- [`manifest.json`](manifest.json) — immutable SHAs, workflow runs and summary data.
+- [`manifest.json`](manifest.json) — required archive refs, immutable SHAs, workflow runs and summary data.
 - [`reproduce.sh`](reproduce.sh) — deterministic local runner.
+- [`fresh-clone-smoke.sh`](fresh-clone-smoke.sh) — shallow-clone preservation proof.
 
 ## Research boundary
 
