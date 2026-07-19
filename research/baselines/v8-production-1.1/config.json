@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "baselineId": "v8-production-1.1-browser-equivalent",
+  "description": "Locked browser-equivalent vocabulary-first 1.1 baseline for the committed 40,966-entry v8 corpus.",
+  "corpus": {
+    "manifest": "bulk-lexicon/manifest.json",
+    "expectedVersion": 8,
+    "expectedEntries": 40966
+  },
+  "grid": {
+    "rows": 17,
+    "cols": 13,
+    "attempts": 30,
+    "sampleLimit": 27
+  },
+  "bootstrap": {
+    "production": "tools/node-benchmark-bootstrap-v1.cjs",
+    "telemetry": "tools/node-baseline-bootstrap-v1.cjs",
+    "worker": "tools/benchmark-seed-v3.cjs"
+  },
+  "environment": {
+    "SCANWORD_BULK_LEXICON": "on",
+    "SCANWORD_CATEGORY_BALANCE": "off",
+    "SCANWORD_VOCABULARY_PORTFOLIO": "on",
+    "SCANWORD_VOCABULARY_PORTFOLIO_MODE": "full",
+    "SCANWORD_VOCABULARY_PORTFOLIO_LIMITS": "2500,3500",
+    "SCANWORD_CONSTRUCTION_MODE": "portfolio",
+    "SCANWORD_CLOSED_FILL": "diagnostic",
+    "SCANWORD_PORTFOLIO_SELECTION": "panel-first",
+    "SCANWORD_LEXICAL_PLACEMENT": "off",
+    "SCANWORD_EDITORIAL_REPAIR": "on",
+    "SCANWORD_EDITORIAL_REPLACE": "off",
+    "SCANWORD_EDITORIAL_PAIR_REFIT": "off",
+    "SCANWORD_EDITORIAL_BUNDLE_REFIT": "off",
+    "SCANWORD_SELECTED_GRID_CLUE_DISAMBIGUATION": "off",
+    "SCANWORD_PORTFOLIO_ATTEMPTS": "240",
+    "SCANWORD_PORTFOLIO_CLUE_RESTARTS": "160",
+    "SCANWORD_VICTIM_BASES": "8",
+    "SCANWORD_VICTIM_VARIANTS": "6",
+    "SCANWORD_VICTIM_SECONDARY_WORDS": "3",
+    "SCANWORD_VICTIM_SECONDARY_VARIANTS": "4",
+    "SCANWORD_VICTIM_SECONDARY_FINALISTS": "6",
+    "SCANWORD_TARGETED_VICTIM_REGIONS": "3",
+    "SCANWORD_TARGETED_VICTIM_WORDS": "4",
+    "SCANWORD_TARGETED_VICTIM_DEPTH": "2",
+    "SCANWORD_TARGETED_VICTIM_BEAM": "5",
+    "SCANWORD_TARGETED_VICTIM_BRANCHING": "18",
+    "SCANWORD_TARGETED_VICTIM_VARIANTS": "8",
+    "SCANWORD_TARGETED_EXACT_VARIANTS": "4",
+    "SCANWORD_TARGETED_EXACT_REPACK_NODES": "120000",
+    "SCANWORD_TARGETED_EXACT_REPACK_CANDIDATES": "20",
+    "SCANWORD_TARGETED_EXACT_REPACK_BRANCH": "14",
+    "SCANWORD_REPACK_NODES": "600000",
+    "SCANWORD_REPACK_CANDIDATES": "24",
+    "SCANWORD_REPACK_BRANCH": "24"
+  }
+}

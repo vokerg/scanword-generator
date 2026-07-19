@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "name": "v8-development-20",
+  "role": "development",
+  "frozenDate": "2026-07-19",
+  "policy": "Immutable after Phase 2 acceptance; do not tune against promotion or stability sets.",
+  "seeds": [
+    "v8-dev-000",
+    "v8-dev-001",
+    "v8-dev-002",
+    "v8-dev-003",
+    "v8-dev-004",
+    "v8-dev-005",
+    "v8-dev-006",
+    "v8-dev-007",
+    "v8-dev-008",
+    "v8-dev-009",
+    "v8-dev-010",
+    "v8-dev-011",
+    "v8-dev-012",
+    "v8-dev-013",
+    "v8-dev-014",
+    "v8-dev-015",
+    "v8-dev-016",
+    "v8-dev-017",
+    "v8-dev-018",
+    "v8-dev-019"
+  ]
+}
