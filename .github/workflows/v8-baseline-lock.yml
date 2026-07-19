@@ -23,9 +23,13 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - name: Check out candidate
+      - name: Check out exact candidate head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -34,6 +38,7 @@ jobs:
 
       - name: Validate locked baseline contract
         run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           node --check tools/node-baseline-bootstrap-v1.cjs
           node --check tools/v8-baseline-checkpoint.cjs
           node --check tools/v8-baseline-test.cjs
@@ -51,12 +56,15 @@ jobs:
           - promotion
           - stability
     env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       SCANWORD_BASELINE_CONCURRENCY: 2
       SCANWORD_BASELINE_ENFORCE: 1
       SCANWORD_BASELINE_SEED_TIMEOUT_MS: 900000
     steps:
-      - name: Check out candidate
+      - name: Check out exact candidate head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -65,8 +73,9 @@ jobs:
 
       - name: Run locked ${{ matrix.set }} checkpoint
         run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           mkdir -p "research-output/v8-baseline/${{ matrix.set }}"
-          node tools/v8-baseline-checkpoint.cjs \
+          GITHUB_SHA="${SOURCE_SHA}" node tools/v8-baseline-checkpoint.cjs \
             "${{ matrix.set }}" \
             "research-output/v8-baseline/${{ matrix.set }}" \
             | tee "research-output/v8-baseline/${{ matrix.set }}/console.jsonl"
@@ -75,6 +84,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: v8-baseline-${{ matrix.set }}-${{ github.sha }}
+          name: v8-baseline-${{ matrix.set }}-${{ env.SOURCE_SHA }}
           path: research-output/v8-baseline/${{ matrix.set }}/
           if-no-files-found: error
