@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "project": "closed-fill",
   "status": "research-snapshot",
   "snapshotDate": "2026-07-16",
@@ -9,10 +9,33 @@
     "checkpoint": "0.9 plus indexed candidate retrieval"
   },
   "snapshot": {
-    "branch": "research/closed-fill-snapshot-2026-07-16",
+    "branch": "research/archive-closed-fill-2026-07-16",
+    "historicalBranch": "research/closed-fill-snapshot-2026-07-16",
     "commit": "d1c12d8acca31edb3b38775db5166f4f5f59ce04",
     "historicalPullRequest": 4,
     "productionRuntimeEnabled": false
+  },
+  "preservation": {
+    "model": "explicit-durable-archive-ref-with-sha-verification",
+    "mainRef": "refs/remotes/origin/main",
+    "auditedMainCommit": "f33233519e3e6902bf2eae9c97c4affb83ffab25",
+    "snapshotIsAncestorOfAuditedMain": false,
+    "snapshotSharesHistoryWithAuditedMain": false,
+    "archiveRefCreated": "2026-07-19",
+    "requiredRefs": [
+      {
+        "name": "closed-fill-history",
+        "ref": "refs/heads/research/archive-closed-fill-2026-07-16",
+        "commit": "d1c12d8acca31edb3b38775db5166f4f5f59ce04",
+        "contains": [
+          "a50c2c25642032cd4c3a9df13580bf5ea9e916a4",
+          "17ba4687ffc94af80cd51c11738e8b4396a03b9f",
+          "d1c12d8acca31edb3b38775db5166f4f5f59ce04"
+        ]
+      }
+    ],
+    "freshCloneSmoke": "bash research/closed-fill/fresh-clone-smoke.sh",
+    "referenceAudit": "node tools/research-reference-audit.cjs"
   },
   "verification": {
     "qualityWorkflowRun": 29480865364,
