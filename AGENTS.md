@@ -27,7 +27,9 @@ Corpus policy includes preferred Russian GeoNames, collision-safe alias handling
 
 The browser default remains the full two-candidate portfolio. Adaptive early acceptance is available only through `SCANWORD_VOCABULARY_PORTFOLIO_MODE=adaptive`.
 
-Canonical decision: `docs/milestones/v1.1-vocabulary-greatness.md`.
+Phase 3 adds an opt-in explicit candidate-state pipeline with exact behavior parity. `SCANWORD_EXPLICIT_PIPELINE` remains `off` in the browser. When enabled, the complete accepted generator runs once as a legacy source stage and the explicit path exposes candidate state, stage order, timing, signatures and validation without changing the returned grid.
+
+Canonical decision: `docs/milestones/v1.1-vocabulary-greatness.md`. Explicit-pipeline parity evidence: `research/explicit-pipeline/README.md`.
 
 ## Runtime structure
 
@@ -40,7 +42,7 @@ Canonical decision: `docs/milestones/v1.1-vocabulary-greatness.md`.
 - default grid and UI values;
 - user-visible corpus and pipeline description.
 
-Changing script order is architectural. The wrapper order must remain:
+Changing script order is architectural. The wrapper and pipeline order must remain:
 
 ```text
 base dictionaries and bulk corpus
@@ -52,10 +54,11 @@ base dictionaries and bulk corpus
 -> radius-two bundle refit
 -> unified editorial repair
 -> vocabulary portfolio
+-> explicit CandidateState and pipeline modules
 -> renderer and UI
 ```
 
-The vocabulary portfolio wraps the repaired single-candidate generator, so every active-set candidate is repaired before selection.
+The vocabulary portfolio wraps the repaired single-candidate generator, so every active-set candidate is repaired before selection. The Phase 3 explicit pipeline loads after the final production wrapper, captures that complete generator as `legacy-source`, and remains a no-op delegation while `SCANWORD_EXPLICIT_PIPELINE=off`.
 
 ### Production modules
 
@@ -65,9 +68,30 @@ The vocabulary portfolio wraps the repaired single-candidate generator, so every
 - `construction-*.js`: bounded construction, clue allocation, rollback and repair stages.
 - `construction-editorial-repair-v3.js`: final same-geometry cleanup.
 - `construction-vocabulary-portfolio-v1.js`: full/adaptive active-set portfolio.
+- `construction-candidate-state-v1.js`: explicit candidate-state contract, cloning, provenance and deterministic signatures.
+- `construction-pipeline-stages-v1.js`: normal stage functions for the Phase 3 compatibility boundary.
+- `construction-pipeline-telemetry-v1.js`: stage timing, candidate counts, signatures and status.
+- `construction-pipeline-v1.js`: opt-in orchestrator and legacy-source compatibility boundary.
 - `renderer.js`, `ui.js`: A5 SVG rendering, controls and export.
 
 Several retained modules are research artifacts. Check `index.html` and the current milestone before treating them as active defaults.
+
+### Explicit pipeline boundary
+
+The accepted Phase 3 stage order is:
+
+```text
+legacy-source
+-> base-construction
+-> clue-allocation
+-> current-repair-chain
+-> validation
+-> comparison
+```
+
+During Phase 3, `legacy-source` owns the historical production wrapper chain. The middle stages are contract observations, validation calls the unchanged `ScanwordSolver.resultMetrics`, and comparison is identity selection over the accepted candidate. This is a transitional compatibility boundary, not permission to add more wrappers inside `legacy-source`.
+
+New construction work should be expressed as `CandidateState -> CandidateState`, `CandidateState -> CandidateState[]`, or `CandidateState[] -> CandidateState[]`. Preserve copy-on-write, explicit cloning or otherwise auditable state ownership. Do not introduce hidden cross-candidate mutation.
 
 ## Dictionary architecture
 
@@ -154,32 +178,44 @@ Source-aware or clue-aware metrics must not outrank structural density without a
 ```text
 SCANWORD_BULK_LEXICON=off
 ```
+
 Use the former construction dictionary.
 
 ```text
 SCANWORD_VOCABULARY_PORTFOLIO=off
 ```
+
 Construct one active working set.
 
 ```text
 SCANWORD_VOCABULARY_PORTFOLIO_MODE=full|adaptive
 ```
+
 Choose complete portfolio evaluation or conservative early acceptance.
 
 ```text
 SCANWORD_EDITORIAL_REPAIR=off
 ```
+
 Disable final same-geometry cleanup.
 
 ```text
 SCANWORD_CATEGORY_BALANCE=on
 ```
+
 Enable retained category-cap research.
 
 ```text
 SCANWORD_CONSTRUCTION_MODE=legacy
 ```
+
 Use the original construction path.
+
+```text
+SCANWORD_EXPLICIT_PIPELINE=on
+```
+
+Run the accepted production generator through the explicit Phase 3 candidate-state and telemetry boundary. The committed browser default is `off` until a later release decision changes it with complete evidence.
 
 A/B flags must not silently change browser defaults.
 
@@ -201,6 +237,18 @@ For adaptive changes:
 NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
   node tools/vocabulary-adaptive-checkpoint.cjs 20
 ```
+
+For explicit-pipeline contract or stage changes:
+
+```bash
+node tools/construction-pipeline-parity-test.cjs
+
+SCANWORD_PIPELINE_CONCURRENCY=2 \
+  node tools/construction-pipeline-checkpoint.cjs \
+  20 research-output/explicit-pipeline/development-parity.jsonl
+```
+
+The explicit parity checkpoint must compare isolated legacy and explicit processes on full-grid, placed-answer, clue and geometry digests as well as validity, connectivity, panels, answers and crossings. Runtime must remain within the phase-specific gate.
 
 Also run `node --check` for every changed JavaScript/CommonJS file and the matching deterministic test for any bounded construction stage.
 
@@ -232,7 +280,9 @@ Every substantive experiment belongs in `research/` and should state:
 
 Keep failed approaches. Do not rewrite negative evidence out of history.
 
-Prefer an explicit pipeline stage over another global `generateBest` wrapper. When a wrapper is unavoidable, document its load-order contract and test real generation.
+Prefer an explicit pipeline stage over another global `generateBest` wrapper. When a wrapper is unavoidable, document its load-order contract and test real generation. After Phase 3, a new stage may not globally replace `generateBest`; it must enter through the explicit orchestrator or be retained strictly as documented historical research.
+
+Do not tune on the locked Phase 2 promotion or stability seed sets. Use development seeds for iteration, promotion only for a frozen candidate, and stability only after promotion when the phase gate requires it.
 
 ## Canonical directories
 
@@ -241,6 +291,7 @@ Prefer an explicit pipeline stage over another global `generateBest` wrapper. Wh
 bulk-lexicon/                         generated chunks, loader and manifest
 docs/milestones/                      accepted project baselines
 research/closed-fill/                 topology and clue-allocation history
+research/explicit-pipeline/           explicit CandidateState and parity evidence
 research/lexical-quality/             same-geometry repair experiments
 research/vocabulary-first/            corpus and active-set history
 research/vocabulary-greatness-1.1/    truthful benchmark and corpus v8 ledger
@@ -261,8 +312,8 @@ tools/                                builders, audits, tests and benchmarks
 
 1. Complete and document a bounded experiment on a short-lived branch.
 2. Run the relevant checkpoint on the exact candidate head.
-3. Update README, AGENTS, milestone, research ledger and user-visible counts.
-4. Confirm browser defaults and wrapper order.
+3. Update README, AGENTS, milestone, research ledger and user-visible counts when they are affected.
+4. Confirm browser defaults and wrapper/pipeline order.
 5. Squash-merge to `main` when the accepted draft boundary is clear.
 6. Verify post-merge checks.
 7. Start the next investigation from updated `main` on a new branch.
