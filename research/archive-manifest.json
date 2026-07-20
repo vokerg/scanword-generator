@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "status": "active",
-  "auditedDate": "2026-07-19",
+  "auditedDate": "2026-07-20",
   "mainRef": "refs/remotes/origin/main",
-  "auditedMainCommit": "87dc59c1b47bcee9846bb1f8243f552fd5d2038b",
+  "auditedMainCommit": "00cdba3c47433cef67b847fe575261324961188c",
   "policy": {
     "historicalBranchNamesAreLabelsUnlessListed": true,
     "requiredRefsMustResolveExactly": true,
@@ -94,6 +94,14 @@
       "commit": "3590819c6aad7e8b8178b5106dcb15b61722e8a0",
       "contains": [
         "3590819c6aad7e8b8178b5106dcb15b61722e8a0"
+      ]
+    },
+    {
+      "name": "phase-3-explicit-pipeline-accepted-evidence",
+      "ref": "refs/heads/research/archive-phase-3-explicit-pipeline-evidence-2026-07-20",
+      "commit": "4c3a72ea4b14a9b57ab9acaa526900b9a2b45047",
+      "contains": [
+        "4c3a72ea4b14a9b57ab9acaa526900b9a2b45047"
       ]
     }
   ]
