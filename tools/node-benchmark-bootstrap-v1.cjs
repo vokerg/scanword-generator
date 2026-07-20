@@ -4,7 +4,11 @@ const path = require("node:path");
 const Module = require("node:module");
 
 const entry = path.basename(process.argv[1] || "");
-if (entry !== "benchmark-seed-v3.cjs") return;
+const supportedEntries = new Set([
+  "benchmark-seed-v3.cjs",
+  "construction-pipeline-seed-v1.cjs",
+]);
+if (!supportedEntries.has(entry)) return;
 
 const root = path.resolve(__dirname, "..");
 global.window = global;
@@ -54,27 +58,37 @@ const scripts = [
   "construction-editorial-bundle-refit-v3.js",
   "construction-editorial-repair-v3.js",
   "construction-vocabulary-portfolio-v1.js",
+  "construction-candidate-state-v1.js",
+  "construction-pipeline-telemetry-v1.js",
+  "construction-pipeline-stages-v1.js",
+  "construction-pipeline-v1.js",
 ];
 
 for (const file of scripts) require(path.join(root, file));
 
 // benchmark-seed-v3 predates the production script order. Its own require loop
-// is allowed to hit modules already cached above, but two research-only wrappers
-// must not be installed after the canonical browser runtime.
+// is allowed to hit modules already cached above, but research-only wrappers
+// must not be installed after the canonical browser runtime. Explicit-pipeline
+// mode records this boundary through SCANWORD_WRAPPER_INSTALLATION_LOCK.
 const blocked = new Set([
   "construction-lexical-placement-v3.js",
   "construction-portfolio-v3.js",
 ]);
-const benchmarkPath = path.join(__dirname, "benchmark-seed-v3.cjs");
+const benchmarkEntrypoints = new Set([
+  path.join(__dirname, "benchmark-seed-v3.cjs"),
+  path.join(__dirname, "construction-pipeline-seed-v1.cjs"),
+]);
 const originalLoad = Module._load;
 Module._load = function loadCanonicalBenchmarkDependency(request, parent, isMain) {
-  if (parent?.filename === benchmarkPath && blocked.has(path.basename(request))) return {};
+  if (benchmarkEntrypoints.has(parent?.filename) && blocked.has(path.basename(request))) return {};
   return originalLoad.call(this, request, parent, isMain);
 };
 
 window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
   version: 1,
   bulkEnabled,
+  entry,
   scripts,
   blocked: [...blocked],
+  explicitPipeline: "construction-pipeline-v1",
 };
