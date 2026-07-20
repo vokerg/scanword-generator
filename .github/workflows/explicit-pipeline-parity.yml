@@ -1,0 +1,87 @@
+name: Explicit pipeline parity
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - construction-candidate-state-v1.js
+      - construction-pipeline-*.js
+      - tools/construction-pipeline-*.cjs
+      - tools/node-benchmark-bootstrap-v1.cjs
+      - research/explicit-pipeline/**
+      - index.html
+      - .github/workflows/explicit-pipeline-parity.yml
+  workflow_dispatch:
+
+concurrency:
+  group: explicit-pipeline-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate explicit pipeline contract
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          node --check construction-candidate-state-v1.js
+          node --check construction-pipeline-telemetry-v1.js
+          node --check construction-pipeline-stages-v1.js
+          node --check construction-pipeline-v1.js
+          node --check tools/construction-pipeline-parity-test.cjs
+          node --check tools/construction-pipeline-seed-v1.cjs
+          node --check tools/construction-pipeline-checkpoint.cjs
+          node tools/construction-pipeline-parity-test.cjs
+
+  development-parity:
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_PIPELINE_CONCURRENCY: 2
+      SCANWORD_PIPELINE_SEED_TIMEOUT_MS: 900000
+      SCANWORD_PIPELINE_RUNTIME_RATIO: 1.10
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run locked development-20 parity checkpoint
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          mkdir -p research-output/explicit-pipeline
+          GITHUB_SHA="${SOURCE_SHA}" node tools/construction-pipeline-checkpoint.cjs \
+            20 research-output/explicit-pipeline/development-parity.jsonl \
+            | tee research-output/explicit-pipeline/console.jsonl
+
+      - name: Publish parity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: explicit-pipeline-development-parity-${{ env.SOURCE_SHA }}
+          path: research-output/explicit-pipeline/
+          if-no-files-found: error
