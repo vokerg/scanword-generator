@@ -10,22 +10,24 @@ The 1.1 corpus adds filtered rivers, regions, mountains, peaks, lakes, islands a
 
 The decision record is [Milestone 1.1](docs/milestones/v1.1-vocabulary-greatness.md). Architecture and contribution rules are in [AGENTS.md](AGENTS.md). The full experiment ledger, including rejected corpus-selection variants, is in [Vocabulary Greatness 1.1](research/vocabulary-greatness-1.1/README.md).
 
-## Validated density baseline
+## Locked v8 baseline
 
-The canonical browser-equivalent 20-seed checkpoint for the 39,586-entry predecessor remains the structural reference while the new 40,966-entry corpus receives longer follow-up runs:
+Phase 2 locks the committed 40,966-entry corpus against disjoint development, promotion and stability seed sets. All 170 accepted runs were structurally valid, contained one connected answer component, used exact clues only and passed the preserved coverage checkpoint.
 
-| metric | former dictionary + repair | vocabulary portfolio + repair |
-| --- | ---: | ---: |
-| average residual panels | 7.05 | **5.30** |
-| average answers | 44.75 | **48.45** |
-| average crossings | 47.35 | **53.00** |
-| average answer-space coverage | 93.98% | **95.53%** |
-| average formulaic short answers | 0.40 | **0.15** |
-| average browser-equivalent runtime | 10.86 s | **24.48 s** |
+| metric | development-20 | promotion-50 | stability-100 |
+| --- | ---: | ---: | ---: |
+| average residual panels | 5.30 | 5.10 | 4.82 |
+| zero-panel rate | 0% | 0% | 0% |
+| average answers | 47.45 | 47.70 | 48.45 |
+| average crossings | 51.70 | 51.96 | 52.78 |
+| average answer-space coverage | 95.50% | 95.67% | 95.92% |
+| average formulaic short answers | 0.00 | 0.02 | 0.04 |
+| average selected-grid clue debt | 15.35 | 13.82 | 13.16 |
+| average browser-equivalent runtime | 26.07 s | 26.49 s | 25.54 s |
 
-All 20 selected candidates were structurally valid, used exact clues and contained one connected answer component.
+The locked protocol, seed files, budgets, aggregate metrics and evidence digests are documented in [Phase 2 baseline](research/baselines/v8-production-1.1/README.md). Promotion and stability seeds must not be used as tuning targets.
 
-The optional adaptive portfolio reproduced the full portfolio result exactly on 10/10 tested seeds and reduced average runtime by 6.57%. It remains an explicit experimental mode rather than a silent browser-default change.
+The baseline is stable but remains far from zero-panel generation: none of the 170 locked seeds produced a zero-panel result. Later density work therefore requires architectural improvements rather than interpreting small three-seed fluctuations as progress.
 
 ## Default pipeline
 
@@ -47,7 +49,29 @@ SCANWORD_VOCABULARY_PORTFOLIO_LIMITS=2500,3500
 SCANWORD_VOCABULARY_PORTFOLIO_MODE=full
 SCANWORD_EDITORIAL_REPAIR=on
 SCANWORD_CATEGORY_BALANCE=off
+SCANWORD_EXPLICIT_PIPELINE=off
 ```
+
+## Explicit pipeline parity
+
+Phase 3 adds an opt-in `CandidateState` pipeline around the complete accepted production generator:
+
+```text
+legacy-source
+-> base-construction
+-> clue-allocation
+-> current-repair-chain
+-> validation
+-> comparison
+```
+
+The explicit mode records candidate signatures, stage timing, candidate counts, provenance and validation while returning the exact browser-compatible result. On the locked development-20 set it achieved 20/20 exact parity for full grids, placed answers, clues and geometry with a 0.9991 aggregate runtime ratio. It remains disabled by default.
+
+```text
+SCANWORD_EXPLICIT_PIPELINE=on
+```
+
+The accepted boundary and its remaining compatibility debt are documented in [Explicit pipeline parity](research/explicit-pipeline/README.md).
 
 ## Structural guarantees
 
@@ -107,7 +131,7 @@ python3 -m http.server 8080
 
 Then open `http://localhost:8080`.
 
-The full two-candidate portfolio typically takes about 20–25 seconds in release-gate environments. Adaptive mode is available for bounded experiments:
+The full two-candidate portfolio typically takes about 20–30 seconds in release-gate environments. Adaptive mode is available for bounded experiments:
 
 ```text
 SCANWORD_VOCABULARY_PORTFOLIO_MODE=adaptive
@@ -122,9 +146,13 @@ NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
   node tools/vocabulary-release-checkpoint.cjs 20
 NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
   node tools/vocabulary-adaptive-checkpoint.cjs 20
+node tools/construction-pipeline-parity-test.cjs
+SCANWORD_PIPELINE_CONCURRENCY=2 \
+  node tools/construction-pipeline-checkpoint.cjs \
+  20 research-output/explicit-pipeline/development-parity.jsonl
 ```
 
-The canonical Node bootstrap mirrors browser corpus and wrapper load order. Release records include source-corpus size, active limit, panels, answers, crossings, coverage, editorial metrics, runtime, category usage and complete structural validation.
+The canonical Node bootstrap mirrors browser corpus and wrapper/pipeline load order. Release records include source-corpus size, active limit, panels, answers, crossings, coverage, editorial metrics, runtime, category usage and complete structural validation.
 
 ## Rollback and A/B controls
 
@@ -135,6 +163,7 @@ SCANWORD_VOCABULARY_PORTFOLIO_MODE=adaptive  allow the conservative fast path
 SCANWORD_EDITORIAL_REPAIR=off                disable same-geometry cleanup
 SCANWORD_CATEGORY_BALANCE=on                 enable the retained category-cap experiment
 SCANWORD_CONSTRUCTION_MODE=legacy            use the original construction path
+SCANWORD_EXPLICIT_PIPELINE=on                 enable explicit state and stage telemetry
 ```
 
 ## Canonical repository structure
@@ -146,6 +175,8 @@ bulk-lexicon/                       generated corpus, loader and manifest
 core.js                             dictionary utilities and active-set selection
 dictionary-policy.js                dictionary admission policy
 solver.js                           base placement, metrics and validation
+construction-candidate-state-v1.js  explicit candidate-state contract
+construction-pipeline-*.js          explicit stage orchestration and telemetry
 construction-*.js                   bounded construction and repair stages
 editorial-*.js                      lexical policy and repair vocabulary
 renderer.js                         A5 SVG renderer
@@ -164,6 +195,7 @@ Canonical experiment descriptions, manifests, reproduction commands and mileston
 Key dossiers:
 
 - [Closed-fill research](research/closed-fill/README.md)
+- [Explicit pipeline parity](research/explicit-pipeline/README.md)
 - [Vocabulary-first program](research/vocabulary-first/README.md)
 - [Vocabulary Greatness 1.1](research/vocabulary-greatness-1.1/README.md)
 - [Lexical-quality experiments](research/lexical-quality/README.md)
@@ -172,8 +204,8 @@ Key dossiers:
 
 The project does not claim zero-panel generation or publication-ready clue prose. Current priorities are:
 
-- measure the committed 40,966-entry corpus on longer identical-seed checkpoints;
-- reduce repeated and generic clues in selected grids, not only in the source corpus;
-- add source-aware candidate tie-breakers without weakening the density hierarchy;
-- tune the adaptive portfolio on a larger sample;
-- broaden reviewed non-geographic subjects such as science, arts, sport and history.
+- add two-level vocabulary retrieval so the active working set is a prior rather than a hard domain boundary;
+- retrieve bounded full-corpus candidates for constrained or editorially poor slot patterns;
+- migrate successful construction and repair behavior from the historical wrapper chain into normal explicit stages;
+- reduce repeated and generic selected-grid clues without weakening structural density;
+- preserve the locked promotion and stability sets for frozen-candidate evaluation only.
