@@ -9,6 +9,7 @@ on:
       - construction-editorial-replace-v3.js
       - construction-editorial-pair-refit-v3.js
       - construction-editorial-bundle-refit-v3.js
+      - construction-editorial-repair-v3.js
       - construction-pipeline-*.js
       - tools/full-corpus-*.cjs
       - tools/node-benchmark-bootstrap-v1.cjs
@@ -47,13 +48,16 @@ jobs:
           node --check full-corpus-pattern-index-v1.js
           node --check construction-editorial-replace-v3.js
           node --check construction-editorial-pair-refit-v3.js
+          node --check construction-editorial-repair-v3.js
           node --check construction-pipeline-stages-v1.js
           node --check construction-pipeline-v1.js
           node --check tools/full-corpus-pattern-index-test.cjs
           node --check tools/full-corpus-pair-priority-test.cjs
+          node --check tools/full-corpus-repair-selection-test.cjs
           node --check tools/full-corpus-retrieval-checkpoint.cjs
           node tools/full-corpus-pattern-index-test.cjs
           node tools/full-corpus-pair-priority-test.cjs
+          node tools/full-corpus-repair-selection-test.cjs
           node tools/construction-pipeline-parity-test.cjs
 
   development:
