@@ -26,6 +26,10 @@
     return mode === "adaptive" ? "adaptive" : "full";
   }
 
+  function partialSearchMode() {
+    return String(environmentOption("SCANWORD_PARTIAL_SEARCH", "off")).toLowerCase();
+  }
+
   function configuredLimits() {
     const parsed = String(environmentOption("SCANWORD_VOCABULARY_PORTFOLIO_LIMITS", "2500,3500"))
       .split(",")
@@ -45,10 +49,11 @@
     };
   }
 
-  function summarize(result, activeLimit, elapsedMs) {
+  function summarize(result, activeLimit, elapsedMs, searchVariant = "default") {
     const editorial = policy?.summarize?.(result.placed || []) || {};
     return {
       activeLimit,
+      searchVariant,
       elapsedMs,
       panels: Number(result.panelCells || 0),
       answers: Number(result.placed?.length || 0),
@@ -60,7 +65,13 @@
       validationValid: Boolean(result.validation?.valid),
       components: Number(result.components || 0),
       score: Number(result.score || 0),
+      selectedAttempt: Number(result.constructionV2?.selectedAttempt || 0),
+      selectedPartialSearchVariant: result.constructionV2?.selectedPartialSearchVariant || null,
     };
+  }
+
+  function variantRank(summary) {
+    return summary.searchVariant === "beam" ? 1 : 0;
   }
 
   function compareCandidates(first, second) {
@@ -75,6 +86,7 @@
       || a.editorialPenalty - b.editorialPenalty
       || a.formulaicShortCount - b.formulaicShortCount
       || b.score - a.score
+      || variantRank(a) - variantRank(b)
       || a.activeLimit - b.activeLimit;
   }
 
@@ -88,40 +100,108 @@
       && summary.formulaicShortCount <= thresholds.maxFormulaicShort;
   }
 
-  function withActiveLimit(limit, callback) {
+  function withEnvironment(name, value, callback) {
     if (typeof process !== "undefined") {
-      const previous = process.env.SCANWORD_ACTIVE_POOL_LIMIT;
-      process.env.SCANWORD_ACTIVE_POOL_LIMIT = String(limit);
+      const previous = process.env[name];
+      if (value == null) delete process.env[name];
+      else process.env[name] = String(value);
       try {
         return callback();
       } finally {
-        if (previous == null) delete process.env.SCANWORD_ACTIVE_POOL_LIMIT;
-        else process.env.SCANWORD_ACTIVE_POOL_LIMIT = previous;
+        if (previous == null) delete process.env[name];
+        else process.env[name] = previous;
       }
     }
-    const previous = window.SCANWORD_ACTIVE_POOL_LIMIT;
-    window.SCANWORD_ACTIVE_POOL_LIMIT = limit;
+    const previous = window[name];
+    window[name] = value;
     try {
       return callback();
     } finally {
-      window.SCANWORD_ACTIVE_POOL_LIMIT = previous;
+      window[name] = previous;
     }
+  }
+
+  function withActiveLimit(limit, callback) {
+    return withEnvironment("SCANWORD_ACTIVE_POOL_LIMIT", limit, callback);
+  }
+
+  function splitAttemptBudget() {
+    const total = Math.max(2, Math.floor(numericOption("SCANWORD_PORTFOLIO_ATTEMPTS", 120)));
+    const baseline = Math.max(1, Math.floor(numericOption(
+      "SCANWORD_PARTIAL_SEARCH_BASE_ATTEMPTS",
+      Math.floor(total / 2),
+    )));
+    const beam = Math.max(1, Math.floor(numericOption(
+      "SCANWORD_PARTIAL_SEARCH_BEAM_ATTEMPTS",
+      Math.max(1, total - baseline),
+    )));
+    return { total, baseline, beam, beamOffset: baseline };
+  }
+
+  function runCandidate(args, limit, searchVariant, attempts = null, offset = null) {
+    const started = Date.now();
+    const result = withActiveLimit(limit, () => withEnvironment(
+      "SCANWORD_PARTIAL_SEARCH",
+      searchVariant === "beam" ? "beam" : searchVariant === "shadow" ? "shadow" : "off",
+      () => withEnvironment(
+        "SCANWORD_PORTFOLIO_ATTEMPTS",
+        attempts,
+        () => withEnvironment(
+          "SCANWORD_PORTFOLIO_ATTEMPT_OFFSET",
+          offset,
+          () => previousGenerateBest(...args),
+        ),
+      ),
+    ));
+    return {
+      result,
+      summary: summarize(result, limit, Date.now() - started, searchVariant),
+    };
+  }
+
+  function attachPartialSearchPortfolio(selected, candidates, budget) {
+    const selectedLimit = selected.summary.activeLimit;
+    const evidence = candidates.find((candidate) => (
+      candidate.summary.activeLimit === selectedLimit && candidate.summary.searchVariant === "beam"
+    )) || candidates.find((candidate) => candidate.summary.searchVariant === "beam") || null;
+    const selectedEvidence = selected.result.partialSearch || null;
+    const beamEvidence = evidence?.result?.partialSearch || null;
+    selected.result.partialSearch = {
+      schemaVersion: 1,
+      search: "split-complete-pipeline-v1",
+      mode: "beam",
+      selected: selectedEvidence?.selected || null,
+      aggregate: beamEvidence?.aggregate || selectedEvidence?.aggregate || null,
+      portfolio: {
+        budget,
+        selectedLimit,
+        selectedSearchVariant: selected.summary.searchVariant,
+        selectedAttemptVariant: selected.summary.selectedPartialSearchVariant,
+        candidates: candidates.map((candidate) => candidate.summary),
+      },
+    };
   }
 
   function generateVocabularyPortfolio(...args) {
     const limits = configuredLimits();
     const mode = portfolioMode();
     const thresholds = adaptiveThresholds();
+    const searchMode = partialSearchMode();
     const candidates = [];
     let fastPathAccepted = false;
+    const splitBudget = searchMode === "beam" ? splitAttemptBudget() : null;
 
     for (let index = 0; index < limits.length; index += 1) {
       const limit = limits[index];
-      const started = Date.now();
-      const result = withActiveLimit(limit, () => previousGenerateBest(...args));
-      const summary = summarize(result, limit, Date.now() - started);
-      candidates.push({ result, summary });
-      if (mode === "adaptive" && index === 0 && qualifiesForAdaptiveFastPath(summary, thresholds)) {
+      if (searchMode === "beam") {
+        candidates.push(runCandidate(args, limit, "baseline", splitBudget.baseline, 0));
+        candidates.push(runCandidate(args, limit, "beam", splitBudget.beam, splitBudget.beamOffset));
+        continue;
+      }
+
+      const candidate = runCandidate(args, limit, searchMode === "shadow" ? "shadow" : "default");
+      candidates.push(candidate);
+      if (mode === "adaptive" && index === 0 && qualifiesForAdaptiveFastPath(candidate.summary, thresholds)) {
         fastPathAccepted = true;
         break;
       }
@@ -132,21 +212,27 @@
     selected.result.constructionV2 = {
       ...(selected.result.constructionV2 || {}),
       vocabularyPortfolio: {
-        mode: mode === "adaptive"
-          ? "panel-first-active-set-portfolio-v1-adaptive"
-          : "panel-first-active-set-portfolio-v1",
+        mode: searchMode === "beam"
+          ? "panel-first-active-set-portfolio-v1-phase6-split"
+          : mode === "adaptive"
+            ? "panel-first-active-set-portfolio-v1-adaptive"
+            : "panel-first-active-set-portfolio-v1",
         evaluationMode: mode,
+        partialSearchMode: searchMode,
+        splitAttemptBudget: splitBudget,
         limits,
-        evaluatedLimits: candidates.map((candidate) => candidate.summary.activeLimit),
+        evaluatedLimits: [...new Set(candidates.map((candidate) => candidate.summary.activeLimit))],
         skippedLimits: limits.filter((limit) => !candidates.some((candidate) => candidate.summary.activeLimit === limit)),
         fastPathAccepted,
         thresholds: mode === "adaptive" ? thresholds : null,
         selectedLimit: selected.summary.activeLimit,
+        selectedSearchVariant: selected.summary.searchVariant,
         selected: selected.summary,
         candidates: ranked.map((candidate) => candidate.summary),
         totalCandidateElapsedMs: candidates.reduce((sum, candidate) => sum + candidate.summary.elapsedMs, 0),
       },
     };
+    if (searchMode === "beam") attachPartialSearchPortfolio(selected, candidates, splitBudget);
     return selected.result;
   }
 
