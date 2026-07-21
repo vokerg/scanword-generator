@@ -8,7 +8,7 @@ This file is the canonical operating guide for the repository root and every sub
 - Accepted project baselines live in `docs/milestones/`.
 - Experiments, including negative results, live in `research/` and must remain reproducible from `main`.
 - A file being present in `main` does not by itself make a feature the browser default. Production behavior is determined by `index.html`, load order, feature flags and the latest milestone document.
-- The whole application is an evolving draft. Draft status permits rapid integration; it does not permit hidden debt, false metrics or weakened validation.
+- The application is an evolving draft. Draft status permits rapid integration; it does not permit hidden debt, false metrics or weakened validation.
 
 ## Current project baseline
 
@@ -31,7 +31,15 @@ Phase 3 adds an opt-in explicit candidate-state pipeline with exact behavior par
 
 Phase 4 adds opt-in bounded full-corpus retrieval for constrained same-geometry repair patterns. `SCANWORD_FULL_CORPUS_RETRIEVAL` remains `off` in the browser. Retrieval may expand only fixed-letter domains and may enter a final result only after complete hot-only and retrieval-enhanced repair chains are compared under strict structural and editorial gates.
 
-Canonical decision: `docs/milestones/v1.1-vocabulary-greatness.md`. Explicit-pipeline parity evidence: `research/explicit-pipeline/README.md`. Full-corpus retrieval evidence: `research/full-corpus-retrieval/README.md`.
+Phase 5 adds opt-in incremental clue-feasibility telemetry at the active `solver.buildAttempt` boundary. `SCANWORD_CLUE_FEASIBILITY` remains `off` in the browser. The accepted `shadow` mode evaluates one production-ranked placement candidate, preserves candidate order and random calls, and calibrates optimistic regional bounds against the unchanged exact clue allocator. `rank` and `guard` are retained experiments, not promoted behavior.
+
+Canonical decision: `docs/milestones/v1.1-vocabulary-greatness.md`.
+
+Evidence ledgers:
+
+- `research/explicit-pipeline/README.md`
+- `research/full-corpus-retrieval/README.md`
+- `research/clue-feasibility/README.md`
 
 ## Runtime structure
 
@@ -50,7 +58,10 @@ Changing script order is architectural. The wrapper and pipeline order must rema
 base dictionaries and bulk corpus
 -> core and dictionary policy
 -> lexical policy and full-corpus pattern index
--> solver and construction stages
+-> solver
+-> construction-v2 runtime and construction-v2
+-> clue-feasibility estimator
+-> remaining construction and clue-repair stages
 -> editorial demand lexicons
 -> single replacement
 -> pair refit
@@ -65,26 +76,30 @@ The vocabulary portfolio wraps the repaired single-candidate generator, so every
 
 The Phase 4 index loads before solver and repair modules so bounded stage functions can use one shared deterministic retrieval API. It is lazy and does not build while `SCANWORD_FULL_CORPUS_RETRIEVAL=off`.
 
+The Phase 5 estimator loads after `construction-v2.js`, where the indexed attempt builder and exact clue allocator are available, and before later construction wrappers. It may wrap `buildAttempt` and observe `assignClueTextCellsV2`; it may not add another `generateBest` wrapper.
+
 ### Production modules
 
 - `core.js`: normalization, indexing, deterministic randomness and active-set selection.
 - `dictionary-policy.js`: clue and lexical admission policy.
 - `full-corpus-pattern-index-v1.js`: complete admitted runtime vocabulary index, constrained lookup, deterministic ranking and retrieval telemetry.
 - `solver.js`: base construction, crossings, scoring, metrics and complete validation.
+- `construction-v2.js`: indexed attempt construction and exact clue-footprint allocation.
+- `construction-clue-feasibility-v1.js`: opt-in regional clue-capacity and local placement telemetry.
 - `construction-*.js`: bounded construction, clue allocation, rollback and repair stages.
 - `construction-editorial-repair-v3.js`: final same-geometry cleanup and complete hot/retrieval chain comparison.
 - `construction-vocabulary-portfolio-v1.js`: full/adaptive active-set portfolio.
 - `construction-candidate-state-v1.js`: explicit candidate-state contract, cloning, provenance and deterministic signatures.
-- `construction-pipeline-stages-v1.js`: normal stage functions for the Phase 3 compatibility boundary and conditional Phase 4 retrieval observation.
+- `construction-pipeline-stages-v1.js`: normal stage functions for the compatibility boundary and conditional Phase 4/5 observations.
 - `construction-pipeline-telemetry-v1.js`: stage timing, candidate counts, signatures and status.
 - `construction-pipeline-v1.js`: opt-in orchestrator and legacy-source compatibility boundary.
 - `renderer.js`, `ui.js`: A5 SVG rendering, controls and export.
 
 Several retained modules are research artifacts. Check `index.html` and the current milestone before treating them as active defaults.
 
-### Explicit pipeline boundary
+## Explicit pipeline boundary
 
-The accepted Phase 3 stage order is:
+The accepted base stage order is:
 
 ```text
 legacy-source
@@ -95,11 +110,12 @@ legacy-source
 -> comparison
 ```
 
-When full-corpus retrieval is enabled, the explicit path adds one observed stage before validation:
+Conditional observed stages run before validation:
 
 ```text
 current-repair-chain
--> full-corpus-retrieval
+-> full-corpus-retrieval     when retrieval is enabled
+-> clue-feasibility          when feasibility telemetry is enabled
 -> validation
 ```
 
@@ -113,20 +129,9 @@ The seed-specific 2,500/3,500-entry hot working set is a prior, not a universal 
 
 ### Index and admission
 
-The index covers the complete admitted runtime vocabulary: the generated 40,966-entry v8 corpus plus reviewed hand-maintained entries. It is keyed by:
+The index covers the complete admitted runtime vocabulary: the generated 40,966-entry v8 corpus plus reviewed hand-maintained entries. It is keyed by answer length, position/fixed letter and intersections of constrained buckets.
 
-- answer length;
-- position and fixed letter;
-- intersections of constrained buckets.
-
-Every returned entry must have:
-
-- normalized Cyrillic spelling;
-- supported length;
-- an exact clue;
-- admitted metadata;
-- no blocked status;
-- no used-answer or explicit exclusion collision.
+Every returned entry must have normalized Cyrillic spelling, supported length, an exact clue, admitted metadata, no blocked status and no used-answer or explicit exclusion collision.
 
 An all-wildcard query is not a constrained search. It must be rejected unless a separately documented experiment explicitly permits it. Phase 4 does not permit it.
 
@@ -146,15 +151,9 @@ Also evaluate bounded fallback when the hot domain is below the configured thres
 
 Neither mode changes unconstrained base-construction sampling.
 
-### Ranking and hot-domain priority
-
-Rank fallback entries deterministically by editorial status, weak/generic/generated-clue penalties, proper-name load, category/source concentration, clue kind, lexical quality and answer tie-break.
-
-The existing hot-domain search must be exhausted before fallback. This rule applies across an entire repair target, not merely within one slot or one partner. A fallback on an earlier partner may not preempt a later hot-only solution.
-
 ### Complete-chain acceptance
 
-Local improvement is insufficient. When retrieval is enabled, `construction-editorial-repair-v3.js` evaluates cloned candidates through:
+When retrieval is enabled, `construction-editorial-repair-v3.js` evaluates cloned candidates through:
 
 ```text
 hot-only complete repair chain
@@ -172,19 +171,64 @@ The retrieval candidate may replace the hot candidate only when:
 
 Equal, ambiguous or worse output must retain the hot-only candidate. Telemetry may record rejected fallback candidates, but final selected-fallback counts must exclude them.
 
-### Telemetry
+## Incremental clue-feasibility estimation
 
-Record at minimum:
+The accepted implementation is `regional-bounds-local-delta-v1`.
 
-- indexed entries;
-- hot and fallback lookups;
-- full-corpus checks;
-- empty, small and poor-domain rescues;
-- returned fallback candidates;
-- candidate and final selected fallback answers;
-- category, source, stage and slot provenance;
-- complete-chain comparison, acceptance and rejection reason;
-- runtime cost.
+For a state, it records:
+
+- remaining panel cells and panel-region topology;
+- isolated one-cell panel regions;
+- clue anchors with no adjacent panel start;
+- long-clue preferred-cell plausibility;
+- optimistic external-clue and clue-text-cell upper bounds;
+- one-pass regional capacity estimate;
+- overlap pressure and maximum clue pressure per region.
+
+For an observed placement candidate, it records:
+
+- consumed panel cells;
+- newly stranded clue anchors;
+- newly implausible long clues;
+- newly isolated panels;
+- new clue-anchor domain size;
+- violation of the preserved 45-cell monotonic capacity floor.
+
+The real allocator and complete validator remain authoritative. An optimistic estimator pass is never proof that allocation will succeed.
+
+### Accepted mode
+
+```text
+SCANWORD_CLUE_FEASIBILITY=shadow
+SCANWORD_CLUE_FEASIBILITY_CANDIDATES=1
+```
+
+Shadow mode must preserve:
+
+- placement candidate order;
+- shortlist size;
+- deterministic random-call sequence;
+- exact clue allocation;
+- downstream repair behavior;
+- final output digest.
+
+The development gate requires 20/20 exact output parity, zero invalid/disconnected/non-exact/checkpoint-failing grids, zero false negatives across completed-state calibration and runtime ratio no greater than 1.15.
+
+### Rejected or unpromoted modes
+
+```text
+SCANWORD_CLUE_FEASIBILITY=rank
+```
+
+The local ranking experiment is rejected. It improved average panels on development seeds but caused six panel regressions, eleven editorial regressions and 16.1% runtime overhead. Do not reuse its local utility as a production placement objective without a new complete-search experiment.
+
+```text
+SCANWORD_CLUE_FEASIBILITY=guard
+```
+
+The hard-capacity guard is unpromoted. It may reject only placements that make the preserved 45-cell clue-text checkpoint mathematically impossible, but no development attempt crossed that floor. Do not claim runtime savings or pruning value from it.
+
+Future output-changing use of feasibility telemetry must be evaluated as a complete bounded search policy, not justified by local estimator scores alone.
 
 ## Dictionary architecture
 
@@ -223,16 +267,7 @@ To change the bulk corpus:
 5. run identical-seed density and editorial benchmarks;
 6. document sources, licenses, canonical-name handling and accepted debt.
 
-Every accepted entry must retain:
-
-- normalized answer;
-- usable clue;
-- lexical category and quality score;
-- source and license;
-- source identifier where available;
-- clue kind;
-- `genericTemplate` and `generatedTemplate` flags;
-- factual metadata when a clue was generated from source facts.
+Every accepted entry must retain normalized answer, usable clue, lexical category and quality, source and license, source identifier where available, clue kind, generic/generated-template flags and factual metadata where applicable.
 
 Do not increase corpus size with unreviewable inflections, malformed abbreviations, colliding aliases or entries without usable clues.
 
@@ -264,63 +299,23 @@ Compare complete valid candidates lexicographically:
 7. higher existing solver score;
 8. deterministic tie-breakers.
 
-Source-aware or clue-aware metrics must not outrank structural density without a separately documented experiment.
+Source-aware, clue-aware or feasibility metrics must not outrank structural density without a separately documented complete-search experiment.
 
 ## Feature flags and rollback
 
 ```text
 SCANWORD_BULK_LEXICON=off
-```
-
-Use the former construction dictionary.
-
-```text
 SCANWORD_VOCABULARY_PORTFOLIO=off
-```
-
-Construct one active working set.
-
-```text
 SCANWORD_VOCABULARY_PORTFOLIO_MODE=full|adaptive
-```
-
-Choose complete portfolio evaluation or conservative early acceptance.
-
-```text
 SCANWORD_EDITORIAL_REPAIR=off
-```
-
-Disable final same-geometry cleanup.
-
-```text
 SCANWORD_CATEGORY_BALANCE=on
-```
-
-Enable retained category-cap research.
-
-```text
 SCANWORD_CONSTRUCTION_MODE=legacy
-```
-
-Use the original construction path.
-
-```text
 SCANWORD_EXPLICIT_PIPELINE=on
-```
-
-Run the accepted production generator through the explicit Phase 3 candidate-state and telemetry boundary. The committed browser default is `off` until a later release decision changes it with complete evidence.
-
-```text
 SCANWORD_FULL_CORPUS_RETRIEVAL=on
-```
-
-Enable bounded full-corpus retrieval for constrained repair domains. The committed browser default is `off`.
-
-```text
 SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=empty|small-poor
+SCANWORD_CLUE_FEASIBILITY=off|shadow|rank|guard
+SCANWORD_CLUE_FEASIBILITY_CANDIDATES=1
 ```
-
-Select the constrained-domain trigger policy. This does not permit uniform full-pool construction sampling.
 
 A/B flags must not silently change browser defaults.
 
@@ -331,7 +326,6 @@ Minimum dictionary or pipeline checks:
 ```bash
 node tools/bulk-lexicon-audit.cjs
 node tools/dictionary-count-v3.cjs
-
 NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
   node tools/vocabulary-release-checkpoint.cjs 20
 ```
@@ -347,13 +341,10 @@ For explicit-pipeline contract or stage changes:
 
 ```bash
 node tools/construction-pipeline-parity-test.cjs
-
 SCANWORD_PIPELINE_CONCURRENCY=2 \
   node tools/construction-pipeline-checkpoint.cjs \
   20 research-output/explicit-pipeline/development-parity.jsonl
 ```
-
-The explicit parity checkpoint must compare isolated legacy and explicit processes on full-grid, placed-answer, clue and geometry digests as well as validity, connectivity, panels, answers and crossings. Runtime must remain within the phase-specific gate.
 
 For full-corpus retrieval changes:
 
@@ -361,28 +352,30 @@ For full-corpus retrieval changes:
 node tools/full-corpus-pattern-index-test.cjs
 node tools/full-corpus-pair-priority-test.cjs
 node tools/full-corpus-repair-selection-test.cjs
-
 SCANWORD_RETRIEVAL_CONCURRENCY=2 \
 SCANWORD_RETRIEVAL_ENFORCE=1 \
   node tools/full-corpus-retrieval-checkpoint.cjs \
   20 research-output/full-corpus-retrieval
 ```
 
-The retrieval checkpoint must compare hard-active-set, empty-domain and small/poor-domain modes on identical locked development seeds. It must fail on structural, validity, exact-clue, two-letter or editorial regression and must propagate failures through any output pipeline such as `tee`.
+For clue-feasibility changes:
 
-Also run `node --check` for every changed JavaScript/CommonJS file and the matching deterministic test for any bounded construction stage.
+```bash
+node tools/clue-feasibility-estimator-test.cjs
+node tools/clue-feasibility-shadow-parity-test.cjs
+node tools/construction-pipeline-parity-test.cjs
+SCANWORD_CLUE_FEASIBILITY_CONCURRENCY=2 \
+SCANWORD_CLUE_FEASIBILITY_MODES=off,shadow \
+SCANWORD_CLUE_FEASIBILITY_CANDIDATES=1 \
+  node tools/clue-feasibility-checkpoint.cjs \
+  research-output/clue-feasibility 20
+node tools/clue-feasibility-acceptance-v1.cjs \
+  research-output/clue-feasibility
+```
 
-A baseline merge must record:
+Use `set -o pipefail` when a gate writes through `tee`. Also run `node --check` for every changed JavaScript/CommonJS file and the matching deterministic test for any bounded construction stage.
 
-- complete structural validity;
-- one connected component;
-- exact clues only;
-- corpus counts and audit status;
-- browser defaults and script order;
-- identical-seed baseline and candidate metrics;
-- runtime;
-- per-seed regressions, not averages alone;
-- known uncompleted checkpoints.
+A baseline merge must record complete structural validity, one connected component, exact clues only, corpus counts, browser defaults, script order, identical-seed metrics, runtime, per-seed regressions and known uncompleted checkpoints.
 
 ## Research discipline
 
@@ -400,7 +393,7 @@ Every substantive experiment belongs in `research/` and should state:
 
 Keep failed approaches. Do not rewrite negative evidence out of history.
 
-Prefer an explicit pipeline stage over another global `generateBest` wrapper. When a wrapper is unavoidable, document its load-order contract and test real generation. After Phase 3, a new stage may not globally replace `generateBest`; it must enter through the explicit orchestrator or be retained strictly as documented historical research.
+Prefer an explicit pipeline stage over another global `generateBest` wrapper. A new stage may not globally replace `generateBest`; it must enter through the explicit orchestrator or be retained strictly as documented historical research.
 
 Do not use the full corpus as an unconstrained random or uniformly expanded construction pool. Pattern retrieval must be demand-driven, bounded, admitted and measured. Local fallback improvement must not be promoted without complete-chain or complete-pipeline comparison.
 
@@ -415,6 +408,7 @@ docs/milestones/                      accepted project baselines
 research/closed-fill/                 topology and clue-allocation history
 research/explicit-pipeline/           explicit CandidateState and parity evidence
 research/full-corpus-retrieval/       bounded pattern retrieval and negative evidence
+research/clue-feasibility/            calibrated estimator and rejected ranking evidence
 research/lexical-quality/             same-geometry repair experiments
 research/vocabulary-first/            corpus and active-set history
 research/vocabulary-greatness-1.1/    truthful benchmark and corpus v8 ledger
@@ -435,12 +429,14 @@ tools/                                builders, audits, tests and benchmarks
 
 1. Complete and document a bounded experiment on a short-lived branch.
 2. Run the relevant checkpoint on the exact candidate head.
-3. Update README, AGENTS, milestone, research ledger and user-visible counts when they are affected.
-4. Confirm browser defaults and wrapper/pipeline order.
-5. Squash-merge to `main` when the accepted draft boundary is clear.
-6. Verify post-merge checks.
-7. Start the next investigation from updated `main` on a new branch.
-8. Delete obsolete branches when no workflow or open PR depends on them.
+3. Preserve accepted evidence with an immutable `research/archive-...` ref before documentation-only commits.
+4. Update README, AGENTS, milestone, research ledger and user-visible counts when affected.
+5. Confirm browser defaults and wrapper/pipeline order.
+6. Run exact final-head CI.
+7. Squash-merge to `main` when the accepted draft boundary is clear.
+8. Verify the squash commit and post-merge checks.
+9. Start the next investigation from updated `main` on a new branch.
+10. Delete obsolete branches when no workflow or open PR depends on them.
 
 ## Branch policy
 
