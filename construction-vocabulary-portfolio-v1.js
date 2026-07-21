@@ -129,13 +129,17 @@
     const total = Math.max(2, Math.floor(numericOption("SCANWORD_PORTFOLIO_ATTEMPTS", 120)));
     const baseline = Math.max(1, Math.floor(numericOption(
       "SCANWORD_PARTIAL_SEARCH_BASE_ATTEMPTS",
-      Math.floor(total / 2),
+      total,
     )));
     const beam = Math.max(1, Math.floor(numericOption(
       "SCANWORD_PARTIAL_SEARCH_BEAM_ATTEMPTS",
-      Math.max(1, total - baseline),
+      Math.max(24, Math.ceil(total / 4)),
     )));
-    return { total, baseline, beam, beamOffset: baseline };
+    const beamOffset = Math.max(0, Math.floor(numericOption(
+      "SCANWORD_PARTIAL_SEARCH_BEAM_OFFSET",
+      Math.floor(total / 2),
+    )));
+    return { total, baseline, beam, beamOffset };
   }
 
   function runCandidate(args, limit, searchVariant, attempts = null, offset = null) {
@@ -166,11 +170,12 @@
     )) || candidates.find((candidate) => candidate.summary.searchVariant === "beam") || null;
     const selectedEvidence = selected.result.partialSearch || null;
     const beamEvidence = evidence?.result?.partialSearch || null;
+    const wordEvidence = (selected.result.placed || []).find((word) => word.phase6Search)?.phase6Search || null;
     selected.result.partialSearch = {
       schemaVersion: 1,
       search: "split-complete-pipeline-v1",
       mode: "beam",
-      selected: selectedEvidence?.selected || null,
+      selected: selectedEvidence?.selected || wordEvidence || null,
       aggregate: beamEvidence?.aggregate || selectedEvidence?.aggregate || null,
       portfolio: {
         budget,
