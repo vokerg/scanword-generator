@@ -76,6 +76,7 @@ jobs:
 
       - name: Compare hard, empty-domain and small-poor retrieval
         run: |
+          set -o pipefail
           test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           mkdir -p research-output/full-corpus-retrieval
           GITHUB_SHA="${SOURCE_SHA}" node tools/full-corpus-retrieval-checkpoint.cjs \
