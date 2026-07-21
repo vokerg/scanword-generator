@@ -36,6 +36,7 @@ const scripts = [
   "construction-v2.js",
   "construction-clue-feasibility-v1.js",
   "construction-bounded-partial-search-v1.js",
+  "construction-bounded-partial-search-fallback-v1.js",
   "construction-victim.js",
   "construction-victim-depth2.js",
   "construction-portfolio.js",
@@ -103,4 +104,5 @@ window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
   fullCorpusRetrieval: "full-corpus-pattern-index-v1",
   clueFeasibility: "construction-clue-feasibility-v1",
   boundedPartialSearch: "construction-bounded-partial-search-v1",
+  boundedPartialSearchFallback: "construction-bounded-partial-search-fallback-v1",
 };
