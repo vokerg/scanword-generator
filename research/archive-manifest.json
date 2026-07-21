@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "status": "active",
-  "auditedDate": "2026-07-20",
+  "auditedDate": "2026-07-21",
   "mainRef": "refs/remotes/origin/main",
-  "auditedMainCommit": "00cdba3c47433cef67b847fe575261324961188c",
+  "auditedMainCommit": "5424e339430e9be176b58f2546b93fcde29eb092",
   "policy": {
     "historicalBranchNamesAreLabelsUnlessListed": true,
     "requiredRefsMustResolveExactly": true,
@@ -102,6 +102,14 @@
       "commit": "4c3a72ea4b14a9b57ab9acaa526900b9a2b45047",
       "contains": [
         "4c3a72ea4b14a9b57ab9acaa526900b9a2b45047"
+      ]
+    },
+    {
+      "name": "phase-4-full-corpus-retrieval-accepted-evidence",
+      "ref": "refs/heads/research/archive-phase-4-full-corpus-retrieval-evidence-2026-07-21",
+      "commit": "054a8188a5395404c7c4dba20211aa9521ad5f23",
+      "contains": [
+        "054a8188a5395404c7c4dba20211aa9521ad5f23"
       ]
     }
   ]

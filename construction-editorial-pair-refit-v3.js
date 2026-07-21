@@ -3,6 +3,7 @@
 
   const solver = window.ScanwordSolver;
   const policy = window.ScanwordEditorialLexicalPolicyV3;
+  const retrieval = window.ScanwordFullCorpusPatternIndexV1;
   if (!solver || !policy || solver.__editorialPairRefitV3Installed) return;
 
   const previousGenerateBest = solver.generateBest.bind(solver);
@@ -64,9 +65,21 @@
     return policy.classify(entry.answer, entry).editorialPenalty;
   }
 
+  function concentrationContext(result) {
+    const categoryCounts = {};
+    const sourceCounts = {};
+    for (const entry of result.placed || []) {
+      const category = entry.lexicalCategory || "unknown";
+      const source = entry.lexicalSource || "unknown";
+      categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+      sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+    }
+    return { categoryCounts, sourceCounts };
+  }
+
   function domainForWord(result, word, pattern, usedOutside, options = {}) {
     const maximum = numericOption("SCANWORD_EDITORIAL_PAIR_DOMAIN", 80);
-    return result.pool
+    const hotDomain = result.pool
       .filter((entry) => String(entry.answer || "").length === word.answer.length)
       .filter((entry) => entry.hasExactClue)
       .filter((entry) => !usedOutside.has(entry.answer))
@@ -74,6 +87,15 @@
       .filter((entry) => !options.requireNonFormulaic || !policy.classify(entry.answer, entry).formulaicShort)
       .sort((a, b) => entryPenalty(a) - entryPenalty(b) || a.answer.localeCompare(b.answer))
       .slice(0, maximum);
+    const augmented = retrieval?.augmentDomain
+      ? retrieval.augmentDomain(hotDomain, pattern, {
+        usedAnswers: usedOutside,
+        requireNonFormulaic: Boolean(options.requireNonFormulaic),
+        maximum,
+        ...concentrationContext(result),
+      })
+      : { entries: hotDomain };
+    return augmented.entries.slice(0, maximum);
   }
 
   function saveWordState(result, words) {
@@ -100,6 +122,7 @@
         weakFill: word.weakFill,
         lexicalQuality: word.lexicalQuality,
         lexicalSource: word.lexicalSource,
+        lexicalCategory: word.lexicalCategory,
       })),
       cells: [...cells.values()],
       clues,
@@ -114,6 +137,7 @@
       item.word.weakFill = item.weakFill;
       item.word.lexicalQuality = item.lexicalQuality;
       item.word.lexicalSource = item.lexicalSource;
+      item.word.lexicalCategory = item.lexicalCategory;
     }
     for (const item of saved.cells) item.cell.char = item.char;
     for (const item of saved.clues) {
@@ -129,6 +153,9 @@
     word.weakFill = Boolean(entry.weakFill);
     word.lexicalQuality = Number(entry.lexicalQuality || policy.classify(entry.answer, entry).editorialQuality);
     word.lexicalSource = entry.lexicalSource || "editorial-pair-refit-v3";
+    if (entry.fullCorpusFallback) {
+      word.lexicalCategory = entry.lexicalCategory || word.lexicalCategory || "unknown";
+    }
     for (let index = 0; index < word.cells.length; index += 1) {
       const cell = word.cells[index];
       result.grid[cell.row][cell.col].char = entry.answer[index];
@@ -151,6 +178,14 @@
     }
     restoreState(saved);
     return { accepted: false, validation, duplicateAnswers };
+  }
+
+  function comparePairs(a, b) {
+    return b.formulaicGain - a.formulaicGain
+      || b.penaltyGain - a.penaltyGain
+      || entryPenalty(a.partnerEntry) - entryPenalty(b.partnerEntry)
+      || a.targetEntry.answer.localeCompare(b.targetEntry.answer)
+      || a.partnerEntry.answer.localeCompare(b.partnerEntry.answer);
   }
 
   function pairCandidates(result, target, partner, usedAnswers) {
@@ -195,18 +230,28 @@
       if (pairs.length >= maximumPairs) break;
     }
 
-    pairs.sort((a, b) =>
-      b.formulaicGain - a.formulaicGain
-      || b.penaltyGain - a.penaltyGain
-      || entryPenalty(a.partnerEntry) - entryPenalty(b.partnerEntry)
-      || a.targetEntry.answer.localeCompare(b.targetEntry.answer)
-      || a.partnerEntry.answer.localeCompare(b.partnerEntry.answer));
-    return { targetPattern, partnerPattern, shared, targetDomain, partnerDomain, pairs };
+    const hotPairs = pairs
+      .filter((pair) => !pair.targetEntry.fullCorpusFallback && !pair.partnerEntry.fullCorpusFallback)
+      .sort(comparePairs);
+    const fallbackPairs = pairs
+      .filter((pair) => pair.targetEntry.fullCorpusFallback || pair.partnerEntry.fullCorpusFallback)
+      .sort(comparePairs);
+    return {
+      targetPattern,
+      partnerPattern,
+      shared,
+      targetDomain,
+      partnerDomain,
+      hotPairs,
+      fallbackPairs,
+      pairs: [...hotPairs, ...fallbackPairs],
+    };
   }
 
   function applyEditorialPairRefits(result) {
     if (!result?.grid || !Array.isArray(result.placed) || !Array.isArray(result.pool)) return result;
 
+    const retrievalBefore = retrieval?.enabled?.() ? retrieval.snapshot() : null;
     const before = policy.summarize(result.placed);
     const byId = new Map(result.placed.map((word) => [Number(word.id), word]));
     const usedAnswers = new Set(result.placed.map((word) => word.answer));
@@ -234,42 +279,69 @@
         .filter(Boolean)
         .sort((a, b) => a.answer.length - b.answer.length || a.id - b.id);
 
+      const deferredFallbacks = [];
       let accepted = false;
+
+      function acceptCandidate(partner, generated, pair) {
+        const fromTarget = target.answer;
+        const fromPartner = partner.answer;
+        const outcome = applyPair(result, target, pair.targetEntry, partner, pair.partnerEntry);
+        if (!outcome.accepted) {
+          rejectedPairs += 1;
+          return false;
+        }
+        usedAnswers.delete(fromTarget);
+        usedAnswers.delete(fromPartner);
+        usedAnswers.add(pair.targetEntry.answer);
+        usedAnswers.add(pair.partnerEntry.answer);
+        retrieval?.recordSelected?.(pair.targetEntry, { stage: "pair-refit", slotId: target.id });
+        retrieval?.recordSelected?.(pair.partnerEntry, { stage: "pair-refit", slotId: partner.id });
+        replacements.push({
+          targetSlotId: target.id,
+          partnerSlotId: partner.id,
+          targetFrom: fromTarget,
+          targetTo: pair.targetEntry.answer,
+          partnerFrom: fromPartner,
+          partnerTo: pair.partnerEntry.answer,
+          targetPattern: generated.targetPattern,
+          partnerPattern: generated.partnerPattern,
+          shared: generated.shared,
+          formulaicGain: pair.formulaicGain,
+          penaltyGain: pair.penaltyGain,
+          targetRetrievalSource: pair.targetEntry.fullCorpusFallback ? "full-corpus-pattern-v1" : "hot-working-set",
+          partnerRetrievalSource: pair.partnerEntry.fullCorpusFallback ? "full-corpus-pattern-v1" : "hot-working-set",
+        });
+        return true;
+      }
+
+      // First pass: exhaust the complete established hot-domain search across
+      // every partner. A fallback on an earlier partner may not preempt a hot
+      // solution that the baseline would find on a later partner.
       for (const partner of partners) {
         partnerSearches += 1;
         const generated = pairCandidates(result, target, partner, usedAnswers);
         domainsBuilt += generated.targetDomain?.length || 0;
         domainsBuilt += generated.partnerDomain?.length || 0;
         compatiblePairs += generated.pairs.length;
-        for (const pair of generated.pairs) {
-          const fromTarget = target.answer;
-          const fromPartner = partner.answer;
-          const outcome = applyPair(result, target, pair.targetEntry, partner, pair.partnerEntry);
-          if (!outcome.accepted) {
-            rejectedPairs += 1;
-            continue;
+        deferredFallbacks.push(...generated.fallbackPairs.map((pair) => ({ partner, generated, pair })));
+        for (const pair of generated.hotPairs) {
+          if (acceptCandidate(partner, generated, pair)) {
+            accepted = true;
+            break;
           }
-          usedAnswers.delete(fromTarget);
-          usedAnswers.delete(fromPartner);
-          usedAnswers.add(pair.targetEntry.answer);
-          usedAnswers.add(pair.partnerEntry.answer);
-          replacements.push({
-            targetSlotId: target.id,
-            partnerSlotId: partner.id,
-            targetFrom: fromTarget,
-            targetTo: pair.targetEntry.answer,
-            partnerFrom: fromPartner,
-            partnerTo: pair.partnerEntry.answer,
-            targetPattern: generated.targetPattern,
-            partnerPattern: generated.partnerPattern,
-            shared: generated.shared,
-            formulaicGain: pair.formulaicGain,
-            penaltyGain: pair.penaltyGain,
-          });
-          accepted = true;
-          break;
         }
         if (accepted) break;
+      }
+
+      // Second pass: only after no hot partner repair succeeds may a bounded
+      // full-corpus candidate enter the accepted result.
+      if (!accepted) {
+        for (const item of deferredFallbacks) {
+          if (acceptCandidate(item.partner, item.generated, item.pair)) {
+            accepted = true;
+            break;
+          }
+        }
       }
     }
 
@@ -298,6 +370,7 @@
         validation: metrics.validation,
       },
     };
+    if (retrievalBefore) retrieval.attachTelemetry(result, "pair-refit", retrievalBefore);
     return result;
   }
 

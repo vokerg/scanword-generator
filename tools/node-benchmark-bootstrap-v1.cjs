@@ -25,6 +25,7 @@ const scripts = [
   "dictionary-policy.js",
   "lexical-policy-v2.js",
   "editorial-lexical-policy-v3.js",
+  "full-corpus-pattern-index-v1.js",
   "solver.js",
   "closed-fill.js",
   "closed-fill-rollback.js",
@@ -91,4 +92,5 @@ window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
   scripts,
   blocked: [...blocked],
   explicitPipeline: "construction-pipeline-v1",
+  fullCorpusRetrieval: "full-corpus-pattern-index-v1",
 };
