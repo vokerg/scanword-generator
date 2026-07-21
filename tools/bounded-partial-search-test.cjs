@@ -41,7 +41,7 @@ assert.equal(solver.validateGrid(off.grid, off.placed).valid, true, "off state m
 
 process.env.SCANWORD_PARTIAL_SEARCH = "shadow";
 process.env.SCANWORD_PARTIAL_SEARCH_RATE = "1";
-process.env.SCANWORD_PARTIAL_SEARCH_START = "24";
+process.env.SCANWORD_PARTIAL_SEARCH_START = "14";
 process.env.SCANWORD_PARTIAL_SEARCH_DEPTH = "3";
 process.env.SCANWORD_PARTIAL_SEARCH_BEAM = "3";
 process.env.SCANWORD_PARTIAL_SEARCH_BRANCHING = "3";
@@ -50,6 +50,8 @@ const shadow = solver.buildAttempt(pool, 17, 13, 30, core.makeRandom("phase6-tes
 assert.equal(digestState(shadow), digestState(off), "shadow mode must return the exact greedy state");
 assert.equal(shadow.partialSearch?.sampled, true, "shadow test must execute the bounded search");
 assert.equal(shadow.partialSearch?.selectedVariant, "baseline", "shadow mode must preserve baseline output");
+assert.ok(shadow.partialSearch.nodes > 0, "shadow mode must expand at least one alternative state");
+assert.ok(shadow.partialSearch.depthReached > 0, "shadow mode must reach at least one beam depth");
 assert.ok(shadow.partialSearch.nodes <= 24, "node budget must be enforced");
 assert.ok(shadow.partialSearch.finalists <= 3, "finalist count must be bounded by beam width");
 
@@ -59,6 +61,7 @@ const beamB = solver.buildAttempt(pool, 17, 13, 30, core.makeRandom("phase6-test
 assert.equal(digestState(beamA), digestState(beamB), "beam search must be deterministic for an identical attempt seed");
 assert.equal(solver.validateGrid(beamA.grid, beamA.placed).valid, true, "beam-selected state must remain structurally valid");
 assert.equal(solver.resultMetrics(beamA).components, 1, "beam-selected state must remain connected");
+assert.ok(beamA.partialSearch?.nodes > 0, "beam mode must expand alternatives");
 assert.ok(beamA.partialSearch?.nodes <= 24, "beam mode must enforce node budget");
 assert.ok(["baseline", "beam"].includes(beamA.partialSearch?.selectedVariant), "selection provenance must be explicit");
 if (beamA.partialSearch?.selectedVariant === "beam") {
