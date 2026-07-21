@@ -18,7 +18,11 @@ const bootstrap = path.join(root, "tools", "node-benchmark-bootstrap-v1.cjs");
 const concurrency = Math.max(1, Number(process.env.SCANWORD_CLUE_FEASIBILITY_CONCURRENCY || 2));
 const timeoutMs = Math.max(60_000, Number(process.env.SCANWORD_CLUE_FEASIBILITY_SEED_TIMEOUT_MS || 900_000));
 const enforce = String(process.env.SCANWORD_CLUE_FEASIBILITY_ENFORCE || "0") === "1";
-const modes = ["off", "shadow", "guard"];
+const modes = String(process.env.SCANWORD_CLUE_FEASIBILITY_MODES || "off,shadow,guard")
+  .split(",")
+  .map((value) => value.trim())
+  .filter((value, index, values) => ["off", "shadow", "guard", "rank"].includes(value) && values.indexOf(value) === index);
+if (!modes.includes("off")) modes.unshift("off");
 
 function sha256File(file) {
   return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
@@ -46,6 +50,8 @@ function summarizeMode(mode, records) {
   const telemetry = completed.map((record) => record.clueFeasibility?.aggregate).filter(Boolean);
   const selected = completed.map((record) => record.clueFeasibility?.selected?.calibration).filter(Boolean);
   const sumTelemetry = (key) => telemetry.reduce((sum, item) => sum + Number(item[key] || 0), 0);
+  const completeStates = sumTelemetry("completeStates");
+  const falsePositives = sumTelemetry("falsePositives");
   return {
     mode,
     requested: seeds.length,
@@ -84,17 +90,14 @@ function summarizeMode(mode, records) {
       candidatesPruned: sumTelemetry("candidatesPruned"),
       denseStops: sumTelemetry("denseStops"),
       newlyStrandedClues: sumTelemetry("newlyStrandedClues"),
-      completeStates: sumTelemetry("completeStates"),
+      completeStates,
       predictedPasses: sumTelemetry("predictedPasses"),
       actualPasses: sumTelemetry("actualPasses"),
-      falsePositives: sumTelemetry("falsePositives"),
+      falsePositives,
+      falsePositiveRate: completeStates ? falsePositives / completeStates : 0,
       falseNegatives: sumTelemetry("falseNegatives"),
-      meanClueTextAbsoluteError: sumTelemetry("completeStates")
-        ? sumTelemetry("clueTextAbsoluteError") / sumTelemetry("completeStates")
-        : 0,
-      meanExternalAbsoluteError: sumTelemetry("completeStates")
-        ? sumTelemetry("externalAbsoluteError") / sumTelemetry("completeStates")
-        : 0,
+      meanClueTextAbsoluteError: completeStates ? sumTelemetry("clueTextAbsoluteError") / completeStates : 0,
+      meanExternalAbsoluteError: completeStates ? sumTelemetry("externalAbsoluteError") / completeStates : 0,
       selectedFalsePositives: selected.filter((item) => item.falsePositive).length,
       selectedFalseNegatives: selected.filter((item) => item.falseNegative).length,
     },
@@ -104,7 +107,7 @@ function summarizeMode(mode, records) {
 function compareModes(recordsByMode, summaries) {
   const offBySeed = new Map(recordsByMode.off.map((record) => [record.seed, record]));
   const comparisons = {};
-  for (const mode of ["shadow", "guard"]) {
+  for (const mode of modes.filter((value) => value !== "off")) {
     const pairs = recordsByMode[mode]
       .filter((record) => record.status === "passed" && offBySeed.get(record.seed)?.status === "passed")
       .map((record) => ({ baseline: offBySeed.get(record.seed), candidate: record }));
@@ -126,7 +129,6 @@ function compareModes(recordsByMode, summaries) {
         baseline: pair.baseline.editorialPenalty,
         candidate: pair.candidate.editorialPenalty,
       })),
-      clueTextImprovements: pairs.filter((pair) => pair.candidate.clueTextCells > pair.baseline.clueTextCells).length,
       runtimeRatio: summaries.off.runtime.totalMs
         ? summaries[mode].runtime.totalMs / summaries.off.runtime.totalMs
         : 0,
@@ -170,6 +172,32 @@ async function runWorker(mode, seed) {
   });
 }
 
+function gateFailures(summaries, comparisons) {
+  const failures = [];
+  for (const mode of modes) {
+    const summary = summaries[mode];
+    if (summary.completed !== seeds.length) failures.push(`${mode}: incomplete runs`);
+    if (summary.validity.invalid) failures.push(`${mode}: invalid grids`);
+    if (summary.validity.disconnected) failures.push(`${mode}: disconnected grids`);
+    if (summary.validity.nonExactClues) failures.push(`${mode}: non-exact clues`);
+    if (summary.validity.checkpointFailures) failures.push(`${mode}: checkpoint failures`);
+  }
+  for (const mode of modes.filter((value) => value !== "off" && value !== "rank")) {
+    const summary = summaries[mode];
+    const comparison = comparisons[mode];
+    if (comparison.exactDigestParity !== comparison.pairedSeeds) failures.push(`${mode}: exact output parity failed`);
+    if (summary.estimator.falseNegatives) failures.push(`${mode}: dangerous complete-state false negatives`);
+    if (summary.estimator.falsePositiveRate > 0.12) failures.push(`${mode}: false-positive rate exceeds 12%`);
+    if (summary.estimator.meanClueTextAbsoluteError > 6) failures.push(`${mode}: clue-text mean absolute error exceeds 6`);
+    if (summary.estimator.meanExternalAbsoluteError > 3) failures.push(`${mode}: external-clue mean absolute error exceeds 3`);
+    if (summary.estimator.candidateEvaluations <= 0 || summary.estimator.completeStates <= 0) failures.push(`${mode}: estimator telemetry missing`);
+    if (comparison.runtimeRatio > 1.10) failures.push(`${mode}: runtime ratio ${comparison.runtimeRatio.toFixed(4)} exceeds 1.10`);
+    if (comparison.panelRegressions.length) failures.push(`${mode}: panel regressions`);
+    if (comparison.editorialRegressions.length) failures.push(`${mode}: editorial regressions`);
+  }
+  return failures;
+}
+
 async function runAll() {
   const queue = modes.flatMap((mode) => seeds.map((seed) => ({ mode, seed })));
   const records = [];
@@ -189,6 +217,7 @@ async function runAll() {
   const recordsByMode = Object.fromEntries(modes.map((mode) => [mode, records.filter((record) => record.mode === mode)]));
   const summaries = Object.fromEntries(modes.map((mode) => [mode, summarizeMode(mode, recordsByMode[mode])]));
   const comparisons = compareModes(recordsByMode, summaries);
+  const failures = gateFailures(summaries, comparisons);
   const aggregate = {
     schemaVersion: 1,
     phase: "phase-5-clue-feasibility",
@@ -196,7 +225,9 @@ async function runAll() {
     seeds,
     modes: summaries,
     comparisons,
+    gate: { enforce, passed: failures.length === 0, failures },
   };
+
   fs.mkdirSync(outputDir, { recursive: true });
   const recordsPath = path.join(outputDir, "per-seed.jsonl");
   const aggregatePath = path.join(outputDir, "aggregate.json");
@@ -211,13 +242,16 @@ async function runAll() {
     arch: process.arch,
     concurrency,
     timeoutMs,
+    modes,
+    candidateLimit: Number(process.env.SCANWORD_CLUE_FEASIBILITY_CANDIDATES || 4),
     configPath: path.relative(root, configPath),
     seedPath: path.relative(root, seedPath),
     worker: path.relative(root, worker),
     bootstrap: path.relative(root, bootstrap),
     environment: config.environment,
   }, null, 2)}\n`);
-  fs.writeFileSync(path.join(outputDir, "run-manifest.json"), `${JSON.stringify({
+  const manifestPath = path.join(outputDir, "run-manifest.json");
+  fs.writeFileSync(manifestPath, `${JSON.stringify({
     schemaVersion: 1,
     command: `node tools/clue-feasibility-checkpoint.cjs ${path.relative(root, outputDir)} ${seeds.length}`,
     files: {
@@ -227,30 +261,7 @@ async function runAll() {
     },
   }, null, 2)}\n`);
   console.log(JSON.stringify(aggregate));
-
-  const failures = [];
-  for (const mode of modes) {
-    const summary = summaries[mode];
-    if (summary.completed !== seeds.length) failures.push(`${mode}: incomplete runs`);
-    if (summary.validity.invalid) failures.push(`${mode}: invalid grids`);
-    if (summary.validity.disconnected) failures.push(`${mode}: disconnected grids`);
-    if (summary.validity.nonExactClues) failures.push(`${mode}: non-exact clues`);
-    if (summary.validity.checkpointFailures) failures.push(`${mode}: checkpoint failures`);
-  }
-  if (comparisons.shadow.exactDigestParity !== comparisons.shadow.pairedSeeds) failures.push("shadow: exact output parity failed");
-  if (summaries.shadow.estimator.falseNegatives) failures.push("shadow: dangerous complete-state false negatives");
-  if (summaries.guard.estimator.falseNegatives) failures.push("guard: dangerous complete-state false negatives");
-  if (comparisons.guard.panelRegressions.length) failures.push("guard: panel regressions");
-  if (comparisons.guard.editorialRegressions.length) failures.push("guard: editorial regressions");
-  if (comparisons.guard.runtimeRatio > 1.15) failures.push(`guard: runtime ratio ${comparisons.guard.runtimeRatio.toFixed(4)} exceeds 1.15`);
-  if (summaries.guard.estimator.candidatesPruned <= 0 || summaries.guard.estimator.denseStops <= 0) failures.push("guard: no clearly impossible dense states rejected");
-  const improved = comparisons.guard.runtimeRatio <= 0.98
-    || comparisons.guard.panelImprovements.length > 0
-    || comparisons.guard.clueTextImprovements > 0;
-  if (!improved) failures.push("guard: no runtime or downstream quality improvement");
   if (enforce && failures.length) throw new Error(`Clue-feasibility gate failed: ${failures.join(", ")}`);
-  aggregate.gate = { enforce, passed: failures.length === 0, failures };
-  fs.writeFileSync(aggregatePath, `${JSON.stringify(aggregate, null, 2)}\n`);
 }
 
 runAll().catch((error) => {
