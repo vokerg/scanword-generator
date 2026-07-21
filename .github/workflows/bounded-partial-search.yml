@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - construction-bounded-partial-search-v1.js
+      - construction-bounded-partial-search-fallback-v1.js
+      - construction-portfolio.js
+      - construction-vocabulary-portfolio-v1.js
       - tools/bounded-partial-search-*.cjs
       - tools/node-benchmark-bootstrap-v1.cjs
       - research/bounded-partial-search/**
@@ -41,6 +44,9 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           node --check construction-bounded-partial-search-v1.js
+          node --check construction-bounded-partial-search-fallback-v1.js
+          node --check construction-portfolio.js
+          node --check construction-vocabulary-portfolio-v1.js
           node --check tools/bounded-partial-search-test.cjs
           node --check tools/bounded-partial-search-seed-v1.cjs
           node --check tools/bounded-partial-search-checkpoint.cjs
@@ -84,6 +90,8 @@ jobs:
       SCANWORD_PARTIAL_SEARCH_BEAM: 4
       SCANWORD_PARTIAL_SEARCH_BRANCHING: 3
       SCANWORD_PARTIAL_SEARCH_NODES: 48
+      SCANWORD_PARTIAL_SEARCH_BEAM_ATTEMPTS: 60
+      SCANWORD_PARTIAL_SEARCH_BEAM_OFFSET: 120
       SCANWORD_PARTIAL_SEARCH_SEED_TIMEOUT_MS: 1200000
     steps:
       - name: Check out exact candidate head
