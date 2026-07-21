@@ -50,6 +50,7 @@ jobs:
           node --check tools/bounded-partial-search-test.cjs
           node --check tools/bounded-partial-search-seed-v1.cjs
           node --check tools/bounded-partial-search-checkpoint.cjs
+          node --check tools/bounded-partial-search-acceptance-v1.cjs
           node --check tools/node-benchmark-bootstrap-v1.cjs
 
       - name: Run deterministic bounded-search contracts
@@ -78,7 +79,7 @@ jobs:
   development:
     needs: unit
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
       SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       SCANWORD_PARTIAL_SEARCH_CONCURRENCY: 2
@@ -110,8 +111,11 @@ jobs:
           test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           mkdir -p research-output/bounded-partial-search
           GITHUB_SHA="${SOURCE_SHA}" node tools/bounded-partial-search-checkpoint.cjs \
-            research-output/bounded-partial-search 5 \
+            research-output/bounded-partial-search 20 \
             | tee research-output/bounded-partial-search/console.jsonl
+
+      - name: Enforce complete-objective acceptance
+        run: node tools/bounded-partial-search-acceptance-v1.cjs research-output/bounded-partial-search
 
       - name: Publish development evidence
         if: always()
