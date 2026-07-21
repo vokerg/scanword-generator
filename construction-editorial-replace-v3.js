@@ -3,6 +3,7 @@
 
   const solver = window.ScanwordSolver;
   const policy = window.ScanwordEditorialLexicalPolicyV3;
+  const retrieval = window.ScanwordFullCorpusPatternIndexV1;
   if (!solver || !policy || solver.__editorialReplacementV3Installed) return;
 
   const previousGenerateBest = solver.generateBest.bind(solver);
@@ -57,6 +58,18 @@
     return references;
   }
 
+  function concentrationContext(result) {
+    const categoryCounts = {};
+    const sourceCounts = {};
+    for (const entry of result.placed || []) {
+      const category = entry.lexicalCategory || "unknown";
+      const source = entry.lexicalSource || "unknown";
+      categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+      sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+    }
+    return { categoryCounts, sourceCounts };
+  }
+
   function applyReplacement(result, word, entry) {
     const previous = {
       word: {
@@ -66,6 +79,7 @@
         weakFill: word.weakFill,
         lexicalQuality: word.lexicalQuality,
         lexicalSource: word.lexicalSource,
+        lexicalCategory: word.lexicalCategory,
       },
       cells: word.cells.map((cell) => ({
         cell: result.grid[cell.row][cell.col],
@@ -84,6 +98,7 @@
     word.weakFill = Boolean(entry.weakFill);
     word.lexicalQuality = Number(entry.lexicalQuality || policy.classify(entry.answer, entry).editorialQuality);
     word.lexicalSource = entry.lexicalSource || "editorial-replacement-v3";
+    word.lexicalCategory = entry.lexicalCategory || word.lexicalCategory || "unknown";
 
     for (let index = 0; index < word.cells.length; index += 1) {
       const cell = result.grid[word.cells[index].row][word.cells[index].col];
@@ -104,6 +119,7 @@
     word.weakFill = previous.word.weakFill;
     word.lexicalQuality = previous.word.lexicalQuality;
     word.lexicalSource = previous.word.lexicalSource;
+    word.lexicalCategory = previous.word.lexicalCategory;
     for (const saved of previous.cells) saved.cell.char = saved.char;
     for (const reference of previous.clues) {
       reference.clue.answer = reference.answer;
@@ -115,6 +131,7 @@
   function applyEditorialReplacements(result) {
     if (!result?.grid || !Array.isArray(result.placed) || !Array.isArray(result.pool)) return result;
 
+    const retrievalBefore = retrieval?.enabled?.() ? retrieval.snapshot() : null;
     const before = policy.summarize(result.placed);
     const usedAnswers = new Set(result.placed.map((word) => word.answer));
     const pool = result.pool
@@ -125,6 +142,8 @@
     const replacements = [];
     let attempted = 0;
     let matchedCandidates = 0;
+    let hotMatchedCandidates = 0;
+    let fallbackMatchedCandidates = 0;
     let rejected = 0;
 
     const formulaicWords = result.placed
@@ -140,7 +159,18 @@
     for (const word of formulaicWords) {
       attempted += 1;
       const pattern = fixedPattern(result, word);
-      const candidates = pool.filter((entry) => !usedAnswers.has(entry.answer) && matchesPattern(entry.answer, pattern));
+      const hotCandidates = pool.filter((entry) => !usedAnswers.has(entry.answer) && matchesPattern(entry.answer, pattern));
+      const augmented = retrieval?.augmentDomain
+        ? retrieval.augmentDomain(hotCandidates, pattern, {
+          usedAnswers,
+          requireNonFormulaic: true,
+          maximum: 80,
+          ...concentrationContext(result),
+        })
+        : { entries: hotCandidates, fallbackEntries: [] };
+      const candidates = [...augmented.entries].sort(compareRank);
+      hotMatchedCandidates += hotCandidates.length;
+      fallbackMatchedCandidates += augmented.fallbackEntries?.length || 0;
       matchedCandidates += candidates.length;
       for (const entry of candidates) {
         const from = word.answer;
@@ -151,6 +181,7 @@
         }
         usedAnswers.delete(from);
         usedAnswers.add(entry.answer);
+        retrieval?.recordSelected?.(entry, { stage: "single-replacement", slotId: word.id });
         replacements.push({
           slotId: word.id,
           from,
@@ -158,6 +189,7 @@
           pattern,
           fromTier: policy.classify(from).editorialTier,
           toTier: policy.classify(entry.answer, entry).editorialTier,
+          retrievalSource: entry.fullCorpusFallback ? "full-corpus-pattern-v1" : "hot-working-set",
         });
         break;
       }
@@ -176,6 +208,8 @@
         mode: "pattern-preserving-short-replacement-v3",
         attempted,
         matchedCandidates,
+        hotMatchedCandidates,
+        fallbackMatchedCandidates,
         accepted: replacements.length,
         rejected,
         before,
@@ -186,6 +220,7 @@
         validation: metrics.validation,
       },
     };
+    if (retrievalBefore) retrieval.attachTelemetry(result, "single-replacement", retrievalBefore);
     return result;
   }
 
