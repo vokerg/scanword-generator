@@ -50,8 +50,10 @@ jobs:
           node --check construction-pipeline-stages-v1.js
           node --check construction-pipeline-v1.js
           node --check tools/full-corpus-pattern-index-test.cjs
+          node --check tools/full-corpus-pair-priority-test.cjs
           node --check tools/full-corpus-retrieval-checkpoint.cjs
           node tools/full-corpus-pattern-index-test.cjs
+          node tools/full-corpus-pair-priority-test.cjs
           node tools/construction-pipeline-parity-test.cjs
 
   development:
