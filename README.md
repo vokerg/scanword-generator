@@ -50,6 +50,8 @@ SCANWORD_VOCABULARY_PORTFOLIO_MODE=full
 SCANWORD_EDITORIAL_REPAIR=on
 SCANWORD_CATEGORY_BALANCE=off
 SCANWORD_EXPLICIT_PIPELINE=off
+SCANWORD_FULL_CORPUS_RETRIEVAL=off
+SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=empty
 ```
 
 ## Explicit pipeline parity
@@ -72,6 +74,21 @@ SCANWORD_EXPLICIT_PIPELINE=on
 ```
 
 The accepted boundary and its remaining compatibility debt are documented in [Explicit pipeline parity](research/explicit-pipeline/README.md).
+
+## Bounded full-corpus retrieval
+
+Phase 4 adds an opt-in two-level retrieval boundary for constrained same-geometry repairs. The normal 2,500/3,500-entry hot set remains the construction prior. Exact patterns containing at least one fixed letter may retrieve a bounded domain from the complete admitted runtime vocabulary; all-wildcard full-pool sampling is rejected.
+
+```text
+SCANWORD_FULL_CORPUS_RETRIEVAL=on
+SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=empty|small-poor
+```
+
+The retrieval-enhanced and hot-only **complete editorial repair chains** are compared on cloned candidates. Retrieval is accepted only for identical structure, complete validity, exact clues, no two-letter increase and a strict final editorial improvement. Equal or worse output preserves the hot-only result.
+
+On the locked development-20 set, all three compared modes remained valid and structurally identical. `small-poor` expanded four constrained domains and surfaced fourteen candidates; none beat the complete hot-only chain, so no fallback answer entered a final grid. Runtime ratios were 1.0392 for `empty` and 1.0206 for `small-poor`. The feature remains off by default.
+
+The accepted evidence and three rejected local-ordering attempts are documented in [Full-corpus retrieval](research/full-corpus-retrieval/README.md).
 
 ## Structural guarantees
 
@@ -150,6 +167,13 @@ node tools/construction-pipeline-parity-test.cjs
 SCANWORD_PIPELINE_CONCURRENCY=2 \
   node tools/construction-pipeline-checkpoint.cjs \
   20 research-output/explicit-pipeline/development-parity.jsonl
+node tools/full-corpus-pattern-index-test.cjs
+node tools/full-corpus-pair-priority-test.cjs
+node tools/full-corpus-repair-selection-test.cjs
+SCANWORD_RETRIEVAL_CONCURRENCY=2 \
+SCANWORD_RETRIEVAL_ENFORCE=1 \
+  node tools/full-corpus-retrieval-checkpoint.cjs \
+  20 research-output/full-corpus-retrieval
 ```
 
 The canonical Node bootstrap mirrors browser corpus and wrapper/pipeline load order. Release records include source-corpus size, active limit, panels, answers, crossings, coverage, editorial metrics, runtime, category usage and complete structural validation.
@@ -164,6 +188,9 @@ SCANWORD_EDITORIAL_REPAIR=off                disable same-geometry cleanup
 SCANWORD_CATEGORY_BALANCE=on                 enable the retained category-cap experiment
 SCANWORD_CONSTRUCTION_MODE=legacy            use the original construction path
 SCANWORD_EXPLICIT_PIPELINE=on                 enable explicit state and stage telemetry
+SCANWORD_FULL_CORPUS_RETRIEVAL=on             enable bounded constrained-pattern retrieval
+SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=empty     restrict fallback to empty hot domains
+SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=small-poor evaluate small or poor hot domains too
 ```
 
 ## Canonical repository structure
@@ -174,6 +201,7 @@ bulk-lexicon-runtime.js             corpus registration and metadata
 bulk-lexicon/                       generated corpus, loader and manifest
 core.js                             dictionary utilities and active-set selection
 dictionary-policy.js                dictionary admission policy
+full-corpus-pattern-index-v1.js     bounded exact-pattern retrieval index
 solver.js                           base placement, metrics and validation
 construction-candidate-state-v1.js  explicit candidate-state contract
 construction-pipeline-*.js          explicit stage orchestration and telemetry
@@ -196,6 +224,7 @@ Key dossiers:
 
 - [Closed-fill research](research/closed-fill/README.md)
 - [Explicit pipeline parity](research/explicit-pipeline/README.md)
+- [Full-corpus retrieval](research/full-corpus-retrieval/README.md)
 - [Vocabulary-first program](research/vocabulary-first/README.md)
 - [Vocabulary Greatness 1.1](research/vocabulary-greatness-1.1/README.md)
 - [Lexical-quality experiments](research/lexical-quality/README.md)
@@ -204,8 +233,8 @@ Key dossiers:
 
 The project does not claim zero-panel generation or publication-ready clue prose. Current priorities are:
 
-- add two-level vocabulary retrieval so the active working set is a prior rather than a hard domain boundary;
-- retrieve bounded full-corpus candidates for constrained or editorially poor slot patterns;
+- estimate clue feasibility before committing structural search to answer domains that cannot fit usable clue footprints;
 - migrate successful construction and repair behavior from the historical wrapper chain into normal explicit stages;
 - reduce repeated and generic selected-grid clues without weakening structural density;
+- evaluate broader full-corpus integration only through complete-chain or complete-pipeline acceptance;
 - preserve the locked promotion and stability sets for frozen-candidate evaluation only.
