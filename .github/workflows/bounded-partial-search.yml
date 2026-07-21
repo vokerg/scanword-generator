@@ -1,0 +1,114 @@
+name: Bounded partial search
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - construction-bounded-partial-search-v1.js
+      - tools/bounded-partial-search-*.cjs
+      - tools/node-benchmark-bootstrap-v1.cjs
+      - research/bounded-partial-search/**
+      - index.html
+      - .github/workflows/bounded-partial-search.yml
+  workflow_dispatch:
+
+concurrency:
+  group: bounded-partial-search-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check bounded-search syntax
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          node --check construction-bounded-partial-search-v1.js
+          node --check tools/bounded-partial-search-test.cjs
+          node --check tools/bounded-partial-search-seed-v1.cjs
+          node --check tools/bounded-partial-search-checkpoint.cjs
+          node --check tools/node-benchmark-bootstrap-v1.cjs
+
+      - name: Run deterministic bounded-search contracts
+        env:
+          NODE_OPTIONS: --require=./tools/node-benchmark-bootstrap-v1.cjs
+        run: |
+          mkdir -p research-output/bounded-partial-search-unit
+          set -o pipefail
+          node tools/bounded-partial-search-test.cjs 2>&1 \
+            | tee research-output/bounded-partial-search-unit/contracts.log
+
+      - name: Preserve explicit pipeline parity
+        run: |
+          set -o pipefail
+          node tools/construction-pipeline-parity-test.cjs 2>&1 \
+            | tee research-output/bounded-partial-search-unit/explicit-parity.log
+
+      - name: Publish unit diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bounded-partial-search-unit-${{ env.SOURCE_SHA }}
+          path: research-output/bounded-partial-search-unit/
+          if-no-files-found: warn
+
+  development:
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_PARTIAL_SEARCH_CONCURRENCY: 2
+      SCANWORD_PARTIAL_SEARCH_ENFORCE: 0
+      SCANWORD_PARTIAL_SEARCH_MODES: off,shadow,beam
+      SCANWORD_PARTIAL_SEARCH_RATE: 0.20
+      SCANWORD_PARTIAL_SEARCH_START: 26
+      SCANWORD_PARTIAL_SEARCH_DEPTH: 4
+      SCANWORD_PARTIAL_SEARCH_BEAM: 4
+      SCANWORD_PARTIAL_SEARCH_BRANCHING: 3
+      SCANWORD_PARTIAL_SEARCH_NODES: 48
+      SCANWORD_PARTIAL_SEARCH_SEED_TIMEOUT_MS: 1200000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Compare off, shadow and beam modes
+        run: |
+          set -o pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          mkdir -p research-output/bounded-partial-search
+          GITHUB_SHA="${SOURCE_SHA}" node tools/bounded-partial-search-checkpoint.cjs \
+            research-output/bounded-partial-search 5 \
+            | tee research-output/bounded-partial-search/console.jsonl
+
+      - name: Publish development evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bounded-partial-search-development-${{ env.SOURCE_SHA }}
+          path: research-output/bounded-partial-search/
+          if-no-files-found: error
