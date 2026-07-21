@@ -138,6 +138,53 @@
     });
   }
 
+  function observeBoundedPartialSearch(state) {
+    stateApi.assert(state);
+    const search = window.ScanwordBoundedPartialSearchV1;
+    const report = state.result.partialSearch || null;
+    if (!search || search.mode() === "off" || !report) {
+      throw new Error("Bounded partial-search stage executed without enabled search telemetry");
+    }
+    const aggregate = report.aggregate || {};
+    const portfolio = report.portfolio || {};
+    const selected = report.selected || null;
+    const ancestry = Array.isArray(selected?.ancestry) ? selected.ancestry : [];
+    const beamSteps = ancestry.filter((step) => step.kind === "beam");
+    return stateApi.transition(state, "bounded-partial-search-observed", {
+      structuralMetrics: {
+        ...state.structuralMetrics,
+        boundedPartialSearch: {
+          mode: report.mode,
+          search: report.search,
+          attemptsObserved: Number(aggregate.attemptsObserved || 0),
+          attemptsSampled: Number(aggregate.attemptsSampled || 0),
+          nodes: Number(aggregate.nodes || 0),
+          depthReached: Number(aggregate.depthReached || 0),
+          beamPeak: Number(aggregate.beamPeak || 0),
+          finalists: Number(aggregate.finalists || 0),
+          beamReturned: Number(aggregate.beamReturned || 0),
+          selectedSearchVariant: portfolio.selectedSearchVariant || null,
+          selectedAttemptVariant: portfolio.selectedAttemptVariant || selected?.selectedVariant || null,
+          selectedBeamAncestry: beamSteps.length,
+        },
+      },
+      provenance: {
+        ...state.provenance,
+        boundedPartialSearch: {
+          version: report.schemaVersion,
+          search: report.search,
+          mode: report.mode,
+          budget: portfolio.budget || null,
+          selectedLimit: portfolio.selectedLimit || null,
+          selectedSearchVariant: portfolio.selectedSearchVariant || null,
+          selectedAttemptVariant: portfolio.selectedAttemptVariant || selected?.selectedVariant || null,
+          beamSteps,
+          candidateSummaries: portfolio.candidates || [],
+        },
+      },
+    });
+  }
+
   function validate(state) {
     stateApi.assert(state);
     const solver = window.ScanwordSolver;
@@ -190,6 +237,7 @@
     observeRepairChain,
     observeFullCorpusRetrieval,
     observeClueFeasibility,
+    observeBoundedPartialSearch,
     validate,
     compare,
   };
