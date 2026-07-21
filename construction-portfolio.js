@@ -8,27 +8,42 @@
 
   const previousGenerateBest = solver.generateBest.bind(solver);
 
-  function modeFromEnvironment() {
-    if (typeof process !== "undefined" && process?.env?.SCANWORD_CONSTRUCTION_MODE) {
-      return process.env.SCANWORD_CONSTRUCTION_MODE;
+  function environmentOption(name, fallback) {
+    if (typeof process !== "undefined" && process?.env?.[name] != null) {
+      return process.env[name];
     }
-    return window.SCANWORD_CONSTRUCTION_MODE || "legacy";
+    return window[name] == null ? fallback : window[name];
+  }
+
+  function modeFromEnvironment() {
+    return environmentOption("SCANWORD_CONSTRUCTION_MODE", "legacy");
   }
 
   function numericOption(name, fallback) {
-    const raw = typeof process !== "undefined" ? process?.env?.[name] : undefined;
-    const value = Number(raw);
+    const value = Number(environmentOption(name, fallback));
     return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+  }
+
+  function nonNegativeOption(name, fallback = 0) {
+    const value = Number(environmentOption(name, fallback));
+    return Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback;
   }
 
   function countWeakFill(placed, poolByAnswer) {
     return placed.reduce((total, word) => total + Number(Boolean(poolByAnswer.get(word.answer)?.weakFill)), 0);
   }
 
+  function partialSearchVariant(state) {
+    return String(state?.partialSearch?.selectedVariant
+      || state?.grid?.__scanwordPartialSearch?.selectedVariant
+      || "default");
+  }
+
   function makeCandidate(state, pool, poolIndex, rows, cols, attempt, clueLayout) {
     const metrics = solver.resultMetrics(state);
     if (!metrics.validation.valid || metrics.components !== 1) return null;
     const coverage = closedFill.measureCoverage(state.grid);
+    const search = state.partialSearch || state.grid.__scanwordPartialSearch || null;
     return {
       rows,
       cols,
@@ -65,7 +80,14 @@
       poolEntries: poolIndex.entries,
       poolOccurrences: poolIndex.occurrences,
       mode: "portfolio-panel-first-v2",
+      partialSearch: search,
+      partialSearchVariant: partialSearchVariant(state),
     };
+  }
+
+  function variantTieRank(candidate) {
+    if (["default", "baseline", "baseline-fallback"].includes(candidate.partialSearchVariant)) return 0;
+    return 1;
   }
 
   function compareCandidates(a, b, poolByAnswer) {
@@ -78,7 +100,9 @@
     if (a.intersections !== b.intersections) return b.intersections - a.intersections;
     if (a.placed.length !== b.placed.length) return b.placed.length - a.placed.length;
     if (Boolean(a.victimReplacement) !== Boolean(b.victimReplacement)) return Number(Boolean(a.victimReplacement)) - Number(Boolean(b.victimReplacement));
-    return a.attempt - b.attempt;
+    return variantTieRank(a) - variantTieRank(b)
+      || a.attempt - b.attempt
+      || String(a.partialSearchVariant).localeCompare(String(b.partialSearchVariant));
   }
 
   function addTelemetry(target, source) {
@@ -102,6 +126,7 @@
 
   function generatePortfolio(seed, poolSize, rows, cols, targetWords) {
     const attempts = numericOption("SCANWORD_PORTFOLIO_ATTEMPTS", 120);
+    const attemptOffset = nonNegativeOption("SCANWORD_PORTFOLIO_ATTEMPT_OFFSET", 0);
     const clueRestarts = numericOption("SCANWORD_PORTFOLIO_CLUE_RESTARTS", 160);
     const victimOptions = {
       baseCount: numericOption("SCANWORD_VICTIM_BASES", 12),
@@ -137,13 +162,49 @@
       && candidate.placed.every((entry) => entry.hasExactClue));
 
     const candidates = [];
-    const structuralByAttempt = new Map();
+    const structuralByCandidate = new Map();
+    let statesEvaluated = 0;
     let structurallyValid = 0;
     let checkpointValid = 0;
     let minimumObservedPanels = Infinity;
     let maximumObservedRawLetters = 0;
+    let beamStatesEvaluated = 0;
+    let baselineFallbackStatesEvaluated = 0;
 
-    for (let attempt = 0; attempt < attempts; attempt += 1) {
+    function evaluateAttemptState(state, attempt, forcedVariant = null) {
+      if (!state || state.placed.length < targetWords) return;
+      statesEvaluated += 1;
+      const variant = forcedVariant || partialSearchVariant(state);
+      if (variant === "beam") beamStatesEvaluated += 1;
+      if (variant === "baseline-fallback") baselineFallbackStatesEvaluated += 1;
+      if (forcedVariant) {
+        state.partialSearch = {
+          ...(state.partialSearch || {}),
+          selectedVariant: forcedVariant,
+        };
+        state.grid.__scanwordPartialSearch = state.partialSearch;
+      }
+      const structural = solver.cloneVictimState ? solver.cloneVictimState(state) : null;
+      const clueLayout = solver.assignClueTextCellsV2(
+        state,
+        core.makeRandom(`${seed}:clues:${attempt}`),
+        clueRestarts,
+      );
+      const candidate = makeCandidate(state, pool, poolIndex, rows, cols, attempt, clueLayout);
+      if (!candidate) return;
+      structurallyValid += 1;
+      minimumObservedPanels = Math.min(minimumObservedPanels, candidate.panelCells);
+      maximumObservedRawLetters = Math.max(maximumObservedRawLetters, candidate.rawLetterCoverage);
+      if (!passesCheckpoint(candidate)) return;
+      checkpointValid += 1;
+      const key = `${attempt}:${candidate.partialSearchVariant}`;
+      candidate.phase6CandidateKey = key;
+      candidates.push(candidate);
+      if (structural) structuralByCandidate.set(key, structural);
+    }
+
+    for (let localAttempt = 0; localAttempt < attempts; localAttempt += 1) {
+      const attempt = attemptOffset + localAttempt;
       const state = solver.buildAttempt(
         pool,
         rows,
@@ -153,22 +214,9 @@
         poolIndex,
         "indexed",
       );
-      if (state.placed.length < targetWords) continue;
-      const structural = solver.cloneVictimState ? solver.cloneVictimState(state) : null;
-      const clueLayout = solver.assignClueTextCellsV2(
-        state,
-        core.makeRandom(`${seed}:clues:${attempt}`),
-        clueRestarts,
-      );
-      const candidate = makeCandidate(state, pool, poolIndex, rows, cols, attempt, clueLayout);
-      if (!candidate) continue;
-      structurallyValid += 1;
-      minimumObservedPanels = Math.min(minimumObservedPanels, candidate.panelCells);
-      maximumObservedRawLetters = Math.max(maximumObservedRawLetters, candidate.rawLetterCoverage);
-      if (!passesCheckpoint(candidate)) continue;
-      checkpointValid += 1;
-      candidates.push(candidate);
-      if (structural) structuralByAttempt.set(attempt, structural);
+      const fallback = state?.__phase6BaselineState || null;
+      evaluateAttemptState(state, attempt);
+      if (fallback) evaluateAttemptState(fallback, attempt, "baseline-fallback");
     }
 
     if (!candidates.length) return null;
@@ -198,18 +246,24 @@
     if (solver.generateVictimReplacementVariants) {
       const bases = candidates.slice(0, victimOptions.baseCount);
       for (const base of bases) {
-        const structural = structuralByAttempt.get(base.attempt);
+        const structural = structuralByCandidate.get(base.phase6CandidateKey);
         if (!structural) continue;
         victimTelemetry.basesExpanded += 1;
         const generated = solver.generateVictimReplacementVariants(structural, pool, victimOptions);
         addTelemetry(victimTelemetry, generated.telemetry);
         for (let variantIndex = 0; variantIndex < generated.states.length; variantIndex += 1) {
           const state = generated.states[variantIndex];
+          const beamSource = base.partialSearchVariant === "beam";
+          const clueSeed = beamSource
+            ? `${seed}:victim:beam:clues:${base.attempt}:${variantIndex}`
+            : `${seed}:victim:clues:${base.attempt}:${variantIndex}`;
           const clueLayout = solver.assignClueTextCellsV2(
             state,
-            core.makeRandom(`${seed}:victim:clues:${base.attempt}:${variantIndex}`),
+            core.makeRandom(clueSeed),
             clueRestarts,
           );
+          state.partialSearch = base.partialSearch || null;
+          if (state.partialSearch) state.grid.__scanwordPartialSearch = state.partialSearch;
           const candidate = makeCandidate(state, pool, poolIndex, rows, cols, base.attempt, clueLayout);
           victimTelemetry.finalistsEvaluated += 1;
           if (!candidate || !passesCheckpoint(candidate)) continue;
@@ -218,7 +272,9 @@
             baseAttempt: base.attempt + 1,
             variant: variantIndex + 1,
             depth: Number(state.victimReplacementDepth || 1),
+            sourceVariant: base.partialSearchVariant,
           };
+          candidate.phase6CandidateKey = base.phase6CandidateKey;
           candidates.push(candidate);
         }
       }
@@ -240,6 +296,10 @@
     best.constructionV2 = {
       mode: "portfolio-panel-first-v2",
       attemptsBuilt: attempts,
+      attemptOffset,
+      statesEvaluated,
+      beamStatesEvaluated,
+      baselineFallbackStatesEvaluated,
       structurallyValid,
       checkpointValid,
       minimumObservedPanels,
@@ -249,6 +309,7 @@
       selectedRawLetterCoverage: best.rawLetterCoverage,
       selectedWeakFillCount: countWeakFill(best.placed, poolByAnswer),
       selectedVictimReplacement: best.victimReplacement || null,
+      selectedPartialSearchVariant: best.partialSearchVariant,
       victimReplacement: victimTelemetry,
     };
     return solver.attachValidationReport(best, seed, {
