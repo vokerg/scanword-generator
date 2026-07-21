@@ -45,6 +45,20 @@
     };
   }
 
+  function attachWordProvenance(state) {
+    const provenance = {
+      schemaVersion: 1,
+      search: "late-placement-beam-v1",
+      selectedVariant: "beam",
+      sampled: Boolean(state.partialSearch?.sampled),
+      baselineRank: state.partialSearch?.baselineRank || null,
+      beamRank: state.partialSearch?.beamRank || null,
+      ancestry: [...(state.partialSearch?.ancestry || [])],
+    };
+    for (const word of state.placed || []) word.phase6Search = provenance;
+    return provenance;
+  }
+
   solver.buildAttempt = (pool, rows, cols, targetWords, random, poolIndex, requestedMode) => {
     if (mode() !== "beam") {
       return previousBuildAttempt(pool, rows, cols, targetWords, random, poolIndex, requestedMode);
@@ -66,6 +80,7 @@
     );
 
     if (state?.partialSearch?.selectedVariant !== "beam") return state;
+    attachWordProvenance(state);
 
     const baseline = withMode("off", () => previousBuildAttempt(
       pool,
