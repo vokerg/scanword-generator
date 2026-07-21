@@ -3,7 +3,7 @@
   "status": "active",
   "auditedDate": "2026-07-21",
   "mainRef": "refs/remotes/origin/main",
-  "auditedMainCommit": "5424e339430e9be176b58f2546b93fcde29eb092",
+  "auditedMainCommit": "dd74f2871892e250fc09520c9f1112a1dab808d7",
   "policy": {
     "historicalBranchNamesAreLabelsUnlessListed": true,
     "requiredRefsMustResolveExactly": true,
@@ -110,6 +110,14 @@
       "commit": "054a8188a5395404c7c4dba20211aa9521ad5f23",
       "contains": [
         "054a8188a5395404c7c4dba20211aa9521ad5f23"
+      ]
+    },
+    {
+      "name": "phase-5-clue-feasibility-accepted-evidence",
+      "ref": "refs/heads/research/archive-phase-5-clue-feasibility-evidence-2026-07-21",
+      "commit": "22fe6087400a9c55c674e0712b23c172812db844",
+      "contains": [
+        "22fe6087400a9c55c674e0712b23c172812db844"
       ]
     }
   ]
