@@ -3,7 +3,7 @@
   "status": "active",
   "auditedDate": "2026-07-21",
   "mainRef": "refs/remotes/origin/main",
-  "auditedMainCommit": "dd74f2871892e250fc09520c9f1112a1dab808d7",
+  "auditedMainCommit": "cd7aa4a9800492c63653c2f0093dbd32d649d0ec",
   "policy": {
     "historicalBranchNamesAreLabelsUnlessListed": true,
     "requiredRefsMustResolveExactly": true,
@@ -118,6 +118,14 @@
       "commit": "22fe6087400a9c55c674e0712b23c172812db844",
       "contains": [
         "22fe6087400a9c55c674e0712b23c172812db844"
+      ]
+    },
+    {
+      "name": "phase-6-bounded-search-accepted-evidence",
+      "ref": "refs/heads/research/archive-phase-6-bounded-search-evidence-2026-07-21",
+      "commit": "2c01178849005747f4a2e06876e40a992bb7a7f4",
+      "contains": [
+        "2c01178849005747f4a2e06876e40a992bb7a7f4"
       ]
     }
   ]
