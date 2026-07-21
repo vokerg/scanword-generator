@@ -83,7 +83,9 @@ jobs:
     env:
       SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       SCANWORD_CLUE_FEASIBILITY_CONCURRENCY: 2
-      SCANWORD_CLUE_FEASIBILITY_ENFORCE: 0
+      SCANWORD_CLUE_FEASIBILITY_ENFORCE: 1
+      SCANWORD_CLUE_FEASIBILITY_MODES: off,shadow,guard
+      SCANWORD_CLUE_FEASIBILITY_CANDIDATES: 1
       SCANWORD_CLUE_FEASIBILITY_SEED_TIMEOUT_MS: 900000
     steps:
       - name: Check out exact candidate head
@@ -96,7 +98,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Compare off, shadow and guard modes
+      - name: Compare off, shadow and hard-guard modes
         run: |
           set -o pipefail
           test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
