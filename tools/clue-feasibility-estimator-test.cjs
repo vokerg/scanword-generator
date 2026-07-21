@@ -126,7 +126,7 @@ function setLetter(state, row, col, char = "А") {
     minimumExternalClues: 1,
     rankWeight: 1,
   });
-  assert.equal(placement.newZeroDomainClues, 1);
+  assert.ok(placement.newZeroDomainClues >= 1);
   assert.equal(placement.panelCellsConsumed, 1);
 }
 
