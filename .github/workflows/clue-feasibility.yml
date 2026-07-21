@@ -38,7 +38,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Validate estimator contract
+      - name: Check estimator syntax
         run: |
           test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           node --check construction-clue-feasibility-v1.js
@@ -48,9 +48,15 @@ jobs:
           node --check tools/clue-feasibility-shadow-parity-test.cjs
           node --check tools/clue-feasibility-seed-v1.cjs
           node --check tools/clue-feasibility-checkpoint.cjs
-          node tools/clue-feasibility-estimator-test.cjs
-          node tools/clue-feasibility-shadow-parity-test.cjs
-          node tools/construction-pipeline-parity-test.cjs
+
+      - name: Run estimator fixtures
+        run: node tools/clue-feasibility-estimator-test.cjs
+
+      - name: Prove shadow placement parity
+        run: node tools/clue-feasibility-shadow-parity-test.cjs
+
+      - name: Preserve explicit pipeline parity
+        run: node tools/construction-pipeline-parity-test.cjs
 
   development:
     needs: unit
