@@ -70,6 +70,8 @@ console.log(JSON.stringify({
   panels: Number(result.panelCells || metrics.panelCells || 0),
   answers: result.placed.length,
   crossings: Number(result.intersections || metrics.intersections || 0),
+  rawLetterPercent: +(Number(result.rawLetterCoverage || 0) * 100).toFixed(4),
+  answerCoveragePercent: +(Number(result.answerCoverage || 0) * 100).toFixed(4),
   clueTextCells: Number(result.clueTextCells || metrics.clueTextCells || 0),
   externalClues: Number(result.externalClueTexts || 0),
   twoLetterCount: Number(editorial.twoLetterCount || 0),
