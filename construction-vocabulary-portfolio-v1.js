@@ -101,10 +101,10 @@
   }
 
   function withEnvironment(name, value, callback) {
+    if (value == null) return callback();
     if (typeof process !== "undefined") {
       const previous = process.env[name];
-      if (value == null) delete process.env[name];
-      else process.env[name] = String(value);
+      process.env[name] = String(value);
       try {
         return callback();
       } finally {
