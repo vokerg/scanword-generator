@@ -53,6 +53,7 @@ SCANWORD_EXPLICIT_PIPELINE=off
 SCANWORD_FULL_CORPUS_RETRIEVAL=off
 SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=empty
 SCANWORD_CLUE_FEASIBILITY=off
+SCANWORD_PARTIAL_SEARCH=off
 ```
 
 ## Explicit pipeline parity
@@ -105,6 +106,29 @@ The accepted `shadow` mode evaluates only the first production-ranked placement 
 Direct feasibility ranking was rejected despite a small average density improvement because six seeds regressed in panel count, eleven regressed editorially and runtime rose by 16.1%. The hard-capacity guard did not fire on development seeds and is not promoted. Phase 5 therefore establishes calibrated telemetry, not an output-changing search policy. The browser default remains off.
 
 The evidence, rejected variants and reproduction commands are documented in [Clue feasibility](research/clue-feasibility/README.md).
+
+## Bounded partial-state search
+
+Phase 6 adds an opt-in late-placement beam at the active attempt-construction boundary. It branches at placement 14, retains up to four states for four depths, expands at most three children per parent and enforces a hard 48-node limit for each sampled attempt.
+
+```text
+SCANWORD_PARTIAL_SEARCH=beam
+```
+
+The exact browser-default portfolio remains a complete fallback. Beam mode runs the unchanged 120-attempt baseline for both working-set sizes and adds a 60-attempt probe over separate attempt IDs. Every beam-replaced attempt retains an exact baseline replay, and final selection happens only after real clue allocation, repair, editorial cleanup and active-set portfolio comparison.
+
+On the locked development-20 set:
+
+- all off, shadow and beam results were valid, connected, exact-clue and checkpoint passing;
+- shadow achieved 20/20 exact full-result parity;
+- average panels improved from **5.30 to 4.90**;
+- six seeds improved in panel count and none regressed;
+- eight seeds improved under the complete canonical objective;
+- five selected results carried explicit beam ancestry;
+- average runtime increased from 20.35 s to 33.55 s, a 1.6484 ratio;
+- no zero-panel grid was produced.
+
+The result proves that bounded retained alternatives can produce complete-grid wins, but the cost is not suitable for browser-default promotion. Phase 6 remains off by default. The implementation, per-seed results, ancestry evidence and rejected unsafe variants are documented in [Bounded partial-state search](research/bounded-partial-search/README.md).
 
 ## Structural guarantees
 
@@ -199,6 +223,22 @@ SCANWORD_CLUE_FEASIBILITY_CANDIDATES=1 \
   research-output/clue-feasibility 20
 node tools/clue-feasibility-acceptance-v1.cjs \
   research-output/clue-feasibility
+NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
+  node tools/bounded-partial-search-test.cjs
+SCANWORD_PARTIAL_SEARCH_CONCURRENCY=2 \
+SCANWORD_PARTIAL_SEARCH_MODES=off,shadow,beam \
+SCANWORD_PARTIAL_SEARCH_RATE=0.20 \
+SCANWORD_PARTIAL_SEARCH_START=14 \
+SCANWORD_PARTIAL_SEARCH_DEPTH=4 \
+SCANWORD_PARTIAL_SEARCH_BEAM=4 \
+SCANWORD_PARTIAL_SEARCH_BRANCHING=3 \
+SCANWORD_PARTIAL_SEARCH_NODES=48 \
+SCANWORD_PARTIAL_SEARCH_BEAM_ATTEMPTS=60 \
+SCANWORD_PARTIAL_SEARCH_BEAM_OFFSET=120 \
+  node tools/bounded-partial-search-checkpoint.cjs \
+  research-output/bounded-partial-search 20
+node tools/bounded-partial-search-acceptance-v1.cjs \
+  research-output/bounded-partial-search
 ```
 
 The canonical Node bootstrap mirrors browser corpus and wrapper/pipeline load order. Release records include source-corpus size, active limit, panels, answers, crossings, coverage, editorial metrics, runtime, category usage and complete structural validation.
@@ -219,30 +259,34 @@ SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=small-poor evaluate small or poor hot domain
 SCANWORD_CLUE_FEASIBILITY=shadow              collect exact-parity clue-feasibility telemetry
 SCANWORD_CLUE_FEASIBILITY=rank                run the rejected local-ranking experiment
 SCANWORD_CLUE_FEASIBILITY=guard               run the unpromoted hard-capacity experiment
+SCANWORD_PARTIAL_SEARCH=shadow                run bounded search with exact output parity
+SCANWORD_PARTIAL_SEARCH=beam                  add the complete-pipeline bounded beam probe
 ```
 
 ## Canonical repository structure
 
 ```text
-index.html                          browser defaults and script order
-bulk-lexicon-runtime.js             corpus registration and metadata
-bulk-lexicon/                       generated corpus, loader and manifest
-core.js                             dictionary utilities and active-set selection
-dictionary-policy.js                dictionary admission policy
-full-corpus-pattern-index-v1.js     bounded exact-pattern retrieval index
-solver.js                           base placement, metrics and validation
-construction-clue-feasibility-v1.js incremental clue-capacity estimator
-construction-candidate-state-v1.js  explicit candidate-state contract
-construction-pipeline-*.js          explicit stage orchestration and telemetry
-construction-*.js                   bounded construction and repair stages
-editorial-*.js                      lexical policy and repair vocabulary
-renderer.js                         A5 SVG renderer
-ui.js                               browser controls and exports
-tools/                              audits, builders, tests and benchmarks
-docs/milestones/                    accepted project baselines
-research/                           chronological experiments and negative results
-.github/workflows/                  gates and research reproduction
-AGENTS.md                           canonical architecture and change rules
+index.html                                      browser defaults and script order
+bulk-lexicon-runtime.js                         corpus registration and metadata
+bulk-lexicon/                                   generated corpus, loader and manifest
+core.js                                         dictionary utilities and active-set selection
+dictionary-policy.js                            dictionary admission policy
+full-corpus-pattern-index-v1.js                 bounded exact-pattern retrieval index
+solver.js                                       base placement, metrics and validation
+construction-clue-feasibility-v1.js             incremental clue-capacity estimator
+construction-bounded-partial-search-v1.js       bounded partial-state beam
+construction-bounded-partial-search-fallback-v1.js exact baseline replay bridge
+construction-candidate-state-v1.js              explicit candidate-state contract
+construction-pipeline-*.js                      explicit stage orchestration and telemetry
+construction-*.js                               bounded construction and repair stages
+editorial-*.js                                  lexical policy and repair vocabulary
+renderer.js                                     A5 SVG renderer
+ui.js                                           browser controls and exports
+tools/                                          audits, builders, tests and benchmarks
+docs/milestones/                                accepted project baselines
+research/                                       chronological experiments and negative results
+.github/workflows/                              gates and research reproduction
+AGENTS.md                                       canonical architecture and change rules
 ```
 
 ## Research archive and branch policy
@@ -255,6 +299,7 @@ Key dossiers:
 - [Explicit pipeline parity](research/explicit-pipeline/README.md)
 - [Full-corpus retrieval](research/full-corpus-retrieval/README.md)
 - [Clue feasibility](research/clue-feasibility/README.md)
+- [Bounded partial-state search](research/bounded-partial-search/README.md)
 - [Vocabulary-first program](research/vocabulary-first/README.md)
 - [Vocabulary Greatness 1.1](research/vocabulary-greatness-1.1/README.md)
 - [Lexical-quality experiments](research/lexical-quality/README.md)
@@ -263,8 +308,8 @@ Key dossiers:
 
 The project does not claim zero-panel generation or publication-ready clue prose. Current priorities are:
 
-- replace independent greedy restarts with one bounded deterministic partial-state search that can consume the calibrated feasibility signals;
+- reduce the runtime cost of bounded partial-state search without losing ancestry-proven complete-grid wins;
+- retain a bounded complete-pipeline Pareto frontier rather than selecting one candidate too early;
 - migrate successful construction and repair behavior from the historical wrapper chain into normal explicit stages;
 - reduce repeated and generic selected-grid clues without weakening structural density;
-- evaluate broader full-corpus integration only through complete-chain or complete-pipeline acceptance;
 - preserve the locked promotion and stability sets for frozen-candidate evaluation only.
