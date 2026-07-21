@@ -16,26 +16,24 @@
   const poolTelemetry = new WeakMap();
   const ORTHOGONAL = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 
-  function stringOption(name, fallback) {
-    if (typeof process !== "undefined" && process?.env?.[name] != null) return String(process.env[name]);
-    if (window[name] != null) return String(window[name]);
-    return fallback;
+  function environmentOption(name, fallback) {
+    const raw = typeof process !== "undefined" ? process?.env?.[name] : window[name];
+    return raw == null || raw === "" ? fallback : raw;
   }
 
   function numericOption(name, fallback, minimum = 0) {
-    const raw = typeof process !== "undefined" ? process?.env?.[name] : window[name];
-    const value = Number(raw);
+    const value = Number(environmentOption(name, fallback));
     return Number.isFinite(value) && value >= minimum ? value : fallback;
   }
 
   function mode() {
-    const value = stringOption("SCANWORD_CLUE_FEASIBILITY", "off").toLowerCase();
+    const value = String(environmentOption("SCANWORD_CLUE_FEASIBILITY", "off")).toLowerCase();
     return ["off", "shadow", "rank", "guard"].includes(value) ? value : "off";
   }
 
   function options() {
     return {
-      candidateLimit: Math.max(1, Math.floor(numericOption("SCANWORD_CLUE_FEASIBILITY_CANDIDATES", 8, 1))),
+      candidateLimit: Math.max(1, Math.floor(numericOption("SCANWORD_CLUE_FEASIBILITY_CANDIDATES", 4, 1))),
       footprintLimit: Math.max(4, Math.floor(numericOption("SCANWORD_CLUE_FEASIBILITY_FOOTPRINTS", 24, 4))),
       minimumClueTextCells: Math.max(1, Math.floor(numericOption("SCANWORD_CLUE_FEASIBILITY_MIN_CELLS", 45, 1))),
       minimumExternalClues: Math.max(1, Math.floor(numericOption("SCANWORD_CLUE_FEASIBILITY_MIN_EXTERNAL", 24, 1))),
@@ -51,51 +49,20 @@
     return row >= 0 && row < state.rows && col >= 0 && col < state.cols;
   }
 
-  function effectiveType(state, row, col, overlay) {
-    const key = cellKey(row, col);
-    if (overlay?.letters?.has(key)) return "letter";
-    if (overlay?.clueKey === key) return "clue";
-    return state.grid[row][col].type;
-  }
-
-  function placementOverlay(state, entry, placement) {
-    const letters = new Set();
-    const { dr, dc } = DIRECTIONS[placement.direction];
-    for (let index = 0; index < entry.answer.length; index += 1) {
-      const row = placement.startRow + dr * index;
-      const col = placement.startCol + dc * index;
-      if (state.grid[row][col].type === "panel") letters.add(cellKey(row, col));
-    }
-    return {
-      letters,
-      clueKey: cellKey(placement.clue.row, placement.clue.col),
-      newClue: {
-        row: placement.clue.row,
-        col: placement.clue.col,
-        clue: {
-          slotId: `candidate:${state.placed.length + 1}`,
-          direction: placement.direction,
-          text: entry.clue,
-          answer: entry.answer,
-        },
-      },
-    };
-  }
-
-  function panelRegions(state, overlay) {
+  function panelTopology(state) {
     const seen = new Set();
     const regionByCell = new Map();
     const regions = [];
     let panelCells = 0;
     for (let row = 0; row < state.rows; row += 1) {
       for (let col = 0; col < state.cols; col += 1) {
-        if (effectiveType(state, row, col, overlay) !== "panel") continue;
+        if (state.grid[row][col].type !== "panel") continue;
         panelCells += 1;
-        const startKey = cellKey(row, col);
-        if (seen.has(startKey)) continue;
+        const start = cellKey(row, col);
+        if (seen.has(start)) continue;
         const queue = [{ row, col }];
         const cells = [];
-        seen.add(startKey);
+        seen.add(start);
         for (let index = 0; index < queue.length; index += 1) {
           const current = queue[index];
           cells.push(current);
@@ -104,16 +71,19 @@
             const nextCol = current.col + dc;
             const key = cellKey(nextRow, nextCol);
             if (!inBounds(state, nextRow, nextCol) || seen.has(key)) continue;
-            if (effectiveType(state, nextRow, nextCol, overlay) !== "panel") continue;
+            if (state.grid[nextRow][nextCol].type !== "panel") continue;
             seen.add(key);
             queue.push({ row: nextRow, col: nextCol });
           }
         }
-        const id = regions.length;
-        const keys = cells.map((cell) => cellKey(cell.row, cell.col));
-        const region = { id, cells, keys, size: cells.length };
+        const region = {
+          id: regions.length,
+          size: cells.length,
+          cells,
+          keys: cells.map((cell) => cellKey(cell.row, cell.col)),
+        };
         regions.push(region);
-        for (const key of keys) regionByCell.set(key, region);
+        for (const key of region.keys) regionByCell.set(key, region);
       }
     }
     return {
@@ -125,7 +95,7 @@
     };
   }
 
-  function collectClues(state, overlay) {
+  function collectClues(state) {
     const clues = [];
     for (let row = 0; row < state.rows; row += 1) {
       for (let col = 0; col < state.cols; col += 1) {
@@ -136,7 +106,6 @@
         }
       }
     }
-    if (overlay?.newClue) clues.push({ ...overlay.newClue, clueIndex: 0 });
     return clues;
   }
 
@@ -151,37 +120,244 @@
     return String(clue?.text || "").length >= 38 ? 4 : 3;
   }
 
-  function footprintCandidates(state, row, col, clue, overlay, limit) {
-    const starts = [];
+  function adjacentPanelKeys(state, row, col, excluded = null) {
+    const keys = [];
     for (const [dr, dc] of ORTHOGONAL) {
       const nextRow = row + dr;
       const nextCol = col + dc;
-      if (!inBounds(state, nextRow, nextCol)) continue;
-      if (effectiveType(state, nextRow, nextCol, overlay) !== "panel") continue;
-      starts.push({ row: nextRow, col: nextCol });
+      const key = cellKey(nextRow, nextCol);
+      if (!inBounds(state, nextRow, nextCol) || excluded?.has(key)) continue;
+      if (state.grid[nextRow][nextCol].type === "panel") keys.push(key);
     }
-    starts.sort((a, b) => a.row - b.row || a.col - b.col);
+    return keys.sort();
+  }
+
+  function analyzeState(state, suppliedOptions = null) {
+    const config = suppliedOptions || options();
+    const topology = panelTopology(state);
+    const clues = collectClues(state);
+    const regionDemand = new Map(topology.regions.map((region) => [region.id, 0]));
+    const regionClues = new Map(topology.regions.map((region) => [region.id, 0]));
+    const items = clues.map((item) => {
+      const starts = adjacentPanelKeys(state, item.row, item.col);
+      const regions = [...new Map(starts
+        .map((key) => topology.regionByCell.get(key))
+        .filter(Boolean)
+        .map((region) => [region.id, region])).values()];
+      const preferred = preferredCells(item.clue);
+      const maximum = regions.reduce(
+        (largest, region) => Math.max(largest, Math.min(maximumCells(item.clue), region.size)),
+        0,
+      );
+      if (regions.length) {
+        const share = preferred / regions.length;
+        for (const region of regions) {
+          regionDemand.set(region.id, (regionDemand.get(region.id) || 0) + share);
+          regionClues.set(region.id, (regionClues.get(region.id) || 0) + 1);
+        }
+      }
+      return {
+        ...item,
+        starts,
+        regions,
+        domainSize: starts.length,
+        preferredCells: preferred,
+        maximumCells: maximum,
+      };
+    });
+
+    const zeroDomain = items.filter((item) => item.domainSize === 0);
+    const longImpossible = items.filter((item) => item.maximumCells < item.preferredCells);
+    const externalUpperBound = items.filter((item) => item.domainSize > 0).length;
+    const clueTextUpperBound = Math.min(
+      topology.panelCells,
+      items.reduce((sum, item) => sum + item.maximumCells, 0),
+    );
+    const overlapPressure = topology.regions.reduce(
+      (sum, region) => sum + Math.max(0, (regionDemand.get(region.id) || 0) - region.size),
+      0,
+    );
+    const maximumCellPressure = topology.regions.reduce(
+      (maximum, region) => Math.max(maximum, (regionClues.get(region.id) || 0) / Math.max(1, region.size)),
+      0,
+    );
+
+    const remaining = new Map(topology.regions.map((region) => [region.id, region.size]));
+    let greedyExternalClues = 0;
+    let greedyClueTextCells = 0;
+    const ordered = [...items].sort((a, b) => a.regions.length - b.regions.length
+      || b.preferredCells - a.preferredCells
+      || a.domainSize - b.domainSize
+      || a.row - b.row
+      || a.col - b.col
+      || Number(a.clue.slotId || 0) - Number(b.clue.slotId || 0));
+    for (const item of ordered) {
+      const choices = item.regions
+        .map((region) => ({ region, available: remaining.get(region.id) || 0 }))
+        .filter((choice) => choice.available > 0)
+        .sort((a, b) => b.available - a.available || a.region.id - b.region.id);
+      if (!choices.length) continue;
+      const choice = choices[0];
+      const used = Math.min(item.maximumCells, choice.available);
+      if (used <= 0) continue;
+      remaining.set(choice.region.id, choice.available - used);
+      greedyExternalClues += 1;
+      greedyClueTextCells += used;
+    }
+
+    const hardFailures = [];
+    if (topology.panelCells < config.minimumClueTextCells) hardFailures.push("panel-capacity");
+    const report = {
+      schemaVersion: 1,
+      panelCells: topology.panelCells,
+      panelRegions: topology.regions.length,
+      isolatedPanels: topology.isolatedPanels,
+      largestPanelRegion: topology.largestRegion,
+      clues: items.length,
+      zeroDomainClues: zeroDomain.length,
+      zeroDomainSlotIds: zeroDomain.map((item) => item.clue.slotId),
+      longClueImpossible: longImpossible.length,
+      longClueImpossibleSlotIds: longImpossible.map((item) => item.clue.slotId),
+      minimumDomainSize: items.length ? Math.min(...items.map((item) => item.domainSize)) : 0,
+      averageDomainSize: items.length
+        ? items.reduce((sum, item) => sum + item.domainSize, 0) / items.length
+        : 0,
+      externalUpperBound,
+      clueTextUpperBound,
+      greedyExternalClues,
+      greedyClueTextCells,
+      overlapPressure,
+      maximumCellPressure,
+      hardFailures,
+      hardImpossible: hardFailures.length > 0,
+      completeNecessaryPass: externalUpperBound >= config.minimumExternalClues
+        && clueTextUpperBound >= config.minimumClueTextCells,
+      utility: greedyClueTextCells * 3
+        + greedyExternalClues * 18
+        - zeroDomain.length * 80
+        - longImpossible.length * 35
+        - overlapPressure * 4
+        - topology.isolatedPanels * 12,
+    };
+    Object.defineProperty(report, "__analysis", {
+      value: { topology, items },
+      enumerable: false,
+    });
+    return report;
+  }
+
+  function placementConsumedKeys(state, entry, placement) {
+    const consumed = new Set();
+    const { dr, dc } = DIRECTIONS[placement.direction];
+    for (let index = 0; index < entry.answer.length; index += 1) {
+      const row = placement.startRow + dr * index;
+      const col = placement.startCol + dc * index;
+      if (state.grid[row][col].type === "panel") consumed.add(cellKey(row, col));
+    }
+    const clueKey = cellKey(placement.clue.row, placement.clue.col);
+    if (state.grid[placement.clue.row][placement.clue.col].type === "panel") consumed.add(clueKey);
+    return consumed;
+  }
+
+  function countNewIsolatedPanels(state, consumed) {
+    const candidates = new Set();
+    for (const key of consumed) {
+      const [row, col] = key.split(":").map(Number);
+      for (const [dr, dc] of ORTHOGONAL) {
+        const nextRow = row + dr;
+        const nextCol = col + dc;
+        const nextKey = cellKey(nextRow, nextCol);
+        if (!inBounds(state, nextRow, nextCol) || consumed.has(nextKey)) continue;
+        if (state.grid[nextRow][nextCol].type === "panel") candidates.add(nextKey);
+      }
+    }
+    let count = 0;
+    for (const key of candidates) {
+      const [row, col] = key.split(":").map(Number);
+      const remainingNeighbors = ORTHOGONAL.filter(([dr, dc]) => {
+        const nextRow = row + dr;
+        const nextCol = col + dc;
+        const nextKey = cellKey(nextRow, nextCol);
+        return inBounds(state, nextRow, nextCol)
+          && !consumed.has(nextKey)
+          && state.grid[nextRow][nextCol].type === "panel";
+      }).length;
+      if (remainingNeighbors === 0) count += 1;
+    }
+    return count;
+  }
+
+  function evaluatePlacement(state, entry, placement, base = null, suppliedOptions = null) {
+    const config = suppliedOptions || options();
+    const baseline = base || analyzeState(state, config);
+    const analysis = baseline.__analysis || analyzeState(state, config).__analysis;
+    const consumed = placementConsumedKeys(state, entry, placement);
+    const panelCells = baseline.panelCells - consumed.size;
+    let newZeroDomainClues = 0;
+    let newLongClueImpossible = 0;
+    for (const item of analysis.items) {
+      if (!item.starts.some((key) => consumed.has(key))) continue;
+      const starts = item.starts.filter((key) => !consumed.has(key));
+      if (item.starts.length > 0 && starts.length === 0) newZeroDomainClues += 1;
+      if (starts.length) {
+        const maximum = starts.reduce((largest, key) => {
+          const region = analysis.topology.regionByCell.get(key);
+          if (!region) return largest;
+          const residual = region.size - region.keys.filter((regionKey) => consumed.has(regionKey)).length;
+          return Math.max(largest, Math.min(maximumCells(item.clue), residual));
+        }, 0);
+        if (item.maximumCells >= item.preferredCells && maximum < item.preferredCells) newLongClueImpossible += 1;
+      }
+    }
+
+    const newClueStarts = adjacentPanelKeys(state, placement.clue.row, placement.clue.col, consumed);
+    const newPreferred = preferredCells({ text: entry.clue });
+    let newClueMaximum = 0;
+    for (const key of newClueStarts) {
+      const region = analysis.topology.regionByCell.get(key);
+      if (!region) continue;
+      const residual = region.size - region.keys.filter((regionKey) => consumed.has(regionKey)).length;
+      newClueMaximum = Math.max(newClueMaximum, Math.min(maximumCells({ text: entry.clue }), residual));
+    }
+    if (!newClueStarts.length) newZeroDomainClues += 1;
+    else if (newClueMaximum < newPreferred) newLongClueImpossible += 1;
+
+    const newIsolatedPanels = countNewIsolatedPanels(state, consumed);
+    const hardFailures = panelCells < config.minimumClueTextCells ? ["panel-capacity"] : [];
+    const utilityDelta = -consumed.size * 0.5
+      - newZeroDomainClues * 80
+      - newLongClueImpossible * 35
+      - newIsolatedPanels * 12;
+    return {
+      schemaVersion: 1,
+      panelCells,
+      panelCellsConsumed: consumed.size,
+      newZeroDomainClues,
+      newLongClueImpossible,
+      newIsolatedPanels,
+      newClueDomainSize: newClueStarts.length,
+      newClueMaximumCells: newClueMaximum,
+      hardFailures,
+      hardImpossible: hardFailures.length > 0,
+      utilityDelta,
+    };
+  }
+
+  function footprintCandidates(state, row, col, maxSize, _regionSizes, limit = 24) {
+    const starts = adjacentPanelKeys(state, row, col).map((key) => {
+      const [targetRow, targetCol] = key.split(":").map(Number);
+      return { row: targetRow, col: targetCol };
+    });
     const candidates = [];
     const seen = new Set();
-    const maxSize = maximumCells(clue);
-
     function add(cells) {
       const ordered = [...cells].sort((a, b) => a.row - b.row || a.col - b.col);
       const keys = ordered.map((cell) => cellKey(cell.row, cell.col));
       const signature = keys.join("|");
       if (seen.has(signature)) return;
       seen.add(signature);
-      const rows = ordered.map((cell) => cell.row);
-      const cols = ordered.map((cell) => cell.col);
-      const area = (Math.max(...rows) - Math.min(...rows) + 1) * (Math.max(...cols) - Math.min(...cols) + 1);
-      candidates.push({
-        cells: ordered,
-        keys,
-        size: ordered.length,
-        score: ordered.length * 100 - (area - ordered.length) * 9,
-      });
+      candidates.push({ cells: ordered, keys, size: ordered.length, score: ordered.length * 100 });
     }
-
     function expand(cells, keys) {
       add(cells);
       if (cells.length >= maxSize || candidates.length >= limit) return;
@@ -192,7 +368,7 @@
           const nextCol = cell.col + dc;
           const key = cellKey(nextRow, nextCol);
           if (!inBounds(state, nextRow, nextCol) || keys.has(key)) continue;
-          if (effectiveType(state, nextRow, nextCol, overlay) !== "panel") continue;
+          if (state.grid[nextRow][nextCol].type !== "panel") continue;
           frontier.set(key, { row: nextRow, col: nextCol });
         }
       }
@@ -203,12 +379,11 @@
         expand([...cells, cell], nextKeys);
       }
     }
-
     for (const start of starts) {
       if (candidates.length >= limit) break;
       expand([start], new Set([cellKey(start.row, start.col)]));
     }
-    return candidates.sort((a, b) => b.size - a.size || b.score - a.score || a.keys.join("|").localeCompare(b.keys.join("|")));
+    return candidates.sort((a, b) => b.size - a.size || a.keys.join("|").localeCompare(b.keys.join("|")));
   }
 
   function greedyFootprintEstimate(items) {
@@ -225,92 +400,13 @@
     for (const { item, index } of order) {
       const available = item.candidates.filter((candidate) => candidate.keys.every((key) => !occupied.has(key)));
       if (!available.length) continue;
-      const preferred = available.find((candidate) => candidate.size >= item.preferredCells) || available[0];
-      selected.push({ index, keys: preferred.keys, size: preferred.size });
-      for (const key of preferred.keys) occupied.add(key);
+      const selectedCandidate = available.find((candidate) => candidate.size >= item.preferredCells) || available[0];
+      selected.push({ index, keys: selectedCandidate.keys, size: selectedCandidate.size });
+      for (const key of selectedCandidate.keys) occupied.add(key);
       externalClues += 1;
-      clueTextCells += preferred.size;
+      clueTextCells += selectedCandidate.size;
     }
     return { externalClues, clueTextCells, selected };
-  }
-
-  function evaluateState(state, overlay = null, suppliedOptions = null) {
-    const config = suppliedOptions || options();
-    const topology = panelRegions(state, overlay);
-    const clues = collectClues(state, overlay);
-    const cellPressure = new Map();
-    const items = clues.map((item) => {
-      const candidates = footprintCandidates(state, item.row, item.col, item.clue, overlay, config.footprintLimit);
-      const reachable = new Set(candidates.flatMap((candidate) => candidate.keys));
-      for (const key of reachable) cellPressure.set(key, (cellPressure.get(key) || 0) + 1);
-      return {
-        ...item,
-        candidates,
-        reachable,
-        domainSize: candidates.length,
-        preferredCells: preferredCells(item.clue),
-        maximumCells: candidates.reduce((maximum, candidate) => Math.max(maximum, candidate.size), 0),
-      };
-    });
-    const zeroDomainClues = items.filter((item) => item.domainSize === 0);
-    const longClueImpossible = items.filter((item) => item.maximumCells < item.preferredCells);
-    const greedy = greedyFootprintEstimate(items);
-    const externalUpperBound = items.filter((item) => item.domainSize > 0).length;
-    const clueTextUpperBound = Math.min(
-      topology.panelCells,
-      items.reduce((sum, item) => sum + item.maximumCells, 0),
-      new Set(items.flatMap((item) => [...item.reachable])).size,
-    );
-    const overlapPressure = [...cellPressure.values()].reduce((sum, count) => sum + Math.max(0, count - 1), 0);
-    const maximumCellPressure = [...cellPressure.values()].reduce((maximum, count) => Math.max(maximum, count), 0);
-    const hardFailures = [];
-    if (topology.panelCells < config.minimumClueTextCells) hardFailures.push("panel-capacity");
-    const completeNecessaryPass = externalUpperBound >= config.minimumExternalClues
-      && clueTextUpperBound >= config.minimumClueTextCells;
-    return {
-      schemaVersion: 1,
-      panelCells: topology.panelCells,
-      panelRegions: topology.regions.length,
-      isolatedPanels: topology.isolatedPanels,
-      largestPanelRegion: topology.largestRegion,
-      clues: items.length,
-      zeroDomainClues: zeroDomainClues.length,
-      zeroDomainSlotIds: zeroDomainClues.map((item) => item.clue.slotId),
-      longClueImpossible: longClueImpossible.length,
-      longClueImpossibleSlotIds: longClueImpossible.map((item) => item.clue.slotId),
-      minimumDomainSize: items.length ? Math.min(...items.map((item) => item.domainSize)) : 0,
-      averageDomainSize: items.length
-        ? items.reduce((sum, item) => sum + item.domainSize, 0) / items.length
-        : 0,
-      externalUpperBound,
-      clueTextUpperBound,
-      greedyExternalClues: greedy.externalClues,
-      greedyClueTextCells: greedy.clueTextCells,
-      overlapPressure,
-      maximumCellPressure,
-      hardFailures,
-      hardImpossible: hardFailures.length > 0,
-      completeNecessaryPass,
-      utility: greedy.clueTextCells * 3
-        + greedy.externalClues * 18
-        - zeroDomainClues.length * 80
-        - longClueImpossible.length * 35
-        - overlapPressure * 1.5
-        - topology.isolatedPanels * 12,
-    };
-  }
-
-  function evaluatePlacement(state, entry, placement, base = null, suppliedOptions = null) {
-    const config = suppliedOptions || options();
-    const baseline = base || evaluateState(state, null, config);
-    const estimate = evaluateState(state, placementOverlay(state, entry, placement), config);
-    return {
-      ...estimate,
-      newZeroDomainClues: Math.max(0, estimate.zeroDomainClues - baseline.zeroDomainClues),
-      newLongClueImpossible: Math.max(0, estimate.longClueImpossible - baseline.longClueImpossible),
-      panelCellsConsumed: baseline.panelCells - estimate.panelCells,
-      utilityDelta: estimate.utility - baseline.utility,
-    };
   }
 
   function telemetryForPool(pool) {
@@ -318,6 +414,7 @@
     if (!telemetry) {
       telemetry = {
         schemaVersion: 1,
+        estimator: "regional-bounds-local-delta-v1",
         mode: mode(),
         attemptsBuilt: 0,
         placementRounds: 0,
@@ -568,38 +665,43 @@
   }
 
   function candidateMode() {
-    if (typeof process !== "undefined" && process?.env?.SCANWORD_CANDIDATE_MODE) return process.env.SCANWORD_CANDIDATE_MODE;
-    return window.SCANWORD_CANDIDATE_MODE || "indexed";
+    return String(environmentOption("SCANWORD_CANDIDATE_MODE", "indexed"));
   }
 
-  function applyFeasibilityOrdering(state, candidates, phase, targetWords, telemetry, config) {
+  function applyFeasibilityOrdering(state, candidates, telemetry, config) {
     if (!candidates.length) return candidates;
     const currentMode = mode();
-    const headCount = Math.min(config.candidateLimit, candidates.length);
-    const head = candidates.slice(0, headCount);
-    const tail = candidates.slice(headCount);
-    const base = evaluateState(state, null, config);
+    const base = analyzeState(state, config);
     telemetry.placementRounds += 1;
-    for (const candidate of head) {
-      candidate.clueFeasibility = evaluatePlacement(state, candidate.entry, candidate.placement, base, config);
-      telemetry.candidateEvaluations += 1;
-      telemetry.hardImpossibleCandidates += Number(candidate.clueFeasibility.hardImpossible);
-      telemetry.newlyStrandedClues += candidate.clueFeasibility.newZeroDomainClues;
-    }
-    if (currentMode === "shadow") return candidates;
-    let retained = head;
-    if (currentMode === "guard" && phase === "dense") {
-      const feasible = head.filter((candidate) => !candidate.clueFeasibility.hardImpossible);
-      if (feasible.length) {
-        telemetry.candidatesPruned += head.length - feasible.length;
-        retained = feasible;
-      } else {
-        telemetry.candidatesPruned += head.length;
+
+    let retained = candidates;
+    if (currentMode === "guard") {
+      const feasible = [];
+      for (const candidate of candidates) {
+        const consumed = placementConsumedKeys(state, candidate.entry, candidate.placement).size;
+        if (base.panelCells - consumed < config.minimumClueTextCells) {
+          telemetry.hardImpossibleCandidates += 1;
+          telemetry.candidatesPruned += 1;
+        } else feasible.push(candidate);
+      }
+      if (!feasible.length) {
         telemetry.denseStops += 1;
         return [];
       }
+      retained = feasible;
     }
-    retained.sort((a, b) => {
+
+    const headCount = Math.min(config.candidateLimit, retained.length);
+    const head = retained.slice(0, headCount);
+    const tail = retained.slice(headCount);
+    for (const candidate of head) {
+      candidate.clueFeasibility = evaluatePlacement(state, candidate.entry, candidate.placement, base, config);
+      telemetry.candidateEvaluations += 1;
+      telemetry.hardImpossibleCandidates += Number(currentMode !== "guard" && candidate.clueFeasibility.hardImpossible);
+      telemetry.newlyStrandedClues += candidate.clueFeasibility.newZeroDomainClues;
+    }
+    if (currentMode === "shadow") return candidates;
+    head.sort((a, b) => {
       const adjustedA = a.score + a.clueFeasibility.utilityDelta * config.rankWeight;
       const adjustedB = b.score + b.clueFeasibility.utilityDelta * config.rankWeight;
       return adjustedB - adjustedA
@@ -608,13 +710,14 @@
         || a.placement.startRow - b.placement.startRow
         || a.placement.startCol - b.placement.startCol;
     });
-    if (!retained.length) telemetry.fallbackRounds += 1;
-    return [...retained, ...tail];
+    return [...head, ...tail];
   }
 
   function buildAttempt(pool, rows, cols, targetWords, random, poolIndex = solver.buildPoolIndex(pool), requestedMode = candidateMode()) {
     const currentMode = mode();
-    if (currentMode === "off" || requestedMode !== "indexed") return originalBuildAttempt(pool, rows, cols, targetWords, random, poolIndex, requestedMode);
+    if (currentMode === "off" || requestedMode !== "indexed") {
+      return originalBuildAttempt(pool, rows, cols, targetWords, random, poolIndex, requestedMode);
+    }
     const config = options();
     const telemetry = telemetryForPool(pool);
     telemetry.mode = currentMode;
@@ -624,6 +727,7 @@
     const initialCandidates = pool.filter((entry) => entry.answer.length >= 5 && entry.answer.length <= 8);
     const first = initialCandidates[Math.floor(random() * initialCandidates.length)] || pool[0];
     if (!first || !placeInitialWord(state, first, random)) return state;
+
     const maxComponents = 1;
     let stalled = 0;
     while (state.placed.length < targetWords && stalled < 8) {
@@ -639,7 +743,7 @@
         const penalty = remaining <= 5 ? 6 : 3;
         candidates.sort((a, b) => (b.score - penalty * b.placement.newCells) - (a.score - penalty * a.placement.newCells));
       }
-      candidates = applyFeasibilityOrdering(state, candidates, "target", targetWords, telemetry, config);
+      candidates = applyFeasibilityOrdering(state, candidates, telemetry, config);
       if (!candidates.length) { stalled += 1; continue; }
       const shortlistSize = seeded ? 5 : (remaining <= 5 ? 1 : 4);
       const shortlist = candidates.slice(0, Math.min(shortlistSize, candidates.length));
@@ -648,6 +752,7 @@
       if (seeded) state.componentsStarted += 1;
       stalled = 0;
     }
+
     if (state.placed.length >= targetWords) {
       let denseStalled = 0;
       const denseLimit = 80;
@@ -660,7 +765,7 @@
         }
         if (!candidates.length) { denseStalled += 1; continue; }
         if (!seeded) candidates.sort((a, b) => (b.score + 4 * b.placement.newCells) - (a.score + 4 * a.placement.newCells));
-        candidates = applyFeasibilityOrdering(state, candidates, "dense", targetWords, telemetry, config);
+        candidates = applyFeasibilityOrdering(state, candidates, telemetry, config);
         if (!candidates.length) { denseStalled += 1; continue; }
         const shortlist = candidates.slice(0, Math.min(seeded ? 4 : 5, candidates.length));
         const selected = shortlist[Math.floor(random() * shortlist.length)];
@@ -672,6 +777,7 @@
     state.clueFeasibility = {
       schemaVersion: 1,
       mode: currentMode,
+      estimator: telemetry.estimator,
       placement: cloneTelemetry(telemetry),
     };
     return state;
@@ -684,7 +790,7 @@
       const currentMode = mode();
       if (currentMode === "off") return originalAssignClueTextCells(state, random, restarts);
       const config = options();
-      const estimate = evaluateState(state, null, config);
+      const estimate = analyzeState(state, config);
       const layout = originalAssignClueTextCells(state, random, restarts);
       const predictedPass = estimate.completeNecessaryPass;
       const actualPass = layout.clueTextCells >= config.minimumClueTextCells
@@ -706,6 +812,7 @@
         ...(state.clueFeasibility || {}),
         schemaVersion: 1,
         mode: currentMode,
+        estimator: "regional-bounds-local-delta-v1",
         calibration,
       };
       state.grid.__scanwordClueFeasibility = state.clueFeasibility;
@@ -733,6 +840,7 @@
         attached.clueFeasibility = {
           schemaVersion: 1,
           mode: mode(),
+          estimator: "regional-bounds-local-delta-v1",
           selected,
           aggregate: aggregate ? cloneTelemetry(aggregate) : null,
         };
@@ -742,16 +850,17 @@
   }
 
   Object.assign(solver, {
-    evaluateClueFeasibilityV1: evaluateState,
+    evaluateClueFeasibilityV1: analyzeState,
     evaluatePlacementClueFeasibilityV1: evaluatePlacement,
     __clueFeasibilityV1Installed: true,
   });
 
   window.ScanwordClueFeasibilityV1 = {
     version: 1,
+    estimator: "regional-bounds-local-delta-v1",
     mode,
     options,
-    evaluateState,
+    evaluateState: analyzeState,
     evaluatePlacement,
     footprintCandidates,
     greedyFootprintEstimate,
