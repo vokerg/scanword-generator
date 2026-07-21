@@ -1,0 +1,90 @@
+name: Clue feasibility
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - construction-clue-feasibility-v1.js
+      - construction-pipeline-*.js
+      - tools/clue-feasibility-*.cjs
+      - tools/node-benchmark-bootstrap-v1.cjs
+      - research/clue-feasibility/**
+      - index.html
+      - .github/workflows/clue-feasibility.yml
+  workflow_dispatch:
+
+concurrency:
+  group: clue-feasibility-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate estimator contract
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          node --check construction-clue-feasibility-v1.js
+          node --check construction-pipeline-stages-v1.js
+          node --check construction-pipeline-v1.js
+          node --check tools/clue-feasibility-estimator-test.cjs
+          node --check tools/clue-feasibility-shadow-parity-test.cjs
+          node --check tools/clue-feasibility-seed-v1.cjs
+          node --check tools/clue-feasibility-checkpoint.cjs
+          node tools/clue-feasibility-estimator-test.cjs
+          node tools/clue-feasibility-shadow-parity-test.cjs
+          node tools/construction-pipeline-parity-test.cjs
+
+  development:
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_CLUE_FEASIBILITY_CONCURRENCY: 2
+      SCANWORD_CLUE_FEASIBILITY_ENFORCE: 0
+      SCANWORD_CLUE_FEASIBILITY_SEED_TIMEOUT_MS: 900000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Compare off, shadow and guard modes
+        run: |
+          set -o pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          mkdir -p research-output/clue-feasibility
+          GITHUB_SHA="${SOURCE_SHA}" node tools/clue-feasibility-checkpoint.cjs \
+            research-output/clue-feasibility 20 \
+            | tee research-output/clue-feasibility/console.jsonl
+
+      - name: Publish development evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clue-feasibility-development-${{ env.SOURCE_SHA }}
+          path: research-output/clue-feasibility/
+          if-no-files-found: error
