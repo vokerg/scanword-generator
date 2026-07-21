@@ -29,7 +29,9 @@ The browser default remains the full two-candidate portfolio. Adaptive early acc
 
 Phase 3 adds an opt-in explicit candidate-state pipeline with exact behavior parity. `SCANWORD_EXPLICIT_PIPELINE` remains `off` in the browser. When enabled, the complete accepted generator runs once as a legacy source stage and the explicit path exposes candidate state, stage order, timing, signatures and validation without changing the returned grid.
 
-Canonical decision: `docs/milestones/v1.1-vocabulary-greatness.md`. Explicit-pipeline parity evidence: `research/explicit-pipeline/README.md`.
+Phase 4 adds opt-in bounded full-corpus retrieval for constrained same-geometry repair patterns. `SCANWORD_FULL_CORPUS_RETRIEVAL` remains `off` in the browser. Retrieval may expand only fixed-letter domains and may enter a final result only after complete hot-only and retrieval-enhanced repair chains are compared under strict structural and editorial gates.
+
+Canonical decision: `docs/milestones/v1.1-vocabulary-greatness.md`. Explicit-pipeline parity evidence: `research/explicit-pipeline/README.md`. Full-corpus retrieval evidence: `research/full-corpus-retrieval/README.md`.
 
 ## Runtime structure
 
@@ -47,8 +49,9 @@ Changing script order is architectural. The wrapper and pipeline order must rema
 ```text
 base dictionaries and bulk corpus
 -> core and dictionary policy
+-> lexical policy and full-corpus pattern index
 -> solver and construction stages
--> editorial lexical policy and demand lexicons
+-> editorial demand lexicons
 -> single replacement
 -> pair refit
 -> radius-two bundle refit
@@ -60,16 +63,19 @@ base dictionaries and bulk corpus
 
 The vocabulary portfolio wraps the repaired single-candidate generator, so every active-set candidate is repaired before selection. The Phase 3 explicit pipeline loads after the final production wrapper, captures that complete generator as `legacy-source`, and remains a no-op delegation while `SCANWORD_EXPLICIT_PIPELINE=off`.
 
+The Phase 4 index loads before solver and repair modules so bounded stage functions can use one shared deterministic retrieval API. It is lazy and does not build while `SCANWORD_FULL_CORPUS_RETRIEVAL=off`.
+
 ### Production modules
 
 - `core.js`: normalization, indexing, deterministic randomness and active-set selection.
 - `dictionary-policy.js`: clue and lexical admission policy.
+- `full-corpus-pattern-index-v1.js`: complete admitted runtime vocabulary index, constrained lookup, deterministic ranking and retrieval telemetry.
 - `solver.js`: base construction, crossings, scoring, metrics and complete validation.
 - `construction-*.js`: bounded construction, clue allocation, rollback and repair stages.
-- `construction-editorial-repair-v3.js`: final same-geometry cleanup.
+- `construction-editorial-repair-v3.js`: final same-geometry cleanup and complete hot/retrieval chain comparison.
 - `construction-vocabulary-portfolio-v1.js`: full/adaptive active-set portfolio.
 - `construction-candidate-state-v1.js`: explicit candidate-state contract, cloning, provenance and deterministic signatures.
-- `construction-pipeline-stages-v1.js`: normal stage functions for the Phase 3 compatibility boundary.
+- `construction-pipeline-stages-v1.js`: normal stage functions for the Phase 3 compatibility boundary and conditional Phase 4 retrieval observation.
 - `construction-pipeline-telemetry-v1.js`: stage timing, candidate counts, signatures and status.
 - `construction-pipeline-v1.js`: opt-in orchestrator and legacy-source compatibility boundary.
 - `renderer.js`, `ui.js`: A5 SVG rendering, controls and export.
@@ -89,9 +95,96 @@ legacy-source
 -> comparison
 ```
 
+When full-corpus retrieval is enabled, the explicit path adds one observed stage before validation:
+
+```text
+current-repair-chain
+-> full-corpus-retrieval
+-> validation
+```
+
 During Phase 3, `legacy-source` owns the historical production wrapper chain. The middle stages are contract observations, validation calls the unchanged `ScanwordSolver.resultMetrics`, and comparison is identity selection over the accepted candidate. This is a transitional compatibility boundary, not permission to add more wrappers inside `legacy-source`.
 
 New construction work should be expressed as `CandidateState -> CandidateState`, `CandidateState -> CandidateState[]`, or `CandidateState[] -> CandidateState[]`. Preserve copy-on-write, explicit cloning or otherwise auditable state ownership. Do not introduce hidden cross-candidate mutation.
+
+## Two-level vocabulary retrieval
+
+The seed-specific 2,500/3,500-entry hot working set is a prior, not a universal legal-domain boundary. Full-corpus access is allowed only through `ScanwordFullCorpusPatternIndexV1` and only for bounded constrained searches.
+
+### Index and admission
+
+The index covers the complete admitted runtime vocabulary: the generated 40,966-entry v8 corpus plus reviewed hand-maintained entries. It is keyed by:
+
+- answer length;
+- position and fixed letter;
+- intersections of constrained buckets.
+
+Every returned entry must have:
+
+- normalized Cyrillic spelling;
+- supported length;
+- an exact clue;
+- admitted metadata;
+- no blocked status;
+- no used-answer or explicit exclusion collision.
+
+An all-wildcard query is not a constrained search. It must be rejected unless a separately documented experiment explicitly permits it. Phase 4 does not permit it.
+
+### Trigger modes
+
+```text
+SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=empty
+```
+
+Retrieve only when the hot domain is empty.
+
+```text
+SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=small-poor
+```
+
+Also evaluate bounded fallback when the hot domain is below the configured threshold or uniformly poor under the editorial policy.
+
+Neither mode changes unconstrained base-construction sampling.
+
+### Ranking and hot-domain priority
+
+Rank fallback entries deterministically by editorial status, weak/generic/generated-clue penalties, proper-name load, category/source concentration, clue kind, lexical quality and answer tie-break.
+
+The existing hot-domain search must be exhausted before fallback. This rule applies across an entire repair target, not merely within one slot or one partner. A fallback on an earlier partner may not preempt a later hot-only solution.
+
+### Complete-chain acceptance
+
+Local improvement is insufficient. When retrieval is enabled, `construction-editorial-repair-v3.js` evaluates cloned candidates through:
+
+```text
+hot-only complete repair chain
+retrieval-enhanced complete repair chain
+```
+
+The retrieval candidate may replace the hot candidate only when:
+
+1. structural signatures are identical;
+2. complete validation passes;
+3. the answer graph remains one component;
+4. all clues remain exact;
+5. two-letter count does not increase;
+6. final formulaic-short count decreases, or remains equal while final editorial penalty strictly decreases.
+
+Equal, ambiguous or worse output must retain the hot-only candidate. Telemetry may record rejected fallback candidates, but final selected-fallback counts must exclude them.
+
+### Telemetry
+
+Record at minimum:
+
+- indexed entries;
+- hot and fallback lookups;
+- full-corpus checks;
+- empty, small and poor-domain rescues;
+- returned fallback candidates;
+- candidate and final selected fallback answers;
+- category, source, stage and slot provenance;
+- complete-chain comparison, acceptance and rejection reason;
+- runtime cost.
 
 ## Dictionary architecture
 
@@ -217,6 +310,18 @@ SCANWORD_EXPLICIT_PIPELINE=on
 
 Run the accepted production generator through the explicit Phase 3 candidate-state and telemetry boundary. The committed browser default is `off` until a later release decision changes it with complete evidence.
 
+```text
+SCANWORD_FULL_CORPUS_RETRIEVAL=on
+```
+
+Enable bounded full-corpus retrieval for constrained repair domains. The committed browser default is `off`.
+
+```text
+SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=empty|small-poor
+```
+
+Select the constrained-domain trigger policy. This does not permit uniform full-pool construction sampling.
+
 A/B flags must not silently change browser defaults.
 
 ## Required checks
@@ -250,6 +355,21 @@ SCANWORD_PIPELINE_CONCURRENCY=2 \
 
 The explicit parity checkpoint must compare isolated legacy and explicit processes on full-grid, placed-answer, clue and geometry digests as well as validity, connectivity, panels, answers and crossings. Runtime must remain within the phase-specific gate.
 
+For full-corpus retrieval changes:
+
+```bash
+node tools/full-corpus-pattern-index-test.cjs
+node tools/full-corpus-pair-priority-test.cjs
+node tools/full-corpus-repair-selection-test.cjs
+
+SCANWORD_RETRIEVAL_CONCURRENCY=2 \
+SCANWORD_RETRIEVAL_ENFORCE=1 \
+  node tools/full-corpus-retrieval-checkpoint.cjs \
+  20 research-output/full-corpus-retrieval
+```
+
+The retrieval checkpoint must compare hard-active-set, empty-domain and small/poor-domain modes on identical locked development seeds. It must fail on structural, validity, exact-clue, two-letter or editorial regression and must propagate failures through any output pipeline such as `tee`.
+
 Also run `node --check` for every changed JavaScript/CommonJS file and the matching deterministic test for any bounded construction stage.
 
 A baseline merge must record:
@@ -282,6 +402,8 @@ Keep failed approaches. Do not rewrite negative evidence out of history.
 
 Prefer an explicit pipeline stage over another global `generateBest` wrapper. When a wrapper is unavoidable, document its load-order contract and test real generation. After Phase 3, a new stage may not globally replace `generateBest`; it must enter through the explicit orchestrator or be retained strictly as documented historical research.
 
+Do not use the full corpus as an unconstrained random or uniformly expanded construction pool. Pattern retrieval must be demand-driven, bounded, admitted and measured. Local fallback improvement must not be promoted without complete-chain or complete-pipeline comparison.
+
 Do not tune on the locked Phase 2 promotion or stability seed sets. Use development seeds for iteration, promotion only for a frozen candidate, and stability only after promotion when the phase gate requires it.
 
 ## Canonical directories
@@ -292,6 +414,7 @@ bulk-lexicon/                         generated chunks, loader and manifest
 docs/milestones/                      accepted project baselines
 research/closed-fill/                 topology and clue-allocation history
 research/explicit-pipeline/           explicit CandidateState and parity evidence
+research/full-corpus-retrieval/       bounded pattern retrieval and negative evidence
 research/lexical-quality/             same-geometry repair experiments
 research/vocabulary-first/            corpus and active-set history
 research/vocabulary-greatness-1.1/    truthful benchmark and corpus v8 ledger
