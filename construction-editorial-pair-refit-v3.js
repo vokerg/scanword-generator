@@ -95,8 +95,6 @@
         ...concentrationContext(result),
       })
       : { entries: hotDomain };
-    // Preserve the established hot-domain order. Full-corpus candidates are
-    // appended by augmentDomain and are considered only after hot candidates.
     return augmented.entries.slice(0, maximum);
   }
 
@@ -155,7 +153,9 @@
     word.weakFill = Boolean(entry.weakFill);
     word.lexicalQuality = Number(entry.lexicalQuality || policy.classify(entry.answer, entry).editorialQuality);
     word.lexicalSource = entry.lexicalSource || "editorial-pair-refit-v3";
-    word.lexicalCategory = entry.lexicalCategory || word.lexicalCategory || "unknown";
+    if (entry.fullCorpusFallback) {
+      word.lexicalCategory = entry.lexicalCategory || word.lexicalCategory || "unknown";
+    }
     for (let index = 0; index < word.cells.length; index += 1) {
       const cell = word.cells[index];
       result.grid[cell.row][cell.col].char = entry.answer[index];
@@ -242,6 +242,8 @@
       shared,
       targetDomain,
       partnerDomain,
+      hotPairs,
+      fallbackPairs,
       pairs: [...hotPairs, ...fallbackPairs],
     };
   }
@@ -277,46 +279,69 @@
         .filter(Boolean)
         .sort((a, b) => a.answer.length - b.answer.length || a.id - b.id);
 
+      const deferredFallbacks = [];
       let accepted = false;
+
+      function acceptCandidate(partner, generated, pair) {
+        const fromTarget = target.answer;
+        const fromPartner = partner.answer;
+        const outcome = applyPair(result, target, pair.targetEntry, partner, pair.partnerEntry);
+        if (!outcome.accepted) {
+          rejectedPairs += 1;
+          return false;
+        }
+        usedAnswers.delete(fromTarget);
+        usedAnswers.delete(fromPartner);
+        usedAnswers.add(pair.targetEntry.answer);
+        usedAnswers.add(pair.partnerEntry.answer);
+        retrieval?.recordSelected?.(pair.targetEntry, { stage: "pair-refit", slotId: target.id });
+        retrieval?.recordSelected?.(pair.partnerEntry, { stage: "pair-refit", slotId: partner.id });
+        replacements.push({
+          targetSlotId: target.id,
+          partnerSlotId: partner.id,
+          targetFrom: fromTarget,
+          targetTo: pair.targetEntry.answer,
+          partnerFrom: fromPartner,
+          partnerTo: pair.partnerEntry.answer,
+          targetPattern: generated.targetPattern,
+          partnerPattern: generated.partnerPattern,
+          shared: generated.shared,
+          formulaicGain: pair.formulaicGain,
+          penaltyGain: pair.penaltyGain,
+          targetRetrievalSource: pair.targetEntry.fullCorpusFallback ? "full-corpus-pattern-v1" : "hot-working-set",
+          partnerRetrievalSource: pair.partnerEntry.fullCorpusFallback ? "full-corpus-pattern-v1" : "hot-working-set",
+        });
+        return true;
+      }
+
+      // First pass: exhaust the complete established hot-domain search across
+      // every partner. A fallback on an earlier partner may not preempt a hot
+      // solution that the baseline would find on a later partner.
       for (const partner of partners) {
         partnerSearches += 1;
         const generated = pairCandidates(result, target, partner, usedAnswers);
         domainsBuilt += generated.targetDomain?.length || 0;
         domainsBuilt += generated.partnerDomain?.length || 0;
         compatiblePairs += generated.pairs.length;
-        for (const pair of generated.pairs) {
-          const fromTarget = target.answer;
-          const fromPartner = partner.answer;
-          const outcome = applyPair(result, target, pair.targetEntry, partner, pair.partnerEntry);
-          if (!outcome.accepted) {
-            rejectedPairs += 1;
-            continue;
+        deferredFallbacks.push(...generated.fallbackPairs.map((pair) => ({ partner, generated, pair })));
+        for (const pair of generated.hotPairs) {
+          if (acceptCandidate(partner, generated, pair)) {
+            accepted = true;
+            break;
           }
-          usedAnswers.delete(fromTarget);
-          usedAnswers.delete(fromPartner);
-          usedAnswers.add(pair.targetEntry.answer);
-          usedAnswers.add(pair.partnerEntry.answer);
-          retrieval?.recordSelected?.(pair.targetEntry, { stage: "pair-refit", slotId: target.id });
-          retrieval?.recordSelected?.(pair.partnerEntry, { stage: "pair-refit", slotId: partner.id });
-          replacements.push({
-            targetSlotId: target.id,
-            partnerSlotId: partner.id,
-            targetFrom: fromTarget,
-            targetTo: pair.targetEntry.answer,
-            partnerFrom: fromPartner,
-            partnerTo: pair.partnerEntry.answer,
-            targetPattern: generated.targetPattern,
-            partnerPattern: generated.partnerPattern,
-            shared: generated.shared,
-            formulaicGain: pair.formulaicGain,
-            penaltyGain: pair.penaltyGain,
-            targetRetrievalSource: pair.targetEntry.fullCorpusFallback ? "full-corpus-pattern-v1" : "hot-working-set",
-            partnerRetrievalSource: pair.partnerEntry.fullCorpusFallback ? "full-corpus-pattern-v1" : "hot-working-set",
-          });
-          accepted = true;
-          break;
         }
         if (accepted) break;
+      }
+
+      // Second pass: only after no hot partner repair succeeds may a bounded
+      // full-corpus candidate enter the accepted result.
+      if (!accepted) {
+        for (const item of deferredFallbacks) {
+          if (acceptCandidate(item.partner, item.generated, item.pair)) {
+            accepted = true;
+            break;
+          }
+        }
       }
     }
 
