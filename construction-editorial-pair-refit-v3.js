@@ -3,6 +3,7 @@
 
   const solver = window.ScanwordSolver;
   const policy = window.ScanwordEditorialLexicalPolicyV3;
+  const retrieval = window.ScanwordFullCorpusPatternIndexV1;
   if (!solver || !policy || solver.__editorialPairRefitV3Installed) return;
 
   const previousGenerateBest = solver.generateBest.bind(solver);
@@ -64,14 +65,37 @@
     return policy.classify(entry.answer, entry).editorialPenalty;
   }
 
+  function concentrationContext(result) {
+    const categoryCounts = {};
+    const sourceCounts = {};
+    for (const entry of result.placed || []) {
+      const category = entry.lexicalCategory || "unknown";
+      const source = entry.lexicalSource || "unknown";
+      categoryCounts[category] = (categoryCounts[category] || 0) + 1;
+      sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+    }
+    return { categoryCounts, sourceCounts };
+  }
+
   function domainForWord(result, word, pattern, usedOutside, options = {}) {
     const maximum = numericOption("SCANWORD_EDITORIAL_PAIR_DOMAIN", 80);
-    return result.pool
+    const hotDomain = result.pool
       .filter((entry) => String(entry.answer || "").length === word.answer.length)
       .filter((entry) => entry.hasExactClue)
       .filter((entry) => !usedOutside.has(entry.answer))
       .filter((entry) => matchesPattern(entry.answer, pattern))
       .filter((entry) => !options.requireNonFormulaic || !policy.classify(entry.answer, entry).formulaicShort)
+      .sort((a, b) => entryPenalty(a) - entryPenalty(b) || a.answer.localeCompare(b.answer))
+      .slice(0, maximum);
+    const augmented = retrieval?.augmentDomain
+      ? retrieval.augmentDomain(hotDomain, pattern, {
+        usedAnswers: usedOutside,
+        requireNonFormulaic: Boolean(options.requireNonFormulaic),
+        maximum,
+        ...concentrationContext(result),
+      })
+      : { entries: hotDomain };
+    return [...augmented.entries]
       .sort((a, b) => entryPenalty(a) - entryPenalty(b) || a.answer.localeCompare(b.answer))
       .slice(0, maximum);
   }
@@ -100,6 +124,7 @@
         weakFill: word.weakFill,
         lexicalQuality: word.lexicalQuality,
         lexicalSource: word.lexicalSource,
+        lexicalCategory: word.lexicalCategory,
       })),
       cells: [...cells.values()],
       clues,
@@ -114,6 +139,7 @@
       item.word.weakFill = item.weakFill;
       item.word.lexicalQuality = item.lexicalQuality;
       item.word.lexicalSource = item.lexicalSource;
+      item.word.lexicalCategory = item.lexicalCategory;
     }
     for (const item of saved.cells) item.cell.char = item.char;
     for (const item of saved.clues) {
@@ -129,6 +155,7 @@
     word.weakFill = Boolean(entry.weakFill);
     word.lexicalQuality = Number(entry.lexicalQuality || policy.classify(entry.answer, entry).editorialQuality);
     word.lexicalSource = entry.lexicalSource || "editorial-pair-refit-v3";
+    word.lexicalCategory = entry.lexicalCategory || word.lexicalCategory || "unknown";
     for (let index = 0; index < word.cells.length; index += 1) {
       const cell = word.cells[index];
       result.grid[cell.row][cell.col].char = entry.answer[index];
@@ -207,6 +234,7 @@
   function applyEditorialPairRefits(result) {
     if (!result?.grid || !Array.isArray(result.placed) || !Array.isArray(result.pool)) return result;
 
+    const retrievalBefore = retrieval?.enabled?.() ? retrieval.snapshot() : null;
     const before = policy.summarize(result.placed);
     const byId = new Map(result.placed.map((word) => [Number(word.id), word]));
     const usedAnswers = new Set(result.placed.map((word) => word.answer));
@@ -253,6 +281,8 @@
           usedAnswers.delete(fromPartner);
           usedAnswers.add(pair.targetEntry.answer);
           usedAnswers.add(pair.partnerEntry.answer);
+          retrieval?.recordSelected?.(pair.targetEntry, { stage: "pair-refit", slotId: target.id });
+          retrieval?.recordSelected?.(pair.partnerEntry, { stage: "pair-refit", slotId: partner.id });
           replacements.push({
             targetSlotId: target.id,
             partnerSlotId: partner.id,
@@ -265,6 +295,8 @@
             shared: generated.shared,
             formulaicGain: pair.formulaicGain,
             penaltyGain: pair.penaltyGain,
+            targetRetrievalSource: pair.targetEntry.fullCorpusFallback ? "full-corpus-pattern-v1" : "hot-working-set",
+            partnerRetrievalSource: pair.partnerEntry.fullCorpusFallback ? "full-corpus-pattern-v1" : "hot-working-set",
           });
           accepted = true;
           break;
@@ -298,6 +330,7 @@
         validation: metrics.validation,
       },
     };
+    if (retrievalBefore) retrieval.attachTelemetry(result, "pair-refit", retrievalBefore);
     return result;
   }
 
