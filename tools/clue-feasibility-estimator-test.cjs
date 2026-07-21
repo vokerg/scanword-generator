@@ -45,26 +45,21 @@ function setClue(state, row, col, text, slotId = 1) {
   };
 }
 
-function setLetter(state, row, col, char = "А") {
-  state.grid[row][col] = {
-    type: "letter",
-    char,
-    slotIds: [99],
-    directions: ["right"],
-    clues: [],
+function estimatorOptions(overrides = {}) {
+  return {
+    candidateLimit: 8,
+    footprintLimit: 24,
+    minimumClueTextCells: 1,
+    minimumExternalClues: 1,
+    rankWeight: 1,
+    ...overrides,
   };
 }
 
 {
   const state = makeState();
   setClue(state, 2, 2, "Короткая подсказка");
-  const report = estimator.evaluateState(state, null, {
-    candidateLimit: 8,
-    footprintLimit: 24,
-    minimumClueTextCells: 1,
-    minimumExternalClues: 1,
-    rankWeight: 1,
-  });
+  const report = estimator.evaluateState(state, estimatorOptions());
   assert.equal(report.zeroDomainClues, 0);
   assert.ok(report.minimumDomainSize > 0);
   assert.ok(report.greedyExternalClues >= 1);
@@ -76,13 +71,7 @@ function setLetter(state, row, col, char = "А") {
   const state = makeState(5, 5, "letter");
   setClue(state, 2, 2, "Очень длинная подсказка, которой нужно несколько клеток");
   state.grid[2][1] = { type: "panel", char: null, slotIds: [], directions: [], clues: [] };
-  const report = estimator.evaluateState(state, null, {
-    candidateLimit: 8,
-    footprintLimit: 24,
-    minimumClueTextCells: 1,
-    minimumExternalClues: 1,
-    rankWeight: 1,
-  });
+  const report = estimator.evaluateState(state, estimatorOptions());
   assert.equal(report.zeroDomainClues, 0);
   assert.equal(report.longClueImpossible, 1);
   assert.equal(report.clueTextUpperBound, 1);
@@ -91,13 +80,7 @@ function setLetter(state, row, col, char = "А") {
 {
   const state = makeState(5, 5, "letter");
   setClue(state, 2, 2, "Подсказка");
-  const report = estimator.evaluateState(state, null, {
-    candidateLimit: 8,
-    footprintLimit: 24,
-    minimumClueTextCells: 1,
-    minimumExternalClues: 1,
-    rankWeight: 1,
-  });
+  const report = estimator.evaluateState(state, estimatorOptions());
   assert.equal(report.zeroDomainClues, 1);
   assert.equal(report.externalUpperBound, 0);
   assert.equal(report.completeNecessaryPass, false);
@@ -107,25 +90,14 @@ function setLetter(state, row, col, char = "А") {
   const state = makeState(5, 5, "letter");
   setClue(state, 2, 2, "Подсказка");
   state.grid[2][1] = { type: "panel", char: null, slotIds: [], directions: [], clues: [] };
-  const base = estimator.evaluateState(state, null, {
-    candidateLimit: 8,
-    footprintLimit: 24,
-    minimumClueTextCells: 1,
-    minimumExternalClues: 1,
-    rankWeight: 1,
-  });
+  const configuration = estimatorOptions();
+  const base = estimator.evaluateState(state, configuration);
   const placement = estimator.evaluatePlacement(state, { answer: "АА", clue: "Новая" }, {
     startRow: 2,
     startCol: 1,
     direction: "right",
     clue: { row: 2, col: 0 },
-  }, base, {
-    candidateLimit: 8,
-    footprintLimit: 24,
-    minimumClueTextCells: 1,
-    minimumExternalClues: 1,
-    rankWeight: 1,
-  });
+  }, base, configuration);
   assert.ok(placement.newZeroDomainClues >= 1);
   assert.equal(placement.panelCellsConsumed, 1);
 }
@@ -135,13 +107,7 @@ function setLetter(state, row, col, char = "А") {
   for (const [row, col] of [[0, 0], [0, 1], [1, 0], [1, 1]]) {
     state.grid[row][col] = { type: "panel", char: null, slotIds: [], directions: [], clues: [] };
   }
-  const report = estimator.evaluateState(state, null, {
-    candidateLimit: 8,
-    footprintLimit: 24,
-    minimumClueTextCells: 5,
-    minimumExternalClues: 1,
-    rankWeight: 1,
-  });
+  const report = estimator.evaluateState(state, estimatorOptions({ minimumClueTextCells: 5 }));
   assert.equal(report.panelCells, 4);
   assert.equal(report.hardImpossible, true);
   assert.deepEqual(report.hardFailures, ["panel-capacity"]);
@@ -164,4 +130,5 @@ console.log(JSON.stringify({
   status: "passed",
   tests: 6,
   estimatorVersion: estimator.version,
+  estimator: estimator.estimator,
 }));
