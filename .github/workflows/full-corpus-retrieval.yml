@@ -1,0 +1,52 @@
+name: Full-corpus retrieval
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - full-corpus-pattern-index-v1.js
+      - construction-editorial-replace-v3.js
+      - construction-editorial-pair-refit-v3.js
+      - construction-editorial-bundle-refit-v3.js
+      - construction-pipeline-*.js
+      - tools/full-corpus-*.cjs
+      - tools/node-benchmark-bootstrap-v1.cjs
+      - research/full-corpus-retrieval/**
+      - index.html
+      - .github/workflows/full-corpus-retrieval.yml
+  workflow_dispatch:
+
+concurrency:
+  group: full-corpus-retrieval-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate retrieval contract
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          node --check full-corpus-pattern-index-v1.js
+          node --check construction-editorial-replace-v3.js
+          node --check construction-editorial-pair-refit-v3.js
+          node --check tools/full-corpus-pattern-index-test.cjs
+          node tools/full-corpus-pattern-index-test.cjs
+          node tools/construction-pipeline-parity-test.cjs
