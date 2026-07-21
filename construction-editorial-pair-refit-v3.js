@@ -180,6 +180,14 @@
     return { accepted: false, validation, duplicateAnswers };
   }
 
+  function comparePairs(a, b) {
+    return b.formulaicGain - a.formulaicGain
+      || b.penaltyGain - a.penaltyGain
+      || entryPenalty(a.partnerEntry) - entryPenalty(b.partnerEntry)
+      || a.targetEntry.answer.localeCompare(b.targetEntry.answer)
+      || a.partnerEntry.answer.localeCompare(b.partnerEntry.answer);
+  }
+
   function pairCandidates(result, target, partner, usedAnswers) {
     const mutableIds = new Set([Number(target.id), Number(partner.id)]);
     const targetPattern = mutablePattern(result, target, mutableIds);
@@ -222,13 +230,20 @@
       if (pairs.length >= maximumPairs) break;
     }
 
-    pairs.sort((a, b) =>
-      b.formulaicGain - a.formulaicGain
-      || b.penaltyGain - a.penaltyGain
-      || entryPenalty(a.partnerEntry) - entryPenalty(b.partnerEntry)
-      || a.targetEntry.answer.localeCompare(b.targetEntry.answer)
-      || a.partnerEntry.answer.localeCompare(b.partnerEntry.answer));
-    return { targetPattern, partnerPattern, shared, targetDomain, partnerDomain, pairs };
+    const hotPairs = pairs
+      .filter((pair) => !pair.targetEntry.fullCorpusFallback && !pair.partnerEntry.fullCorpusFallback)
+      .sort(comparePairs);
+    const fallbackPairs = pairs
+      .filter((pair) => pair.targetEntry.fullCorpusFallback || pair.partnerEntry.fullCorpusFallback)
+      .sort(comparePairs);
+    return {
+      targetPattern,
+      partnerPattern,
+      shared,
+      targetDomain,
+      partnerDomain,
+      pairs: [...hotPairs, ...fallbackPairs],
+    };
   }
 
   function applyEditorialPairRefits(result) {
