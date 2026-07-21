@@ -7,6 +7,7 @@
   const stages = window.ScanwordConstructionPipelineStagesV1;
   const retrieval = window.ScanwordFullCorpusPatternIndexV1;
   const clueFeasibility = window.ScanwordClueFeasibilityV1;
+  const partialSearch = window.ScanwordBoundedPartialSearchV1;
   if (!solver || !stateApi || !telemetryApi || !stages || solver.__explicitPipelineV1Installed) return;
 
   const legacyGenerateBest = solver.generateBest.bind(solver);
@@ -49,6 +50,12 @@
         ownership: "incremental construction estimate and complete-state calibration",
       });
     }
+    if (partialSearch && partialSearch.mode() !== "off") {
+      state = telemetry.runStage("bounded-partial-search", state, stages.observeBoundedPartialSearch, {
+        mode: partialSearch.mode(),
+        ownership: "bounded placement alternatives plus complete-pipeline fallback comparison",
+      });
+    }
     if (retrieval?.enabled?.()) {
       state = telemetry.runStage("full-corpus-retrieval", state, stages.observeFullCorpusRetrieval, {
         mode: retrieval.retrievalMode(),
@@ -65,14 +72,20 @@
     const selected = ranked[0];
     const result = stateApi.toLegacyResult(selected);
     const feasibilityMode = clueFeasibility?.mode?.() || "off";
+    const partialSearchMode = partialSearch?.mode?.() || "off";
     return telemetryApi.attach(result, telemetry.summary({
       selectedSignature: stateApi.signature(selected),
-      exactOutputParityExpected: !retrieval?.enabled?.() && ["off", "shadow"].includes(feasibilityMode),
+      exactOutputParityExpected: !retrieval?.enabled?.()
+        && ["off", "shadow"].includes(feasibilityMode)
+        && ["off", "shadow"].includes(partialSearchMode),
       fullCorpusRetrieval: retrieval?.enabled?.()
         ? { enabled: true, mode: retrieval.retrievalMode() }
         : { enabled: false },
       clueFeasibility: feasibilityMode !== "off"
         ? { enabled: true, mode: feasibilityMode }
+        : { enabled: false },
+      boundedPartialSearch: partialSearchMode !== "off"
+        ? { enabled: true, mode: partialSearchMode }
         : { enabled: false },
     }));
   }
