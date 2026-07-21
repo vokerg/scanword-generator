@@ -62,6 +62,44 @@
     });
   }
 
+  function observeFullCorpusRetrieval(state) {
+    stateApi.assert(state);
+    const retrieval = window.ScanwordFullCorpusPatternIndexV1;
+    const report = state.result.constructionV2?.fullCorpusRetrieval || null;
+    if (!retrieval?.enabled?.() || !report?.enabled) {
+      throw new Error("Full-corpus retrieval stage executed without enabled retrieval telemetry");
+    }
+    const sourcePool = retrieval.entries();
+    const selected = report.totals?.selectedFallbackAnswers || [];
+    return stateApi.transition(state, "full-corpus-retrieval-observed", {
+      sourcePool,
+      hotWorkingSet: state.result.pool || state.hotWorkingSet,
+      clueMetrics: {
+        ...state.clueMetrics,
+        fullCorpusRetrieval: {
+          mode: report.mode,
+          indexedEntries: report.indexedEntries,
+          hotEntries: Number(state.result.pool?.length || 0),
+          fallbackLookups: Number(report.totals?.fallbackLookups || 0),
+          fullCorpusChecks: Number(report.totals?.fullCorpusChecks || 0),
+          emptyDomainRescues: Number(report.totals?.emptyDomainRescues || 0),
+          smallDomainRescues: Number(report.totals?.smallDomainRescues || 0),
+          poorDomainRescues: Number(report.totals?.poorDomainRescues || 0),
+          selectedFallbackAnswers: selected,
+        },
+      },
+      provenance: {
+        ...state.provenance,
+        fullCorpusRetrieval: {
+          mode: report.mode,
+          indexedEntries: report.indexedEntries,
+          stages: Object.keys(report.stages || {}).sort(),
+          selectedFallbackAnswers: selected,
+        },
+      },
+    });
+  }
+
   function validate(state) {
     stateApi.assert(state);
     const solver = window.ScanwordSolver;
@@ -112,6 +150,7 @@
     observeBaseConstruction,
     observeClueAllocation,
     observeRepairChain,
+    observeFullCorpusRetrieval,
     validate,
     compare,
   };
