@@ -5,6 +5,7 @@
   const stateApi = window.ScanwordCandidateStateV1;
   const telemetryApi = window.ScanwordConstructionPipelineTelemetryV1;
   const stages = window.ScanwordConstructionPipelineStagesV1;
+  const retrieval = window.ScanwordFullCorpusPatternIndexV1;
   if (!solver || !stateApi || !telemetryApi || !stages || solver.__explicitPipelineV1Installed) return;
 
   const legacyGenerateBest = solver.generateBest.bind(solver);
@@ -41,6 +42,12 @@
     state = telemetry.runStage("current-repair-chain", state, stages.observeRepairChain, {
       mode: "legacy-observation",
     });
+    if (retrieval?.enabled?.()) {
+      state = telemetry.runStage("full-corpus-retrieval", state, stages.observeFullCorpusRetrieval, {
+        mode: retrieval.retrievalMode(),
+        ownership: "bounded constrained-domain retrieval",
+      });
+    }
     state = telemetry.runStage("validation", state, stages.validate, {
       validator: "ScanwordSolver.resultMetrics",
     });
@@ -52,7 +59,10 @@
     const result = stateApi.toLegacyResult(selected);
     return telemetryApi.attach(result, telemetry.summary({
       selectedSignature: stateApi.signature(selected),
-      exactOutputParityExpected: true,
+      exactOutputParityExpected: !retrieval?.enabled?.(),
+      fullCorpusRetrieval: retrieval?.enabled?.()
+        ? { enabled: true, mode: retrieval.retrievalMode() }
+        : { enabled: false },
     }));
   }
 
