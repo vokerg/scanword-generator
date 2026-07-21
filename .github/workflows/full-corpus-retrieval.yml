@@ -47,6 +47,45 @@ jobs:
           node --check full-corpus-pattern-index-v1.js
           node --check construction-editorial-replace-v3.js
           node --check construction-editorial-pair-refit-v3.js
+          node --check construction-pipeline-stages-v1.js
+          node --check construction-pipeline-v1.js
           node --check tools/full-corpus-pattern-index-test.cjs
+          node --check tools/full-corpus-retrieval-checkpoint.cjs
           node tools/full-corpus-pattern-index-test.cjs
           node tools/construction-pipeline-parity-test.cjs
+
+  development:
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_RETRIEVAL_CONCURRENCY: 2
+      SCANWORD_RETRIEVAL_ENFORCE: 1
+      SCANWORD_RETRIEVAL_SEED_TIMEOUT_MS: 900000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Compare hard, empty-domain and small-poor retrieval
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          mkdir -p research-output/full-corpus-retrieval
+          GITHUB_SHA="${SOURCE_SHA}" node tools/full-corpus-retrieval-checkpoint.cjs \
+            20 research-output/full-corpus-retrieval \
+            | tee research-output/full-corpus-retrieval/console.jsonl
+
+      - name: Publish development evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-corpus-retrieval-development-${{ env.SOURCE_SHA }}
+          path: research-output/full-corpus-retrieval/
+          if-no-files-found: error
