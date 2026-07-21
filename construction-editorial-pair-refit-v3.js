@@ -95,9 +95,9 @@
         ...concentrationContext(result),
       })
       : { entries: hotDomain };
-    return [...augmented.entries]
-      .sort((a, b) => entryPenalty(a) - entryPenalty(b) || a.answer.localeCompare(b.answer))
-      .slice(0, maximum);
+    // Preserve the established hot-domain order. Full-corpus candidates are
+    // appended by augmentDomain and are considered only after hot candidates.
+    return augmented.entries.slice(0, maximum);
   }
 
   function saveWordState(result, words) {
