@@ -100,6 +100,44 @@
     });
   }
 
+  function observeClueFeasibility(state) {
+    stateApi.assert(state);
+    const estimator = window.ScanwordClueFeasibilityV1;
+    const report = state.result.clueFeasibility || null;
+    if (!estimator || estimator.mode() === "off" || !report) {
+      throw new Error("Clue-feasibility stage executed without enabled estimator telemetry");
+    }
+    const aggregate = report.aggregate || {};
+    const calibration = report.selected?.calibration || null;
+    return stateApi.transition(state, "clue-feasibility-observed", {
+      clueMetrics: {
+        ...state.clueMetrics,
+        clueFeasibility: {
+          mode: report.mode,
+          candidateEvaluations: Number(aggregate.candidateEvaluations || 0),
+          hardImpossibleCandidates: Number(aggregate.hardImpossibleCandidates || 0),
+          candidatesPruned: Number(aggregate.candidatesPruned || 0),
+          denseStops: Number(aggregate.denseStops || 0),
+          completeStates: Number(aggregate.completeStates || 0),
+          falsePositives: Number(aggregate.falsePositives || 0),
+          falseNegatives: Number(aggregate.falseNegatives || 0),
+          selectedCalibration: calibration,
+        },
+      },
+      provenance: {
+        ...state.provenance,
+        clueFeasibility: {
+          version: report.schemaVersion,
+          mode: report.mode,
+          selectedPrediction: calibration ? {
+            predictedPass: Boolean(calibration.predictedPass),
+            actualPass: Boolean(calibration.actual?.passedCheckpoint),
+          } : null,
+        },
+      },
+    });
+  }
+
   function validate(state) {
     stateApi.assert(state);
     const solver = window.ScanwordSolver;
@@ -151,6 +189,7 @@
     observeClueAllocation,
     observeRepairChain,
     observeFullCorpusRetrieval,
+    observeClueFeasibility,
     validate,
     compare,
   };

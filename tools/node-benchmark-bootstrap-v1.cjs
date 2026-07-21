@@ -7,6 +7,7 @@ const entry = path.basename(process.argv[1] || "");
 const supportedEntries = new Set([
   "benchmark-seed-v3.cjs",
   "construction-pipeline-seed-v1.cjs",
+  "clue-feasibility-seed-v1.cjs",
 ]);
 if (!supportedEntries.has(entry)) return;
 
@@ -31,6 +32,7 @@ const scripts = [
   "closed-fill-rollback.js",
   "construction-v2-runtime.js",
   "construction-v2.js",
+  "construction-clue-feasibility-v1.js",
   "construction-victim.js",
   "construction-victim-depth2.js",
   "construction-portfolio.js",
@@ -78,6 +80,7 @@ const blocked = new Set([
 const benchmarkEntrypoints = new Set([
   path.join(__dirname, "benchmark-seed-v3.cjs"),
   path.join(__dirname, "construction-pipeline-seed-v1.cjs"),
+  path.join(__dirname, "clue-feasibility-seed-v1.cjs"),
 ]);
 const originalLoad = Module._load;
 Module._load = function loadCanonicalBenchmarkDependency(request, parent, isMain) {
@@ -93,4 +96,5 @@ window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
   blocked: [...blocked],
   explicitPipeline: "construction-pipeline-v1",
   fullCorpusRetrieval: "full-corpus-pattern-index-v1",
+  clueFeasibility: "construction-clue-feasibility-v1",
 };

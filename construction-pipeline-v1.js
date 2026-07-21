@@ -6,6 +6,7 @@
   const telemetryApi = window.ScanwordConstructionPipelineTelemetryV1;
   const stages = window.ScanwordConstructionPipelineStagesV1;
   const retrieval = window.ScanwordFullCorpusPatternIndexV1;
+  const clueFeasibility = window.ScanwordClueFeasibilityV1;
   if (!solver || !stateApi || !telemetryApi || !stages || solver.__explicitPipelineV1Installed) return;
 
   const legacyGenerateBest = solver.generateBest.bind(solver);
@@ -42,6 +43,12 @@
     state = telemetry.runStage("current-repair-chain", state, stages.observeRepairChain, {
       mode: "legacy-observation",
     });
+    if (clueFeasibility && clueFeasibility.mode() !== "off") {
+      state = telemetry.runStage("clue-feasibility", state, stages.observeClueFeasibility, {
+        mode: clueFeasibility.mode(),
+        ownership: "incremental construction estimate and complete-state calibration",
+      });
+    }
     if (retrieval?.enabled?.()) {
       state = telemetry.runStage("full-corpus-retrieval", state, stages.observeFullCorpusRetrieval, {
         mode: retrieval.retrievalMode(),
@@ -57,11 +64,15 @@
     });
     const selected = ranked[0];
     const result = stateApi.toLegacyResult(selected);
+    const feasibilityMode = clueFeasibility?.mode?.() || "off";
     return telemetryApi.attach(result, telemetry.summary({
       selectedSignature: stateApi.signature(selected),
-      exactOutputParityExpected: !retrieval?.enabled?.(),
+      exactOutputParityExpected: !retrieval?.enabled?.() && ["off", "shadow"].includes(feasibilityMode),
       fullCorpusRetrieval: retrieval?.enabled?.()
         ? { enabled: true, mode: retrieval.retrievalMode() }
+        : { enabled: false },
+      clueFeasibility: feasibilityMode !== "off"
+        ? { enabled: true, mode: feasibilityMode }
         : { enabled: false },
     }));
   }
