@@ -50,13 +50,31 @@ jobs:
           node --check tools/clue-feasibility-checkpoint.cjs
 
       - name: Run estimator fixtures
-        run: node tools/clue-feasibility-estimator-test.cjs
+        run: |
+          mkdir -p research-output/clue-feasibility-unit
+          set -o pipefail
+          node tools/clue-feasibility-estimator-test.cjs 2>&1 \
+            | tee research-output/clue-feasibility-unit/estimator-fixtures.log
 
       - name: Prove shadow placement parity
-        run: node tools/clue-feasibility-shadow-parity-test.cjs
+        run: |
+          set -o pipefail
+          node tools/clue-feasibility-shadow-parity-test.cjs 2>&1 \
+            | tee research-output/clue-feasibility-unit/shadow-parity.log
 
       - name: Preserve explicit pipeline parity
-        run: node tools/construction-pipeline-parity-test.cjs
+        run: |
+          set -o pipefail
+          node tools/construction-pipeline-parity-test.cjs 2>&1 \
+            | tee research-output/clue-feasibility-unit/explicit-parity.log
+
+      - name: Publish unit diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clue-feasibility-unit-${{ env.SOURCE_SHA }}
+          path: research-output/clue-feasibility-unit/
+          if-no-files-found: warn
 
   development:
     needs: unit
