@@ -52,6 +52,7 @@ SCANWORD_CATEGORY_BALANCE=off
 SCANWORD_EXPLICIT_PIPELINE=off
 SCANWORD_FULL_CORPUS_RETRIEVAL=off
 SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=empty
+SCANWORD_CLUE_FEASIBILITY=off
 ```
 
 ## Explicit pipeline parity
@@ -89,6 +90,21 @@ The retrieval-enhanced and hot-only **complete editorial repair chains** are com
 On the locked development-20 set, all three compared modes remained valid and structurally identical. `small-poor` expanded four constrained domains and surfaced fourteen candidates; none beat the complete hot-only chain, so no fallback answer entered a final grid. Runtime ratios were 1.0392 for `empty` and 1.0206 for `small-poor`. The feature remains off by default.
 
 The accepted evidence and three rejected local-ordering attempts are documented in [Full-corpus retrieval](research/full-corpus-retrieval/README.md).
+
+## Incremental clue-feasibility diagnostics
+
+Phase 5 adds an opt-in estimator at the active `ScanwordSolver.buildAttempt` boundary. It measures panel-region capacity, clue-anchor access, long-clue plausibility, overlap pressure, local panel consumption and stranded-clue risk without replacing the exact clue allocator or validator.
+
+```text
+SCANWORD_CLUE_FEASIBILITY=shadow
+SCANWORD_CLUE_FEASIBILITY_CANDIDATES=1
+```
+
+The accepted `shadow` mode evaluates only the first production-ranked placement candidate and does not alter candidate order, randomness, clue allocation or final selection. On the locked development-20 set it achieved 20/20 exact full-result parity and zero false negatives across 5,180 completed states. Its optimistic false-positive rate was 8.09%, with mean absolute errors of 4.88 clue-text cells and 1.96 external clues. Runtime ratio was 1.1182, within the phase-specific 1.15 diagnostic cap.
+
+Direct feasibility ranking was rejected despite a small average density improvement because six seeds regressed in panel count, eleven regressed editorially and runtime rose by 16.1%. The hard-capacity guard did not fire on development seeds and is not promoted. Phase 5 therefore establishes calibrated telemetry, not an output-changing search policy. The browser default remains off.
+
+The evidence, rejected variants and reproduction commands are documented in [Clue feasibility](research/clue-feasibility/README.md).
 
 ## Structural guarantees
 
@@ -174,6 +190,15 @@ SCANWORD_RETRIEVAL_CONCURRENCY=2 \
 SCANWORD_RETRIEVAL_ENFORCE=1 \
   node tools/full-corpus-retrieval-checkpoint.cjs \
   20 research-output/full-corpus-retrieval
+node tools/clue-feasibility-estimator-test.cjs
+node tools/clue-feasibility-shadow-parity-test.cjs
+SCANWORD_CLUE_FEASIBILITY_CONCURRENCY=2 \
+SCANWORD_CLUE_FEASIBILITY_MODES=off,shadow \
+SCANWORD_CLUE_FEASIBILITY_CANDIDATES=1 \
+  node tools/clue-feasibility-checkpoint.cjs \
+  research-output/clue-feasibility 20
+node tools/clue-feasibility-acceptance-v1.cjs \
+  research-output/clue-feasibility
 ```
 
 The canonical Node bootstrap mirrors browser corpus and wrapper/pipeline load order. Release records include source-corpus size, active limit, panels, answers, crossings, coverage, editorial metrics, runtime, category usage and complete structural validation.
@@ -191,6 +216,9 @@ SCANWORD_EXPLICIT_PIPELINE=on                 enable explicit state and stage te
 SCANWORD_FULL_CORPUS_RETRIEVAL=on             enable bounded constrained-pattern retrieval
 SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=empty     restrict fallback to empty hot domains
 SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=small-poor evaluate small or poor hot domains too
+SCANWORD_CLUE_FEASIBILITY=shadow              collect exact-parity clue-feasibility telemetry
+SCANWORD_CLUE_FEASIBILITY=rank                run the rejected local-ranking experiment
+SCANWORD_CLUE_FEASIBILITY=guard               run the unpromoted hard-capacity experiment
 ```
 
 ## Canonical repository structure
@@ -203,6 +231,7 @@ core.js                             dictionary utilities and active-set selectio
 dictionary-policy.js                dictionary admission policy
 full-corpus-pattern-index-v1.js     bounded exact-pattern retrieval index
 solver.js                           base placement, metrics and validation
+construction-clue-feasibility-v1.js incremental clue-capacity estimator
 construction-candidate-state-v1.js  explicit candidate-state contract
 construction-pipeline-*.js          explicit stage orchestration and telemetry
 construction-*.js                   bounded construction and repair stages
@@ -225,6 +254,7 @@ Key dossiers:
 - [Closed-fill research](research/closed-fill/README.md)
 - [Explicit pipeline parity](research/explicit-pipeline/README.md)
 - [Full-corpus retrieval](research/full-corpus-retrieval/README.md)
+- [Clue feasibility](research/clue-feasibility/README.md)
 - [Vocabulary-first program](research/vocabulary-first/README.md)
 - [Vocabulary Greatness 1.1](research/vocabulary-greatness-1.1/README.md)
 - [Lexical-quality experiments](research/lexical-quality/README.md)
@@ -233,7 +263,7 @@ Key dossiers:
 
 The project does not claim zero-panel generation or publication-ready clue prose. Current priorities are:
 
-- estimate clue feasibility before committing structural search to answer domains that cannot fit usable clue footprints;
+- replace independent greedy restarts with one bounded deterministic partial-state search that can consume the calibrated feasibility signals;
 - migrate successful construction and repair behavior from the historical wrapper chain into normal explicit stages;
 - reduce repeated and generic selected-grid clues without weakening structural density;
 - evaluate broader full-corpus integration only through complete-chain or complete-pipeline acceptance;
