@@ -168,7 +168,9 @@
           ...concentrationContext(result),
         })
         : { entries: hotCandidates, fallbackEntries: [] };
-      const candidates = [...augmented.entries].sort(compareRank);
+      // Hot candidates retain their established order. Ranked fallback candidates
+      // are appended and are considered only after the former legal domain fails.
+      const candidates = augmented.entries;
       hotMatchedCandidates += hotCandidates.length;
       fallbackMatchedCandidates += augmented.fallbackEntries?.length || 0;
       matchedCandidates += candidates.length;
