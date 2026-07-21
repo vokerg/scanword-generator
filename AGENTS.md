@@ -33,6 +33,8 @@ Phase 4 adds opt-in bounded full-corpus retrieval for constrained same-geometry 
 
 Phase 5 adds opt-in incremental clue-feasibility telemetry at the active `solver.buildAttempt` boundary. `SCANWORD_CLUE_FEASIBILITY` remains `off` in the browser. The accepted `shadow` mode evaluates one production-ranked placement candidate, preserves candidate order and random calls, and calibrates optimistic regional bounds against the unchanged exact clue allocator. `rank` and `guard` are retained experiments, not promoted behavior.
 
+Phase 6 adds an opt-in deterministic late-placement beam. `SCANWORD_PARTIAL_SEARCH` remains `off` in the browser. The accepted `beam` experiment retains bounded placement alternatives, reconstructs the exact greedy fallback for every replaced attempt, evaluates both through the complete production pipeline and selects only at the final active-set portfolio boundary. It improved development-20 average panels from 5.30 to 4.90 with zero canonical objective regressions, but runtime increased by about 65%, so it is not a browser default.
+
 Canonical decision: `docs/milestones/v1.1-vocabulary-greatness.md`.
 
 Evidence ledgers:
@@ -40,6 +42,7 @@ Evidence ledgers:
 - `research/explicit-pipeline/README.md`
 - `research/full-corpus-retrieval/README.md`
 - `research/clue-feasibility/README.md`
+- `research/bounded-partial-search/README.md`
 
 ## Runtime structure
 
@@ -61,6 +64,8 @@ base dictionaries and bulk corpus
 -> solver
 -> construction-v2 runtime and construction-v2
 -> clue-feasibility estimator
+-> bounded partial-state beam
+-> exact baseline replay bridge
 -> remaining construction and clue-repair stages
 -> editorial demand lexicons
 -> single replacement
@@ -78,6 +83,8 @@ The Phase 4 index loads before solver and repair modules so bounded stage functi
 
 The Phase 5 estimator loads after `construction-v2.js`, where the indexed attempt builder and exact clue allocator are available, and before later construction wrappers. It may wrap `buildAttempt` and observe `assignClueTextCellsV2`; it may not add another `generateBest` wrapper.
 
+The Phase 6 beam loads after the estimator and wraps only `buildAttempt`. The exact replay bridge loads immediately after it. Search modules may not globally wrap `generateBest`. Complete-pipeline comparison is integrated into the existing construction and vocabulary portfolio wrappers.
+
 ### Production modules
 
 - `core.js`: normalization, indexing, deterministic randomness and active-set selection.
@@ -86,11 +93,13 @@ The Phase 5 estimator loads after `construction-v2.js`, where the indexed attemp
 - `solver.js`: base construction, crossings, scoring, metrics and complete validation.
 - `construction-v2.js`: indexed attempt construction and exact clue-footprint allocation.
 - `construction-clue-feasibility-v1.js`: opt-in regional clue-capacity and local placement telemetry.
-- `construction-*.js`: bounded construction, clue allocation, rollback and repair stages.
+- `construction-bounded-partial-search-v1.js`: deterministic bounded late-placement beam, state cloning, ranking, signatures and ancestry.
+- `construction-bounded-partial-search-fallback-v1.js`: exact random-sequence replay of the greedy state for every beam-replaced attempt.
+- `construction-portfolio.js`: attempt portfolio, clue allocation, baseline/beam state evaluation and victim-repair integration.
 - `construction-editorial-repair-v3.js`: final same-geometry cleanup and complete hot/retrieval chain comparison.
-- `construction-vocabulary-portfolio-v1.js`: full/adaptive active-set portfolio.
+- `construction-vocabulary-portfolio-v1.js`: full/adaptive active-set portfolio and Phase 6 complete baseline plus beam-probe comparison.
 - `construction-candidate-state-v1.js`: explicit candidate-state contract, cloning, provenance and deterministic signatures.
-- `construction-pipeline-stages-v1.js`: normal stage functions for the compatibility boundary and conditional Phase 4/5 observations.
+- `construction-pipeline-stages-v1.js`: normal stage functions for the compatibility boundary and conditional Phase 4/5/6 observations.
 - `construction-pipeline-telemetry-v1.js`: stage timing, candidate counts, signatures and status.
 - `construction-pipeline-v1.js`: opt-in orchestrator and legacy-source compatibility boundary.
 - `renderer.js`, `ui.js`: A5 SVG rendering, controls and export.
@@ -114,8 +123,9 @@ Conditional observed stages run before validation:
 
 ```text
 current-repair-chain
--> full-corpus-retrieval     when retrieval is enabled
 -> clue-feasibility          when feasibility telemetry is enabled
+-> bounded-partial-search    when bounded search is enabled
+-> full-corpus-retrieval     when retrieval is enabled
 -> validation
 ```
 
@@ -203,32 +213,87 @@ SCANWORD_CLUE_FEASIBILITY=shadow
 SCANWORD_CLUE_FEASIBILITY_CANDIDATES=1
 ```
 
-Shadow mode must preserve:
-
-- placement candidate order;
-- shortlist size;
-- deterministic random-call sequence;
-- exact clue allocation;
-- downstream repair behavior;
-- final output digest.
+Shadow mode must preserve placement order, shortlist size, deterministic random calls, exact clue allocation, downstream repair behavior and final output digest.
 
 The development gate requires 20/20 exact output parity, zero invalid/disconnected/non-exact/checkpoint-failing grids, zero false negatives across completed-state calibration and runtime ratio no greater than 1.15.
 
 ### Rejected or unpromoted modes
 
-```text
-SCANWORD_CLUE_FEASIBILITY=rank
-```
+`SCANWORD_CLUE_FEASIBILITY=rank` is rejected. It improved average panels on development seeds but caused six panel regressions, eleven editorial regressions and 16.1% runtime overhead. Do not reuse its local utility as a production placement objective without a new complete-search experiment.
 
-The local ranking experiment is rejected. It improved average panels on development seeds but caused six panel regressions, eleven editorial regressions and 16.1% runtime overhead. Do not reuse its local utility as a production placement objective without a new complete-search experiment.
-
-```text
-SCANWORD_CLUE_FEASIBILITY=guard
-```
-
-The hard-capacity guard is unpromoted. It may reject only placements that make the preserved 45-cell clue-text checkpoint mathematically impossible, but no development attempt crossed that floor. Do not claim runtime savings or pruning value from it.
+`SCANWORD_CLUE_FEASIBILITY=guard` is unpromoted. It may reject only placements that make the preserved 45-cell clue-text checkpoint mathematically impossible, but no development attempt crossed that floor. Do not claim runtime savings or pruning value from it.
 
 Future output-changing use of feasibility telemetry must be evaluated as a complete bounded search policy, not justified by local estimator scores alone.
+
+## Bounded partial-state search
+
+The accepted Phase 6 implementation is `late-placement-beam-v1` with a `split-complete-pipeline-v1` outer comparison.
+
+### State ownership
+
+Every branch candidate must own independent copies of:
+
+- the grid and each cell's slot, direction and clue arrays;
+- placed-answer records and their cell coordinates;
+- the used-answer set;
+- clue footprints and mutable clue metadata;
+- ancestry and search telemetry.
+
+Do not mutate a parent after a child is created. Equivalent states must be deduplicated by deterministic structural signature.
+
+### Accepted bounds
+
+```text
+branch point:          placement 14
+beam depth:            4
+beam width:            4
+branching factor:      3
+maximum nodes:         48 per sampled attempt
+sample rate:           0.20
+baseline attempts:     120 per active set
+beam probe attempts:   60 per active set
+beam attempt IDs:      120–179
+```
+
+Timeout and budget behavior must be deterministic. The exact default candidate must remain available.
+
+### Complete-pipeline fallback
+
+Local or pre-allocation preference is not acceptance. The accepted path is:
+
+```text
+complete exact baseline portfolio
++ isolated bounded beam probe
+-> exact clue allocation
+-> exact greedy replay for every beam-replaced attempt
+-> repair and editorial chain
+-> active-set portfolio comparison
+-> complete validation
+-> canonical final objective
+```
+
+A beam state may not delete, replace or conceal the exact baseline complete result. On a complete tie, prefer the exact baseline.
+
+The final selected beam result must include ancestry with at least one `kind: "beam"` step. Search telemetry must record sampled attempts, nodes, depth, beam width, finalists, locally preferred states, returned beam states and selected provenance.
+
+### Phase 6 acceptance
+
+The development-20 gate requires:
+
+- all off, shadow and beam runs complete;
+- 100% validity, connectivity, exact clues and coverage checkpoint passage;
+- 20/20 exact shadow output parity;
+- zero regressions under the complete canonical objective;
+- at least one panel improvement;
+- at least one complete-objective improvement;
+- at least one selected beam result with complete ancestry;
+- expanded nodes and non-zero search depth;
+- shadow runtime ratio no greater than 1.65;
+- beam runtime ratio no greater than 1.70.
+
+The accepted development result improved average panels from 5.30 to 4.90 with six panel wins, no canonical objective regressions and five ancestry-proven selected beam grids. It remains off by default because runtime ratio was 1.6484 and zero-panel rate remained 0%.
+
+Do not treat extra attempt partitions as search evidence. The full exact baseline must be held constant when attributing gains to retained alternatives.
 
 ## Dictionary architecture
 
@@ -294,12 +359,14 @@ Compare complete valid candidates lexicographically:
 2. more answers;
 3. more crossings;
 4. greater raw-letter coverage;
-5. lower short-answer editorial penalty and fewer formulaic short answers;
+5. fewer formulaic short answers and lower short-answer editorial penalty;
 6. lower selected-grid clue debt, when an experiment explicitly measures it;
 7. higher existing solver score;
-8. deterministic tie-breakers.
+8. deterministic tie-breakers with exact-baseline preference on complete ties.
 
 Source-aware, clue-aware or feasibility metrics must not outrank structural density without a separately documented complete-search experiment.
+
+A lower answer count is not a regression when residual panels improve, because panel count is the first canonical objective. Per-seed reports must still disclose the answer change.
 
 ## Feature flags and rollback
 
@@ -315,6 +382,15 @@ SCANWORD_FULL_CORPUS_RETRIEVAL=on
 SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=empty|small-poor
 SCANWORD_CLUE_FEASIBILITY=off|shadow|rank|guard
 SCANWORD_CLUE_FEASIBILITY_CANDIDATES=1
+SCANWORD_PARTIAL_SEARCH=off|shadow|beam
+SCANWORD_PARTIAL_SEARCH_RATE=0.20
+SCANWORD_PARTIAL_SEARCH_START=14
+SCANWORD_PARTIAL_SEARCH_DEPTH=4
+SCANWORD_PARTIAL_SEARCH_BEAM=4
+SCANWORD_PARTIAL_SEARCH_BRANCHING=3
+SCANWORD_PARTIAL_SEARCH_NODES=48
+SCANWORD_PARTIAL_SEARCH_BEAM_ATTEMPTS=60
+SCANWORD_PARTIAL_SEARCH_BEAM_OFFSET=120
 ```
 
 A/B flags must not silently change browser defaults.
@@ -373,6 +449,27 @@ node tools/clue-feasibility-acceptance-v1.cjs \
   research-output/clue-feasibility
 ```
 
+For bounded partial-search changes:
+
+```bash
+NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
+  node tools/bounded-partial-search-test.cjs
+SCANWORD_PARTIAL_SEARCH_CONCURRENCY=2 \
+SCANWORD_PARTIAL_SEARCH_MODES=off,shadow,beam \
+SCANWORD_PARTIAL_SEARCH_RATE=0.20 \
+SCANWORD_PARTIAL_SEARCH_START=14 \
+SCANWORD_PARTIAL_SEARCH_DEPTH=4 \
+SCANWORD_PARTIAL_SEARCH_BEAM=4 \
+SCANWORD_PARTIAL_SEARCH_BRANCHING=3 \
+SCANWORD_PARTIAL_SEARCH_NODES=48 \
+SCANWORD_PARTIAL_SEARCH_BEAM_ATTEMPTS=60 \
+SCANWORD_PARTIAL_SEARCH_BEAM_OFFSET=120 \
+  node tools/bounded-partial-search-checkpoint.cjs \
+  research-output/bounded-partial-search 20
+node tools/bounded-partial-search-acceptance-v1.cjs \
+  research-output/bounded-partial-search
+```
+
 Use `set -o pipefail` when a gate writes through `tee`. Also run `node --check` for every changed JavaScript/CommonJS file and the matching deterministic test for any bounded construction stage.
 
 A baseline merge must record complete structural validity, one connected component, exact clues only, corpus counts, browser defaults, script order, identical-seed metrics, runtime, per-seed regressions and known uncompleted checkpoints.
@@ -393,9 +490,11 @@ Every substantive experiment belongs in `research/` and should state:
 
 Keep failed approaches. Do not rewrite negative evidence out of history.
 
-Prefer an explicit pipeline stage over another global `generateBest` wrapper. A new stage may not globally replace `generateBest`; it must enter through the explicit orchestrator or be retained strictly as documented historical research.
+Prefer an explicit pipeline stage over another global `generateBest` wrapper. A new stage may not globally replace `generateBest`; it must enter through the explicit orchestrator or be integrated into an existing owner with an explicit, tested contract.
 
 Do not use the full corpus as an unconstrained random or uniformly expanded construction pool. Pattern retrieval must be demand-driven, bounded, admitted and measured. Local fallback improvement must not be promoted without complete-chain or complete-pipeline comparison.
+
+Do not promote partial-state ranking from local metrics alone. Compare final valid candidates after clue allocation, repair and editorial processing, and preserve the exact baseline fallback.
 
 Do not tune on the locked Phase 2 promotion or stability seed sets. Use development seeds for iteration, promotion only for a frozen candidate, and stability only after promotion when the phase gate requires it.
 
@@ -409,6 +508,7 @@ research/closed-fill/                 topology and clue-allocation history
 research/explicit-pipeline/           explicit CandidateState and parity evidence
 research/full-corpus-retrieval/       bounded pattern retrieval and negative evidence
 research/clue-feasibility/            calibrated estimator and rejected ranking evidence
+research/bounded-partial-search/      bounded search, ancestry and complete-pipeline evidence
 research/lexical-quality/             same-geometry repair experiments
 research/vocabulary-first/            corpus and active-set history
 research/vocabulary-greatness-1.1/    truthful benchmark and corpus v8 ledger
