@@ -3,7 +3,7 @@
   "status": "active",
   "auditedDate": "2026-07-23",
   "mainRef": "refs/remotes/origin/main",
-  "auditedMainCommit": "5bc3570a1661dc63b040ddba1ddbebc1f1a7b721",
+  "auditedMainCommit": "060a05e3245a24ccf6e3408bcfb887fc390c02d5",
   "policy": {
     "historicalBranchNamesAreLabelsUnlessListed": true,
     "requiredRefsMustResolveExactly": true,
@@ -36,113 +36,91 @@
       "name": "vocabulary-naive-full-pool-test-merge",
       "ref": "refs/heads/research/archive-vocabulary-naive-full-pool-2026-07-17",
       "commit": "f28ffbbd5b16163bbb14be42b2c091af45602bbb",
-      "contains": [
-        "f28ffbbd5b16163bbb14be42b2c091af45602bbb"
-      ]
+      "contains": ["f28ffbbd5b16163bbb14be42b2c091af45602bbb"]
     },
     {
       "name": "vocabulary-balanced-5000-test-merge",
       "ref": "refs/heads/research/archive-vocabulary-balanced-5000-2026-07-17",
       "commit": "15dd6b349f96fe6d3a572ee54ad3922b02dede76",
-      "contains": [
-        "15dd6b349f96fe6d3a572ee54ad3922b02dede76"
-      ]
+      "contains": ["15dd6b349f96fe6d3a572ee54ad3922b02dede76"]
     },
     {
       "name": "vocabulary-pool-sweep-test-merge",
       "ref": "refs/heads/research/archive-vocabulary-pool-sweep-2026-07-17",
       "commit": "7e3a9163e998d2e7cad1c0756488104739d42c9c",
-      "contains": [
-        "7e3a9163e998d2e7cad1c0756488104739d42c9c"
-      ]
+      "contains": ["7e3a9163e998d2e7cad1c0756488104739d42c9c"]
     },
     {
       "name": "vocabulary-confirmation-test-merge",
       "ref": "refs/heads/research/archive-vocabulary-confirmation-2026-07-17",
       "commit": "4304e64f11a0184be5b00c6c42d09d47659fbf0f",
-      "contains": [
-        "4304e64f11a0184be5b00c6c42d09d47659fbf0f"
-      ]
+      "contains": ["4304e64f11a0184be5b00c6c42d09d47659fbf0f"]
     },
     {
       "name": "vocabulary-confirmation-39586-test-merge",
       "ref": "refs/heads/research/archive-vocabulary-confirmation-39586-2026-07-17",
       "commit": "ec0337e792466e08a1d1b44121db5d88792adba0",
-      "contains": [
-        "ec0337e792466e08a1d1b44121db5d88792adba0"
-      ]
+      "contains": ["ec0337e792466e08a1d1b44121db5d88792adba0"]
     },
     {
       "name": "phase-0-accepted-evidence",
       "ref": "refs/heads/research/archive-phase-0-evidence-2026-07-19",
       "commit": "111368ecac9e8b0f00281d2bb0b62fc25795a4c2",
-      "contains": [
-        "111368ecac9e8b0f00281d2bb0b62fc25795a4c2"
-      ]
+      "contains": ["111368ecac9e8b0f00281d2bb0b62fc25795a4c2"]
     },
     {
       "name": "phase-1-accepted-evidence",
       "ref": "refs/heads/research/archive-phase-1-evidence-2026-07-19",
       "commit": "935d23d3886d5f4a8de5c0856e65429f0fcdc140",
-      "contains": [
-        "935d23d3886d5f4a8de5c0856e65429f0fcdc140"
-      ]
+      "contains": ["935d23d3886d5f4a8de5c0856e65429f0fcdc140"]
     },
     {
       "name": "phase-2-baseline-accepted-evidence",
       "ref": "refs/heads/research/archive-phase-2-baseline-evidence-2026-07-19",
       "commit": "3590819c6aad7e8b8178b5106dcb15b61722e8a0",
-      "contains": [
-        "3590819c6aad7e8b8178b5106dcb15b61722e8a0"
-      ]
+      "contains": ["3590819c6aad7e8b8178b5106dcb15b61722e8a0"]
     },
     {
       "name": "phase-3-explicit-pipeline-accepted-evidence",
       "ref": "refs/heads/research/archive-phase-3-explicit-pipeline-evidence-2026-07-20",
       "commit": "4c3a72ea4b14a9b57ab9acaa526900b9a2b45047",
-      "contains": [
-        "4c3a72ea4b14a9b57ab9acaa526900b9a2b45047"
-      ]
+      "contains": ["4c3a72ea4b14a9b57ab9acaa526900b9a2b45047"]
     },
     {
       "name": "phase-4-full-corpus-retrieval-accepted-evidence",
       "ref": "refs/heads/research/archive-phase-4-full-corpus-retrieval-evidence-2026-07-21",
       "commit": "054a8188a5395404c7c4dba20211aa9521ad5f23",
-      "contains": [
-        "054a8188a5395404c7c4dba20211aa9521ad5f23"
-      ]
+      "contains": ["054a8188a5395404c7c4dba20211aa9521ad5f23"]
     },
     {
       "name": "phase-5-clue-feasibility-accepted-evidence",
       "ref": "refs/heads/research/archive-phase-5-clue-feasibility-evidence-2026-07-21",
       "commit": "22fe6087400a9c55c674e0712b23c172812db844",
-      "contains": [
-        "22fe6087400a9c55c674e0712b23c172812db844"
-      ]
+      "contains": ["22fe6087400a9c55c674e0712b23c172812db844"]
     },
     {
       "name": "phase-6-bounded-search-accepted-evidence",
       "ref": "refs/heads/research/archive-phase-6-bounded-search-evidence-2026-07-21",
       "commit": "2c01178849005747f4a2e06876e40a992bb7a7f4",
-      "contains": [
-        "2c01178849005747f4a2e06876e40a992bb7a7f4"
-      ]
+      "contains": ["2c01178849005747f4a2e06876e40a992bb7a7f4"]
     },
     {
       "name": "phase-7-adaptive-search-accepted-evidence",
       "ref": "refs/heads/research/archive-phase-7-adaptive-search-evidence-2026-07-23",
       "commit": "036e4c6d2296e57d9fb679c42728203178110f97",
-      "contains": [
-        "036e4c6d2296e57d9fb679c42728203178110f97"
-      ]
+      "contains": ["036e4c6d2296e57d9fb679c42728203178110f97"]
     },
     {
       "name": "phase-8-direct-stage-runtime-accepted-evidence",
       "ref": "refs/heads/research/archive-phase-8-direct-stage-runtime-evidence-2026-07-23",
       "commit": "76f4cb8cbeee14b111e678e5646ccf3983a3d5d6",
-      "contains": [
-        "76f4cb8cbeee14b111e678e5646ccf3983a3d5d6"
-      ]
+      "contains": ["76f4cb8cbeee14b111e678e5646ccf3983a3d5d6"]
+    },
+    {
+      "name": "phase-9-explicit-default-accepted-evidence",
+      "ref": "refs/heads/research/archive-phase-9-explicit-default-evidence-2026-07-23",
+      "commit": "f77be9fed8223925819830fad6956f1018717bbb",
+      "contains": ["f77be9fed8223925819830fad6956f1018717bbb"]
     }
   ]
 }
