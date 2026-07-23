@@ -12,8 +12,8 @@
   }
 
   function snapshot() {
-    const explicitMode = String(environmentOption("SCANWORD_EXPLICIT_PIPELINE", "off")).toLowerCase();
-    const stageRuntime = String(environmentOption("SCANWORD_PIPELINE_STAGE_RUNTIME", "legacy")).toLowerCase();
+    const explicitMode = String(environmentOption("SCANWORD_EXPLICIT_PIPELINE", "on")).toLowerCase();
+    const stageRuntime = String(environmentOption("SCANWORD_PIPELINE_STAGE_RUNTIME", "explicit")).toLowerCase();
     const installationLock = window.SCANWORD_WRAPPER_INSTALLATION_LOCK || null;
     const executionOwner = solver.explicitPipelineExecutionOwnerV1?.() || null;
     const operationalChecks = {
@@ -30,11 +30,20 @@
       directStageRuntimeDefault: stageRuntime === "explicit",
     };
     const rollbackMode = explicitMode === "off";
+    const rollbackChecks = {
+      explicitPipelineInstalled: operationalChecks.explicitPipelineInstalled,
+      directStageRuntimeInstalled: operationalChecks.directStageRuntimeInstalled,
+      sourceAnchorInstalled: operationalChecks.sourceAnchorInstalled,
+      executionOwnerDirect: operationalChecks.executionOwnerDirect,
+      activeGenerateBestOwnerExplicit: operationalChecks.activeGenerateBestOwnerExplicit,
+      rollbackChainRetained: operationalChecks.rollbackChainRetained,
+      rollbackUnlocked: installationLock == null,
+    };
     const passed = rollbackMode
-      ? Object.values(operationalChecks).every(Boolean)
+      ? Object.values(rollbackChecks).every(Boolean)
       : Object.values({ ...defaultChecks, ...operationalChecks }).every(Boolean);
     return {
-      schemaVersion: 1,
+      schemaVersion: 2,
       mode: rollbackMode ? "legacy-wrapper-chain-rollback-v1" : "explicit-default-rollback-only-legacy-v1",
       explicitMode,
       stageRuntime,
@@ -43,7 +52,7 @@
       activeGenerateBestOwner: operationalChecks.activeGenerateBestOwnerExplicit ? "construction-pipeline-v1" : "unknown",
       rollbackOwner: operationalChecks.rollbackChainRetained ? "legacy-wrapper-chain" : null,
       rollbackMode,
-      checks: { ...defaultChecks, ...operationalChecks },
+      checks: rollbackMode ? { ...defaultChecks, ...rollbackChecks } : { ...defaultChecks, ...operationalChecks },
       passed,
     };
   }
@@ -54,7 +63,7 @@
   }
 
   window.ScanwordWrapperRetirementAuditV1 = {
-    version: 1,
+    version: 2,
     snapshot,
     report,
   };
