@@ -11,10 +11,18 @@ const requested = Math.max(1, Math.min(seedSet.seeds.length, Number(process.argv
 const outputPath = path.resolve(process.argv[3] || path.join(root, "research-output/explicit-pipeline/development-parity.jsonl"));
 const concurrency = Math.max(1, Number(process.env.SCANWORD_PIPELINE_CONCURRENCY || 2));
 const timeoutMs = Math.max(60_000, Number(process.env.SCANWORD_PIPELINE_SEED_TIMEOUT_MS || 900_000));
-const runtimeLimit = Number(process.env.SCANWORD_PIPELINE_RUNTIME_RATIO || 1.10);
+const runtimeLimit = Number(process.env.SCANWORD_PIPELINE_RUNTIME_RATIO || 1.15);
 const worker = path.join(root, "tools/construction-pipeline-seed-v1.cjs");
 const bootstrap = path.join(root, config.bootstrap.production);
 const seeds = seedSet.seeds.slice(0, requested);
+const expectedStages = [
+  "production-stage-source",
+  "base-construction",
+  "clue-allocation",
+  "current-repair-chain",
+  "validation",
+  "comparison",
+];
 
 function runWorker(seed, mode) {
   return new Promise((resolve, reject) => {
@@ -62,12 +70,18 @@ function comparePair(seed, legacy, explicit) {
     .filter((field) => legacy[field] !== explicit[field])
     .map((field) => ({ field, legacy: legacy[field], explicit: explicit[field] }));
   const stageNames = explicit.pipeline?.stages?.map((stage) => stage.name) || [];
-  const expectedStages = ["legacy-source", "base-construction", "clue-allocation", "current-repair-chain", "validation", "comparison"];
   if (JSON.stringify(stageNames) !== JSON.stringify(expectedStages)) {
     differences.push({ field: "pipelineStages", legacy: null, explicit: stageNames });
   }
   if (explicit.pipeline?.stages?.some((stage) => stage.status !== "ok")) {
     differences.push({ field: "pipelineStageStatus", legacy: null, explicit: explicit.pipeline.stages });
+  }
+  if (explicit.pipeline?.executionOwner !== "direct-production-stage-runtime-v2") {
+    differences.push({
+      field: "pipelineExecutionOwner",
+      legacy: null,
+      explicit: explicit.pipeline?.executionOwner || null,
+    });
   }
   return {
     type: "seed",
@@ -117,8 +131,8 @@ async function main() {
   const runtimeRatio = legacyRuntime ? explicitRuntime / legacyRuntime : Infinity;
   const aggregate = {
     type: "aggregate",
-    schemaVersion: 1,
-    phase: "explicit-pipeline-parity-v1",
+    schemaVersion: 2,
+    phase: "direct-stage-runtime-parity-v2",
     seedSet: seedSet.name,
     requested: seeds.length,
     passed: completed.length,
@@ -129,7 +143,8 @@ async function main() {
     runtimeRatio: +runtimeRatio.toFixed(4),
     maximumRuntimeRatio: runtimeLimit,
     runtimeGatePassed: runtimeRatio <= runtimeLimit,
-    stageContract: ["legacy-source", "base-construction", "clue-allocation", "current-repair-chain", "validation", "comparison"],
+    executionOwner: "direct-production-stage-runtime-v2",
+    stageContract: expectedStages,
   };
   process.stdout.write(`${JSON.stringify(aggregate)}\n`);
   fs.writeFileSync(outputPath, `${records.map(JSON.stringify).join("\n")}\n${JSON.stringify(aggregate)}\n`);

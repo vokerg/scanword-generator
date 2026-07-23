@@ -1,0 +1,98 @@
+name: Direct stage runtime
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - construction-stage-source-anchor-v2.js
+      - construction-stage-runtime-v2.js
+      - construction-vocabulary-portfolio-v1.js
+      - construction-pipeline-v1.js
+      - construction-pipeline-stages-v1.js
+      - tools/construction-stage-runtime-test-v2.cjs
+      - tools/construction-pipeline-*.cjs
+      - tools/node-benchmark-bootstrap-v1.cjs
+      - research/direct-stage-runtime/**
+      - index.html
+      - .github/workflows/direct-stage-runtime.yml
+  workflow_dispatch:
+
+concurrency:
+  group: direct-stage-runtime-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check direct-stage syntax
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          node --check construction-stage-source-anchor-v2.js
+          node --check construction-stage-runtime-v2.js
+          node --check construction-vocabulary-portfolio-v1.js
+          node --check construction-pipeline-v1.js
+          node --check tools/construction-stage-runtime-test-v2.cjs
+          node --check tools/construction-pipeline-parity-test.cjs
+          node --check tools/construction-pipeline-checkpoint.cjs
+          node --check tools/node-benchmark-bootstrap-v1.cjs
+
+      - name: Test deterministic direct stage order
+        run: node tools/construction-stage-runtime-test-v2.cjs
+
+      - name: Test direct explicit source contract
+        run: node tools/construction-pipeline-parity-test.cjs
+
+  development-parity:
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_PIPELINE_CONCURRENCY: 2
+      SCANWORD_PIPELINE_RUNTIME_RATIO: 1.15
+      SCANWORD_PIPELINE_SEED_TIMEOUT_MS: 1200000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Compare wrapper and direct stage runtimes
+        run: |
+          set -o pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          mkdir -p research-output/direct-stage-runtime
+          node tools/construction-pipeline-checkpoint.cjs \
+            20 research-output/direct-stage-runtime/development-parity.jsonl \
+            | tee research-output/direct-stage-runtime/console.jsonl
+
+      - name: Publish direct-stage evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: direct-stage-runtime-development-${{ env.SOURCE_SHA }}
+          path: research-output/direct-stage-runtime/
+          if-no-files-found: error

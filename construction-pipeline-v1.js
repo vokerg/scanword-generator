@@ -11,15 +11,47 @@
   if (!solver || !stateApi || !telemetryApi || !stages || solver.__explicitPipelineV1Installed) return;
 
   const legacyGenerateBest = solver.generateBest.bind(solver);
-  const legacySource = stages.createLegacySource(legacyGenerateBest);
 
   function environmentOption(name, fallback) {
     const raw = typeof process !== "undefined" ? process?.env?.[name] : window[name];
     return raw == null || raw === "" ? fallback : raw;
   }
 
+  function withEnvironment(name, value, callback) {
+    if (typeof process !== "undefined") {
+      const previous = process.env[name];
+      if (value == null) delete process.env[name];
+      else process.env[name] = String(value);
+      try {
+        return callback();
+      } finally {
+        if (previous == null) delete process.env[name];
+        else process.env[name] = previous;
+      }
+    }
+    const previous = window[name];
+    window[name] = value;
+    try {
+      return callback();
+    } finally {
+      window[name] = previous;
+    }
+  }
+
   function explicitModeEnabled() {
     return String(environmentOption("SCANWORD_EXPLICIT_PIPELINE", "off")).toLowerCase() === "on";
+  }
+
+  function generateDirectProductionResult(args) {
+    if (typeof solver.generateVocabularyPortfolioV1 !== "function") {
+      throw new Error("Vocabulary portfolio v1 is unavailable for the explicit stage runtime");
+    }
+    if (typeof solver.generateExplicitSingleCandidateV2 !== "function") {
+      throw new Error("Direct single-candidate stage runtime v2 is unavailable");
+    }
+    return withEnvironment("SCANWORD_PIPELINE_STAGE_RUNTIME", "explicit", () => (
+      solver.generateVocabularyPortfolioV1(...args)
+    ));
   }
 
   function runExplicitPipeline(...args) {
@@ -28,21 +60,29 @@
       rows: Number(args[2] || 0),
       cols: Number(args[3] || 0),
       targetWords: Number(args[4] || 0),
-      legacyBoundary: "complete-production-generator",
+      legacyBoundary: "rollback-only-wrapper-chain",
+      executionOwner: "direct-production-stage-runtime-v2",
     });
-    const context = { arguments: args };
 
-    let state = telemetry.runSource("legacy-source", () => legacySource(context), {
-      ownership: "existing production wrapper chain",
+    let state = telemetry.runSource("production-stage-source", () => {
+      const result = generateDirectProductionResult(args);
+      return stateApi.create(result, {
+        sourceStage: "direct-production-stage-runtime-v2",
+        seed: args[0],
+        arguments: args,
+      });
+    }, {
+      ownership: "explicit ordered production stages",
+      rollback: "SCANWORD_EXPLICIT_PIPELINE=off",
     });
     state = telemetry.runStage("base-construction", state, stages.observeBaseConstruction, {
-      mode: "legacy-observation",
+      mode: "direct-stage-observation",
     });
     state = telemetry.runStage("clue-allocation", state, stages.observeClueAllocation, {
-      mode: "legacy-observation",
+      mode: "direct-stage-observation",
     });
     state = telemetry.runStage("current-repair-chain", state, stages.observeRepairChain, {
-      mode: "legacy-observation",
+      mode: "direct-stage-observation",
     });
     if (clueFeasibility && clueFeasibility.mode() !== "off") {
       state = telemetry.runStage("clue-feasibility", state, stages.observeClueFeasibility, {
@@ -75,6 +115,7 @@
     const partialSearchMode = partialSearch?.mode?.() || "off";
     return telemetryApi.attach(result, telemetry.summary({
       selectedSignature: stateApi.signature(selected),
+      executionOwner: "direct-production-stage-runtime-v2",
       exactOutputParityExpected: !retrieval?.enabled?.()
         && ["off", "shadow"].includes(feasibilityMode)
         && ["off", "shadow"].includes(partialSearchMode),
@@ -99,6 +140,7 @@
     generateExplicitPipelineV1: runExplicitPipeline,
     legacyGenerateBestV1: legacyGenerateBest,
     explicitPipelineModeEnabledV1: explicitModeEnabled,
+    explicitPipelineExecutionOwnerV1: () => "direct-production-stage-runtime-v2",
     __explicitPipelineV1Installed: true,
   });
 
