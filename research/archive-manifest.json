@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "status": "active",
-  "auditedDate": "2026-07-21",
+  "auditedDate": "2026-07-23",
   "mainRef": "refs/remotes/origin/main",
-  "auditedMainCommit": "cd7aa4a9800492c63653c2f0093dbd32d649d0ec",
+  "auditedMainCommit": "465e5fdb1b56f9644dde402523e119ad04c448df",
   "policy": {
     "historicalBranchNamesAreLabelsUnlessListed": true,
     "requiredRefsMustResolveExactly": true,
@@ -126,6 +126,14 @@
       "commit": "2c01178849005747f4a2e06876e40a992bb7a7f4",
       "contains": [
         "2c01178849005747f4a2e06876e40a992bb7a7f4"
+      ]
+    },
+    {
+      "name": "phase-7-adaptive-search-accepted-evidence",
+      "ref": "refs/heads/research/archive-phase-7-adaptive-search-evidence-2026-07-23",
+      "commit": "036e4c6d2296e57d9fb679c42728203178110f97",
+      "contains": [
+        "036e4c6d2296e57d9fb679c42728203178110f97"
       ]
     }
   ]
