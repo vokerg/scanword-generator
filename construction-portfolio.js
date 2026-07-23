@@ -114,14 +114,20 @@
   }
 
   function frontierVector(candidate, poolByAnswer) {
+    const panels = Number(candidate.panelCells || 0);
+    const largestPanelRegion = Number(candidate.largestPanelRegion || 0);
     return {
-      panels: Number(candidate.panelCells || 0),
+      panels,
       letters: Number(candidate.letterCells || 0),
       weakFill: countWeakFill(candidate.placed || [], poolByAnswer),
       clueTextCells: Number(candidate.clueTextCells || 0),
       externalClues: Number(candidate.externalClueTexts || 0),
       crossings: Number(candidate.intersections || 0),
       answers: Number(candidate.placed?.length || 0),
+      panelRegions: Number(candidate.panelRegions || 0),
+      isolatedPanels: Number(candidate.isolatedPanels || 0),
+      largestPanelRegion,
+      residualConcentration: panels > 0 ? +(largestPanelRegion / panels).toFixed(6) : 1,
     };
   }
 
@@ -132,7 +138,10 @@
       && first.clueTextCells <= second.clueTextCells
       && first.externalClues >= second.externalClues
       && first.crossings >= second.crossings
-      && first.answers >= second.answers;
+      && first.answers >= second.answers
+      && first.panelRegions <= second.panelRegions
+      && first.isolatedPanels <= second.isolatedPanels
+      && first.residualConcentration >= second.residualConcentration;
     if (!noWorse) return false;
     return first.panels < second.panels
       || first.letters > second.letters
@@ -140,7 +149,10 @@
       || first.clueTextCells < second.clueTextCells
       || first.externalClues > second.externalClues
       || first.crossings > second.crossings
-      || first.answers > second.answers;
+      || first.answers > second.answers
+      || first.panelRegions < second.panelRegions
+      || first.isolatedPanels < second.isolatedPanels
+      || first.residualConcentration > second.residualConcentration;
   }
 
   function candidateProvenance(candidate, sourceIndex) {
@@ -203,8 +215,8 @@
     return {
       candidates: selected,
       telemetry: {
-        schemaVersion: 1,
-        mode: "bounded-complete-construction-frontier-v1",
+        schemaVersion: 2,
+        mode: "repair-potential-complete-construction-frontier-v2",
         width,
         considered: ranked.length,
         retained: selected.length,
@@ -436,9 +448,17 @@
       for (const candidate of frontierSelection.candidates) {
         candidate.attemptBudget = attempts;
         candidate.coverageCheckpoint = coverageCheckpoint;
-        candidate.constructionV2 = constructionTelemetryFor(candidate);
+        candidate.constructionV2 = {
+          ...constructionTelemetryFor(candidate),
+          completePipelineConstructionFrontier: frontierSelection.telemetry,
+        };
+        candidate.completePipelineConstructionFrontierV1 = frontierSelection.telemetry;
       }
-      best.constructionV2.completePipelineFrontier = frontierSelection.telemetry;
+      best.constructionV2 = {
+        ...best.constructionV2,
+        completePipelineConstructionFrontier: frontierSelection.telemetry,
+      };
+      best.completePipelineConstructionFrontierV1 = frontierSelection.telemetry;
     }
 
     const validated = solver.attachValidationReport(best, seed, {
@@ -454,10 +474,15 @@
     });
 
     if (frontierSelection) {
+      validated.completePipelineConstructionFrontierV1 = frontierSelection.telemetry;
+      validated.constructionV2 = {
+        ...(validated.constructionV2 || {}),
+        completePipelineConstructionFrontier: frontierSelection.telemetry,
+      };
       const frontierCandidates = frontierSelection.candidates.map((candidate) => candidate === best ? validated : candidate);
       Object.defineProperty(validated, "__completePipelineFrontierV1", {
         value: {
-          schemaVersion: 1,
+          schemaVersion: 2,
           candidates: frontierCandidates,
           telemetry: frontierSelection.telemetry,
         },
