@@ -12,7 +12,9 @@ on:
       - tools/complete-pipeline-frontier-test-v1.cjs
       - tools/complete-pipeline-frontier-checkpoint-v1.cjs
       - tools/node-benchmark-bootstrap-v1.cjs
+      - research/baselines/v8-production-1.1/config.json
       - research/complete-pipeline-frontier/**
+      - research/archive-manifest.json
       - .github/workflows/complete-pipeline-frontier.yml
   workflow_dispatch:
 
@@ -50,6 +52,7 @@ jobs:
           node --check tools/complete-pipeline-frontier-checkpoint-v1.cjs
           grep -q 'SCANWORD_COMPLETE_PIPELINE_FRONTIER = "off"' index.html
           grep -q 'SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH = 4' index.html
+          grep -q '"SCANWORD_CONSTRUCTION_MODE": "portfolio"' research/baselines/v8-production-1.1/config.json
 
       - name: Test bounded frontier contracts
         run: node tools/complete-pipeline-frontier-test-v1.cjs
@@ -64,10 +67,10 @@ jobs:
     env:
       SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       SCANWORD_FRONTIER_CONCURRENCY: 4
-      SCANWORD_FRONTIER_RUNTIME_RATIO: 2.50
+      SCANWORD_FRONTIER_RUNTIME_RATIO: 1.35
       SCANWORD_FRONTIER_SEED_TIMEOUT_MS: 1200000
       SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH: 4
-      SCANWORD_FRONTIER_REQUIRE_WIN: 0
+      SCANWORD_FRONTIER_REQUIRE_WIN: 1
     steps:
       - name: Check out exact candidate head
         uses: actions/checkout@v4
@@ -88,10 +91,88 @@ jobs:
             research-output/complete-pipeline-frontier/development-20.jsonl \
             | tee research-output/complete-pipeline-frontier/development-console.jsonl
 
-      - name: Publish frontier evidence
+      - name: Publish development evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: complete-pipeline-frontier-development-${{ env.SOURCE_SHA }}
+          path: research-output/complete-pipeline-frontier/
+          if-no-files-found: error
+
+  promotion:
+    needs: development
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_FRONTIER_CONCURRENCY: 4
+      SCANWORD_FRONTIER_RUNTIME_RATIO: 1.35
+      SCANWORD_FRONTIER_SEED_TIMEOUT_MS: 1200000
+      SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH: 4
+      SCANWORD_FRONTIER_REQUIRE_WIN: 1
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run locked promotion-50 A/B checkpoint
+        run: |
+          set -o pipefail
+          mkdir -p research-output/complete-pipeline-frontier
+          node tools/complete-pipeline-frontier-checkpoint-v1.cjs \
+            research/baselines/seed-sets/promotion-50.json \
+            research-output/complete-pipeline-frontier/promotion-50.jsonl \
+            | tee research-output/complete-pipeline-frontier/promotion-console.jsonl
+
+      - name: Publish promotion evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: complete-pipeline-frontier-promotion-${{ env.SOURCE_SHA }}
+          path: research-output/complete-pipeline-frontier/
+          if-no-files-found: error
+
+  stability:
+    needs: promotion
+    runs-on: ubuntu-latest
+    timeout-minutes: 480
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_FRONTIER_CONCURRENCY: 4
+      SCANWORD_FRONTIER_RUNTIME_RATIO: 1.35
+      SCANWORD_FRONTIER_SEED_TIMEOUT_MS: 1200000
+      SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH: 4
+      SCANWORD_FRONTIER_REQUIRE_WIN: 1
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run locked stability-100 A/B checkpoint
+        run: |
+          set -o pipefail
+          mkdir -p research-output/complete-pipeline-frontier
+          node tools/complete-pipeline-frontier-checkpoint-v1.cjs \
+            research/baselines/seed-sets/stability-100.json \
+            research-output/complete-pipeline-frontier/stability-100.jsonl \
+            | tee research-output/complete-pipeline-frontier/stability-console.jsonl
+
+      - name: Publish stability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: complete-pipeline-frontier-stability-${{ env.SOURCE_SHA }}
           path: research-output/complete-pipeline-frontier/
           if-no-files-found: error
