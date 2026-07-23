@@ -7,9 +7,15 @@ const { spawn } = require("node:child_process");
 const root = path.resolve(__dirname, "..");
 const seedFile = path.resolve(process.argv[2] || path.join(root, "research/baselines/seed-sets/development-20.json"));
 const outputFile = path.resolve(process.argv[3] || path.join(root, "research-output/complete-pipeline-frontier/development-20.jsonl"));
+const baselineConfigFile = path.join(root, "research/baselines/v8-production-1.1/config.json");
 const seedPayload = JSON.parse(fs.readFileSync(seedFile, "utf8"));
+const baselineConfig = JSON.parse(fs.readFileSync(baselineConfigFile, "utf8"));
+const canonicalEnvironment = baselineConfig.environment || {};
 const seeds = Array.isArray(seedPayload) ? seedPayload : seedPayload.seeds;
 if (!Array.isArray(seeds) || !seeds.length) throw new Error(`No seeds found in ${seedFile}`);
+if (String(canonicalEnvironment.SCANWORD_CONSTRUCTION_MODE || "") !== "portfolio") {
+  throw new Error(`Baseline config must select SCANWORD_CONSTRUCTION_MODE=portfolio: ${baselineConfigFile}`);
+}
 
 const concurrency = Math.max(1, Math.floor(Number(process.env.SCANWORD_FRONTIER_CONCURRENCY || 4)));
 const timeoutMs = Math.max(60_000, Math.floor(Number(process.env.SCANWORD_FRONTIER_SEED_TIMEOUT_MS || 1_200_000)));
@@ -28,10 +34,8 @@ function runSeed(seed, frontierMode) {
       cwd: root,
       env: {
         ...process.env,
+        ...canonicalEnvironment,
         NODE_OPTIONS: `--require=${bootstrap}`,
-        SCANWORD_EXPLICIT_PIPELINE: "on",
-        SCANWORD_PIPELINE_STAGE_RUNTIME: "explicit",
-        SCANWORD_WRAPPER_INSTALLATION_LOCK: "explicit-pipeline-v1",
         SCANWORD_COMPLETE_PIPELINE_FRONTIER: frontierMode,
         SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH: String(width),
       },
@@ -113,7 +117,7 @@ async function worker() {
     const comparison = canonicalCompare(frontier, baseline);
     const telemetry = frontier.completePipelineFrontier;
     const record = {
-      schemaVersion: 1,
+      schemaVersion: 2,
       seed,
       comparison,
       outcome: comparison < 0 ? "win" : comparison > 0 ? "regression" : "tie",
@@ -122,8 +126,9 @@ async function worker() {
       outputChanged: frontier.gridDigest !== baseline.gridDigest,
       selectionChanged: Boolean(telemetry?.selectionChanged),
       selectedFrontierIndex: telemetry?.selectedFrontierIndex ?? null,
-      frontierWidth: telemetry?.width ?? 1,
-      retainedConstructionCandidates: telemetry?.constructionFrontier?.retained ?? 1,
+      frontierWidth: telemetry?.width ?? 0,
+      retainedConstructionCandidates: telemetry?.constructionFrontier?.retained ?? 0,
+      consideredConstructionCandidates: telemetry?.constructionFrontier?.considered ?? 0,
       frontierTelemetry: telemetry || null,
     };
     results[index] = record;
@@ -138,6 +143,9 @@ async function worker() {
   const invalid = results.filter((record) => !record.frontier.valid
     || record.frontier.components !== 1
     || !record.frontier.exactCluesOnly);
+  const missingTelemetry = results.filter((record) => !record.frontierTelemetry
+    || record.retainedConstructionCandidates < 1
+    || record.consideredConstructionCandidates < 1);
   const regressions = results.filter((record) => record.comparison > 0);
   const wins = results.filter((record) => record.comparison < 0);
   const changes = results.filter((record) => record.outputChanged);
@@ -146,16 +154,19 @@ async function worker() {
   const frontierMs = results.reduce((sum, record) => sum + record.frontier.elapsedMs, 0);
   const runtimeRatio = frontierMs / Math.max(1, baselineMs);
   const passed = invalid.length === 0
+    && missingTelemetry.length === 0
     && regressions.length === 0
     && runtimeRatio <= runtimeCap
     && (!requireWin || wins.length > 0);
   const summary = {
     type: "summary",
-    schemaVersion: 1,
+    schemaVersion: 2,
+    baselineId: baselineConfig.baselineId,
     seedSet: seedPayload.name || path.basename(seedFile),
     seeds: results.length,
     width,
     invalid: invalid.length,
+    missingTelemetry: missingTelemetry.length,
     regressions: regressions.length,
     wins: wins.length,
     ties: results.length - regressions.length - wins.length,
