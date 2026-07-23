@@ -419,7 +419,7 @@
 
   function runCompletePipelineFrontier(initial, args, stages) {
     const payload = initial?.__completePipelineFrontierV1;
-    if (!completePipelineFrontierEnabled() || !payload?.candidates?.length || payload.candidates.length < 2) return null;
+    if (!completePipelineFrontierEnabled() || !payload?.candidates?.length) return null;
 
     const started = Date.now();
     const legacyStarted = Date.now();
@@ -461,8 +461,8 @@
     selected.result.constructionV2 = {
       ...(selected.result.constructionV2 || {}),
       completePipelineFrontier: {
-        schemaVersion: 1,
-        mode: "bounded-complete-pipeline-frontier-v1",
+        schemaVersion: 2,
+        mode: "repair-potential-complete-pipeline-frontier-v2",
         width: payload.candidates.length,
         exactBaselinePreserved: true,
         baselineFrontierIndex: 0,
@@ -479,7 +479,9 @@
       initial,
       selected.result,
       Date.now() - started,
-      selectedSourceIndex === 0 ? "baseline-retained" : "alternative-selected",
+      selectedSourceIndex === 0
+        ? payload.candidates.length === 1 ? "single-member" : "baseline-retained"
+        : "alternative-selected",
     ));
     return selected.result;
   }
