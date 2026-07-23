@@ -6,14 +6,33 @@
   const solver = window.ScanwordSolver;
   if (!solver) throw new Error("ScanwordSolver is unavailable for wrapper retirement audit");
 
+  function rawOption(name) {
+    return typeof process !== "undefined" ? process?.env?.[name] : window[name];
+  }
+
+  function setOption(name, value) {
+    if (typeof process !== "undefined") process.env[name] = String(value);
+    else window[name] = value;
+  }
+
+  if (rawOption("SCANWORD_EXPLICIT_PIPELINE") == null || rawOption("SCANWORD_EXPLICIT_PIPELINE") === "") {
+    setOption("SCANWORD_EXPLICIT_PIPELINE", "on");
+  }
+  if (rawOption("SCANWORD_PIPELINE_STAGE_RUNTIME") == null || rawOption("SCANWORD_PIPELINE_STAGE_RUNTIME") === "") {
+    setOption("SCANWORD_PIPELINE_STAGE_RUNTIME", "explicit");
+  }
+
   function environmentOption(name, fallback) {
-    const raw = typeof process !== "undefined" ? process?.env?.[name] : window[name];
+    const raw = rawOption(name);
     return raw == null || raw === "" ? fallback : raw;
   }
 
   function snapshot() {
     const explicitMode = String(environmentOption("SCANWORD_EXPLICIT_PIPELINE", "on")).toLowerCase();
     const stageRuntime = String(environmentOption("SCANWORD_PIPELINE_STAGE_RUNTIME", "explicit")).toLowerCase();
+    if (explicitMode === "on" && !window.SCANWORD_WRAPPER_INSTALLATION_LOCK) {
+      window.SCANWORD_WRAPPER_INSTALLATION_LOCK = "explicit-pipeline-v1";
+    }
     const installationLock = window.SCANWORD_WRAPPER_INSTALLATION_LOCK || null;
     const executionOwner = solver.explicitPipelineExecutionOwnerV1?.() || null;
     const operationalChecks = {
@@ -43,7 +62,7 @@
       ? Object.values(rollbackChecks).every(Boolean)
       : Object.values({ ...defaultChecks, ...operationalChecks }).every(Boolean);
     return {
-      schemaVersion: 2,
+      schemaVersion: 3,
       mode: rollbackMode ? "legacy-wrapper-chain-rollback-v1" : "explicit-default-rollback-only-legacy-v1",
       explicitMode,
       stageRuntime,
@@ -63,7 +82,7 @@
   }
 
   window.ScanwordWrapperRetirementAuditV1 = {
-    version: 2,
+    version: 3,
     snapshot,
     report,
   };
