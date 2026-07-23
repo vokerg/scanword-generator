@@ -61,14 +61,23 @@ function fixture() {
     constructionV2: {
       editorialRepair: { mode: "fixture-repair" },
       vocabularyPortfolio: { mode: "fixture-portfolio", selectedLimit: 2500 },
+      explicitStageRuntime: { mode: "fixture-direct-stage-runtime" },
     },
   };
 }
 
-let calls = 0;
+let legacyCalls = 0;
+let directCalls = 0;
 global.ScanwordSolver = {
   generateBest() {
-    calls += 1;
+    legacyCalls += 1;
+    return fixture();
+  },
+  generateVocabularyPortfolioV1() {
+    directCalls += 1;
+    return fixture();
+  },
+  generateExplicitSingleCandidateV2() {
     return fixture();
   },
   resultMetrics(result) {
@@ -90,23 +99,27 @@ for (const file of [
 
 const solver = global.ScanwordSolver;
 assert.equal(solver.__explicitPipelineV1Installed, true);
+assert.equal(solver.explicitPipelineExecutionOwnerV1(), "direct-production-stage-runtime-v2");
 
 process.env.SCANWORD_EXPLICIT_PIPELINE = "off";
 const legacy = solver.generateBest("fixture", 1, 2, 3, 1);
 assert.equal(legacy.constructionPipelineV1, undefined);
-assert.equal(calls, 1);
+assert.equal(legacyCalls, 1);
+assert.equal(directCalls, 0);
 
 process.env.SCANWORD_EXPLICIT_PIPELINE = "on";
 const explicit = solver.generateBest("fixture", 1, 2, 3, 1);
-assert.equal(calls, 2);
+assert.equal(legacyCalls, 1);
+assert.equal(directCalls, 1);
 assert.deepEqual(explicit.grid, legacy.grid);
 assert.deepEqual(explicit.placed, legacy.placed);
 assert.equal(explicit.panelCells, legacy.panelCells);
 assert.equal(explicit.components, legacy.components);
 assert.equal(explicit.constructionPipelineV1.mode, "explicit-pipeline-v1");
+assert.equal(explicit.constructionPipelineV1.executionOwner, "direct-production-stage-runtime-v2");
 assert.deepEqual(
   explicit.constructionPipelineV1.stages.map((stage) => stage.name),
-  ["legacy-source", "base-construction", "clue-allocation", "current-repair-chain", "validation", "comparison"],
+  ["production-stage-source", "base-construction", "clue-allocation", "current-repair-chain", "validation", "comparison"],
 );
 assert.ok(explicit.constructionPipelineV1.stages.every((stage) => stage.status === "ok"));
 assert.equal(explicit.constructionPipelineV1.stages[0].candidateCountBefore, 0);
@@ -124,7 +137,8 @@ assert.match(api.signature(state), /^candidate-v1:[0-9a-f]{8}$/);
 
 console.log(JSON.stringify({
   status: "ok",
-  tests: 17,
+  tests: 20,
   stages: explicit.constructionPipelineV1.stages.length,
   signature: explicit.constructionPipelineV1.selectedSignature,
+  executionOwner: explicit.constructionPipelineV1.executionOwner,
 }));
