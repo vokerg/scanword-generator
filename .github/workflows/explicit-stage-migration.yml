@@ -1,0 +1,83 @@
+name: Explicit stage migration
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - construction-stage-*.js
+      - construction-single-candidate-source-v2.js
+      - tools/construction-stage-*.cjs
+      - tools/node-benchmark-bootstrap-v1.cjs
+      - index.html
+      - research/explicit-stage-migration/**
+      - .github/workflows/explicit-stage-migration.yml
+  workflow_dispatch:
+
+concurrency:
+  group: explicit-stage-migration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check syntax
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          node --check construction-stage-source-anchor-v2.js
+          node --check construction-stage-runtime-v2.js
+          node --check construction-single-candidate-source-v2.js
+          node --check tools/construction-stage-runtime-test-v2.cjs
+          node --check tools/construction-stage-parity-checkpoint-v2.cjs
+          node --check tools/node-benchmark-bootstrap-v1.cjs
+      - name: Test direct stage contract
+        run: node tools/construction-stage-runtime-test-v2.cjs
+
+  development-parity:
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_STAGE_PARITY_CONCURRENCY: 2
+      SCANWORD_STAGE_PARITY_RUNTIME_RATIO: 1.10
+      SCANWORD_STAGE_PARITY_TIMEOUT_MS: 1200000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run locked development-20 exact parity
+        run: |
+          set -o pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          mkdir -p research-output/explicit-stage-migration
+          GITHUB_SHA="${SOURCE_SHA}" node tools/construction-stage-parity-checkpoint-v2.cjs \
+            20 research-output/explicit-stage-migration/development-parity.jsonl \
+            | tee research-output/explicit-stage-migration/console.jsonl
+      - name: Publish parity evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: explicit-stage-migration-${{ env.SOURCE_SHA }}
+          path: research-output/explicit-stage-migration/
+          if-no-files-found: error
