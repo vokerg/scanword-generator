@@ -3,7 +3,7 @@
   "status": "active",
   "auditedDate": "2026-07-23",
   "mainRef": "refs/remotes/origin/main",
-  "auditedMainCommit": "060a05e3245a24ccf6e3408bcfb887fc390c02d5",
+  "auditedMainCommit": "8ae6f69df60eba4a0fc36399a42ab3418c77edae",
   "policy": {
     "historicalBranchNamesAreLabelsUnlessListed": true,
     "requiredRefsMustResolveExactly": true,
@@ -121,6 +121,12 @@
       "ref": "refs/heads/research/archive-phase-9-explicit-default-evidence-2026-07-23",
       "commit": "f77be9fed8223925819830fad6956f1018717bbb",
       "contains": ["f77be9fed8223925819830fad6956f1018717bbb"]
+    },
+    {
+      "name": "phase-10-complete-pipeline-frontier-accepted-evidence",
+      "ref": "refs/heads/research/archive-phase-10-complete-pipeline-frontier-evidence-2026-07-23",
+      "commit": "df537dd5f47712062fb6224d4e42cb67e41876b3",
+      "contains": ["df537dd5f47712062fb6224d4e42cb67e41876b3"]
     }
   ]
 }
