@@ -35,6 +35,17 @@
     return value === "adaptive" ? "adaptive" : "full";
   }
 
+  function stageRuntimeMode() {
+    return String(environmentOption("SCANWORD_PIPELINE_STAGE_RUNTIME", "legacy")).toLowerCase();
+  }
+
+  function candidateGenerator() {
+    if (stageRuntimeMode() === "explicit" && typeof solver.generateExplicitSingleCandidateV2 === "function") {
+      return solver.generateExplicitSingleCandidateV2.bind(solver);
+    }
+    return previousGenerateBest;
+  }
+
   function configuredLimits() {
     const parsed = String(environmentOption("SCANWORD_VOCABULARY_PORTFOLIO_LIMITS", "2500,3500"))
       .split(",")
@@ -83,6 +94,7 @@
       score: Number(result.score || 0),
       selectedAttempt: Number(result.constructionV2?.selectedAttempt || 0),
       selectedPartialSearchVariant: result.constructionV2?.selectedPartialSearchVariant || null,
+      stageRuntime: stageRuntimeMode(),
     };
   }
 
@@ -161,6 +173,7 @@
 
   function runCandidate(args, limit, searchVariant, attempts = null, offset = null) {
     const started = Date.now();
+    const generateCandidate = candidateGenerator();
     const result = withActiveLimit(limit, () => withEnvironment(
       "SCANWORD_PARTIAL_SEARCH",
       searchVariant === "beam" ? "beam" : searchVariant === "shadow" ? "shadow" : "off",
@@ -170,7 +183,7 @@
         () => withEnvironment(
           "SCANWORD_PORTFOLIO_ATTEMPT_OFFSET",
           offset,
-          () => previousGenerateBest(...args),
+          () => generateCandidate(...args),
         ),
       ),
     ));
@@ -281,6 +294,7 @@
         partialSearchMode: searchMode,
         partialSearchPolicy: searchPolicy,
         partialSearchPlan: searchPlan,
+        stageRuntime: stageRuntimeMode(),
         splitAttemptBudget: splitBudget,
         limits,
         evaluatedLimits: [...new Set(candidates.map((candidate) => candidate.summary.activeLimit))],
@@ -310,6 +324,7 @@
     vocabularyAdaptiveThresholdsV1: adaptiveThresholds,
     partialSearchAdaptiveThresholdsV1: partialSearchThresholds,
     partialSearchAdaptiveBeamLimitsV1: adaptiveBeamLimits,
+    vocabularyPortfolioStageRuntimeModeV1: stageRuntimeMode,
     __vocabularyPortfolioV1Installed: true,
   });
 })();
