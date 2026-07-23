@@ -77,5 +77,6 @@ const summary = {
     })),
   }),
   pipeline: result.constructionPipelineV1 || null,
+  retirementAudit: global.ScanwordWrapperRetirementAuditV1?.snapshot?.() || null,
 };
 console.log(JSON.stringify(summary));
