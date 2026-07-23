@@ -3,7 +3,7 @@
   "status": "active",
   "auditedDate": "2026-07-23",
   "mainRef": "refs/remotes/origin/main",
-  "auditedMainCommit": "465e5fdb1b56f9644dde402523e119ad04c448df",
+  "auditedMainCommit": "5bc3570a1661dc63b040ddba1ddbebc1f1a7b721",
   "policy": {
     "historicalBranchNamesAreLabelsUnlessListed": true,
     "requiredRefsMustResolveExactly": true,
@@ -134,6 +134,14 @@
       "commit": "036e4c6d2296e57d9fb679c42728203178110f97",
       "contains": [
         "036e4c6d2296e57d9fb679c42728203178110f97"
+      ]
+    },
+    {
+      "name": "phase-8-direct-stage-runtime-accepted-evidence",
+      "ref": "refs/heads/research/archive-phase-8-direct-stage-runtime-evidence-2026-07-23",
+      "commit": "76f4cb8cbeee14b111e678e5646ccf3983a3d5d6",
+      "contains": [
+        "76f4cb8cbeee14b111e678e5646ccf3983a3d5d6"
       ]
     }
   ]
