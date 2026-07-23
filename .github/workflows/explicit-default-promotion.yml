@@ -1,0 +1,168 @@
+name: Explicit default promotion
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - index.html
+      - construction-wrapper-retirement-audit-v1.js
+      - construction-pipeline-v1.js
+      - construction-stage-runtime-v2.js
+      - construction-vocabulary-portfolio-v1.js
+      - tools/wrapper-retirement-test-v1.cjs
+      - tools/explicit-default-parity-checkpoint-v1.cjs
+      - tools/construction-pipeline-seed-v1.cjs
+      - tools/node-benchmark-bootstrap-v1.cjs
+      - research/baselines/v8-production-1.1/config.json
+      - research/explicit-default/**
+      - .github/workflows/explicit-default-promotion.yml
+  workflow_dispatch:
+
+concurrency:
+  group: explicit-default-promotion-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_EXPLICIT_PIPELINE: on
+      SCANWORD_PIPELINE_STAGE_RUNTIME: explicit
+      SCANWORD_WRAPPER_INSTALLATION_LOCK: explicit-pipeline-v1
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check promotion syntax and browser defaults
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          node --check construction-wrapper-retirement-audit-v1.js
+          node --check tools/wrapper-retirement-test-v1.cjs
+          node --check tools/explicit-default-parity-checkpoint-v1.cjs
+          node --check tools/construction-pipeline-seed-v1.cjs
+          node --check tools/node-benchmark-bootstrap-v1.cjs
+          grep -q 'SCANWORD_EXPLICIT_PIPELINE = "on"' index.html
+          grep -q 'SCANWORD_PIPELINE_STAGE_RUNTIME = "explicit"' index.html
+          grep -q 'SCANWORD_WRAPPER_INSTALLATION_LOCK = "explicit-pipeline-v1"' index.html
+
+      - name: Audit canonical production ownership
+        env:
+          NODE_OPTIONS: --require=./tools/node-benchmark-bootstrap-v1.cjs
+        run: node tools/wrapper-retirement-test-v1.cjs
+
+      - name: Preserve deterministic stage contracts
+        run: |
+          node tools/construction-stage-runtime-test-v2.cjs
+          SCANWORD_EXPLICIT_PIPELINE=off node tools/construction-pipeline-parity-test.cjs
+
+  development:
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_EXPLICIT_DEFAULT_CONCURRENCY: 4
+      SCANWORD_EXPLICIT_DEFAULT_RUNTIME_RATIO: 1.10
+      SCANWORD_EXPLICIT_DEFAULT_SEED_TIMEOUT_MS: 1200000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate development-20 explicit default
+        run: |
+          set -o pipefail
+          mkdir -p research-output/explicit-default
+          node tools/explicit-default-parity-checkpoint-v1.cjs \
+            research/baselines/seed-sets/development-20.json \
+            research-output/explicit-default/development-20.jsonl \
+            | tee research-output/explicit-default/development-console.jsonl
+      - name: Publish development evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: explicit-default-development-${{ env.SOURCE_SHA }}
+          path: research-output/explicit-default/
+          if-no-files-found: error
+
+  promotion:
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_EXPLICIT_DEFAULT_CONCURRENCY: 4
+      SCANWORD_EXPLICIT_DEFAULT_RUNTIME_RATIO: 1.10
+      SCANWORD_EXPLICIT_DEFAULT_SEED_TIMEOUT_MS: 1200000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate promotion-50 explicit default
+        run: |
+          set -o pipefail
+          mkdir -p research-output/explicit-default
+          node tools/explicit-default-parity-checkpoint-v1.cjs \
+            research/baselines/seed-sets/promotion-50.json \
+            research-output/explicit-default/promotion-50.jsonl \
+            | tee research-output/explicit-default/promotion-console.jsonl
+      - name: Publish promotion evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: explicit-default-promotion-${{ env.SOURCE_SHA }}
+          path: research-output/explicit-default/
+          if-no-files-found: error
+
+  stability:
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_EXPLICIT_DEFAULT_CONCURRENCY: 4
+      SCANWORD_EXPLICIT_DEFAULT_RUNTIME_RATIO: 1.10
+      SCANWORD_EXPLICIT_DEFAULT_SEED_TIMEOUT_MS: 1200000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate stability-100 explicit default
+        run: |
+          set -o pipefail
+          mkdir -p research-output/explicit-default
+          node tools/explicit-default-parity-checkpoint-v1.cjs \
+            research/baselines/seed-sets/stability-100.json \
+            research-output/explicit-default/stability-100.jsonl \
+            | tee research-output/explicit-default/stability-console.jsonl
+      - name: Publish stability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: explicit-default-stability-${{ env.SOURCE_SHA }}
+          path: research-output/explicit-default/
+          if-no-files-found: error
