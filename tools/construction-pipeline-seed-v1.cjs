@@ -46,20 +46,36 @@ function normalizedPlaced(result) {
   }));
 }
 
+function selectedGridClueDebt(result) {
+  return Number(
+    result.selectedGridClueQuality?.clueDebt
+    ?? result.selectedGridClueMetrics?.clueDebt
+    ?? result.clueQuality?.selectedGridDebt
+    ?? 0,
+  );
+}
+
 const started = Date.now();
 const result = global.ScanwordSolver.generateBest(seed, global.RUSSIAN_WORDS.length, 17, 13, 30, 27);
 const grid = normalizedGrid(result);
 const placed = normalizedPlaced(result);
 const cluePayload = placed.map(({ answer, clue, hasExactClue }) => ({ answer, clue, hasExactClue }));
+const editorial = global.ScanwordEditorialLexicalPolicyV3?.summarize?.(result.placed || []) || {};
 const summary = {
   seed,
   mode: String(process.env.SCANWORD_EXPLICIT_PIPELINE || "off").toLowerCase(),
+  frontierMode: String(process.env.SCANWORD_COMPLETE_PIPELINE_FRONTIER || "off").toLowerCase(),
   elapsedMs: Date.now() - started,
   valid: Boolean(result.validation?.valid),
   components: Number(result.components || 0),
   panels: Number(result.panelCells || 0),
   answers: placed.length,
   crossings: Number(result.intersections || 0),
+  rawLetterCoverage: Number(result.rawLetterCoverage || 0),
+  formulaicShortCount: Number(editorial.formulaicShortCount || 0),
+  editorialPenalty: Number(editorial.editorialPenalty || 0),
+  clueDebt: selectedGridClueDebt(result),
+  score: Number(result.score || 0),
   exactCluesOnly: placed.every((entry) => entry.hasExactClue),
   gridDigest: digest(grid),
   placedDigest: digest(placed),
@@ -77,6 +93,8 @@ const summary = {
     })),
   }),
   pipeline: result.constructionPipelineV1 || null,
+  stageRuntime: result.constructionV2?.explicitStageRuntime || null,
+  completePipelineFrontier: result.constructionV2?.completePipelineFrontier || null,
   retirementAudit: global.ScanwordWrapperRetirementAuditV1?.snapshot?.() || null,
 };
 console.log(JSON.stringify(summary));
