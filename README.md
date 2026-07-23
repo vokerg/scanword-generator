@@ -2,17 +2,30 @@
 
 A browser-based generator for Russian Swedish-style crosswords (arrowwords / scanwords) on an exact A5 page.
 
-## Current project baseline: vocabulary-first 1.1
+## Current project baseline: explicit pipeline 1.2
 
-This repository is an actively developed draft. The current baseline combines a **40,966-entry attributed corpus**, deterministic 2,500/3,500 active-set portfolios, same-geometry editorial repair and complete structural validation.
+The project is an actively developed draft. Its canonical production path combines:
 
-The 1.1 corpus adds filtered rivers, regions, mountains, peaks, lakes, islands and related geographic entities; uses language-tagged preferred Russian GeoNames; and drops colliding fallback aliases instead of retaining malformed or historical spellings.
+```text
+40,966-entry attributed corpus v8
+-> deterministic 2,500/3,500 seed-specific working sets
+-> directly ordered construction, clue and repair stages
+-> same-geometry editorial repair
+-> panel-first complete-candidate selection
+-> complete structural validation
+```
 
-The decision record is [Milestone 1.1](docs/milestones/v1.1-vocabulary-greatness.md). Architecture and contribution rules are in [AGENTS.md](AGENTS.md). The full experiment ledger, including rejected corpus-selection variants, is in [Vocabulary Greatness 1.1](research/vocabulary-greatness-1.1/README.md).
+The explicit orchestrator is now the sole production `generateBest` owner. The historical cumulative wrapper chain remains available only as an explicit rollback source.
+
+Decision records:
+
+- [Milestone 1.2 — explicit production pipeline](docs/milestones/v1.2-explicit-pipeline-default.md)
+- [Phase 9 ledger](research/explicit-default/README.md)
+- [Architecture and contribution rules](AGENTS.md)
 
 ## Locked v8 baseline
 
-Phase 2 locks the committed 40,966-entry corpus against disjoint development, promotion and stability seed sets. All 170 accepted runs were structurally valid, contained one connected answer component, used exact clues only and passed the preserved coverage checkpoint.
+Phase 2 froze disjoint development, promotion and stability seed sets for the committed corpus. All 170 runs were structurally valid, connected, exact-clue-only and checkpoint passing.
 
 | metric | development-20 | promotion-50 | stability-100 |
 | --- | ---: | ---: | ---: |
@@ -25,22 +38,9 @@ Phase 2 locks the committed 40,966-entry corpus against disjoint development, pr
 | average selected-grid clue debt | 15.35 | 13.82 | 13.16 |
 | average browser-equivalent runtime | 26.07 s | 26.49 s | 25.54 s |
 
-The locked protocol, seed files, budgets, aggregate metrics and evidence digests are documented in [Phase 2 baseline](research/baselines/v8-production-1.1/README.md). Promotion and stability seeds must not be used as tuning targets.
+The protocol and evidence are in [the Phase 2 baseline ledger](research/baselines/v8-production-1.1/README.md). Promotion and stability seeds are frozen evaluation sets, not tuning targets.
 
-The baseline is stable but remains far from zero-panel generation: none of the 170 locked seeds produced a zero-panel result. Later density work therefore requires architectural improvements rather than interpreting small three-seed fluctuations as progress.
-
-## Default pipeline
-
-```text
-load attributed source corpus
--> derive 2,500- and 3,500-entry seed-specific working sets
--> construct connected candidates and clue footprints
--> apply same-geometry editorial repair
--> select panel-first
--> validate runs, crossings, clues and connectivity
-```
-
-The browser enables this path explicitly in `index.html`:
+## Browser defaults
 
 ```text
 SCANWORD_CONSTRUCTION_MODE=portfolio
@@ -49,19 +49,32 @@ SCANWORD_VOCABULARY_PORTFOLIO_LIMITS=2500,3500
 SCANWORD_VOCABULARY_PORTFOLIO_MODE=full
 SCANWORD_EDITORIAL_REPAIR=on
 SCANWORD_CATEGORY_BALANCE=off
-SCANWORD_EXPLICIT_PIPELINE=off
+SCANWORD_EXPLICIT_PIPELINE=on
+SCANWORD_PIPELINE_STAGE_RUNTIME=explicit
+SCANWORD_WRAPPER_INSTALLATION_LOCK=explicit-pipeline-v1
 SCANWORD_FULL_CORPUS_RETRIEVAL=off
-SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=empty
 SCANWORD_CLUE_FEASIBILITY=off
 SCANWORD_PARTIAL_SEARCH=off
 ```
 
-## Explicit pipeline parity
-
-Phase 3 adds an opt-in `CandidateState` pipeline around the complete accepted production generator:
+Explicit rollback:
 
 ```text
-legacy-source
+SCANWORD_EXPLICIT_PIPELINE=off
+```
+
+## Explicit production ownership
+
+```text
+active generateBest owner: construction-pipeline-v1
+execution owner:            direct-production-stage-runtime-v2
+rollback owner:             legacy-wrapper-chain
+```
+
+CandidateState stage contract:
+
+```text
+production-stage-source
 -> base-construction
 -> clue-allocation
 -> current-repair-chain
@@ -69,84 +82,64 @@ legacy-source
 -> comparison
 ```
 
-The explicit mode records candidate signatures, stage timing, candidate counts, provenance and validation while returning the exact browser-compatible result. On the locked development-20 set it achieved 20/20 exact parity for full grids, placed answers, clues and geometry with a 0.9991 aggregate runtime ratio. It remains disabled by default.
+The direct single-candidate source invokes the accepted stages in their production order:
 
 ```text
-SCANWORD_EXPLICIT_PIPELINE=on
+pre-portfolio construction source
+-> construction portfolio
+-> portfolio polish
+-> clue-footprint repack
+-> adaptive clue repack
+-> clue-tail absorption
+-> single-footprint clue reflow
+-> pair clue reflow
+-> targeted residual-victim repair
+-> baseline guard
+-> editorial repair
 ```
 
-The accepted boundary and its remaining compatibility debt are documented in [Explicit pipeline parity](research/explicit-pipeline/README.md).
+Phase 9 validated exact output parity against rollback:
 
-## Bounded full-corpus retrieval
+| seed set | exact pairs | failures | explicit / rollback runtime |
+| --- | ---: | ---: | ---: |
+| development-20 | 20/20 | 0 | 0.9692 |
+| promotion-50 | 50/50 | 0 | 0.9850 |
+| stability-100 | 100/100 | 0 | 0.9915 |
 
-Phase 4 adds an opt-in two-level retrieval boundary for constrained same-geometry repairs. The normal 2,500/3,500-entry hot set remains the construction prior. Exact patterns containing at least one fixed letter may retrieve a bounded domain from the complete admitted runtime vocabulary; all-wildcard full-pool sampling is rejected.
+Every pair had identical grid, answer, clue and geometry digests. See [Phase 9](research/explicit-default/README.md).
 
-```text
-SCANWORD_FULL_CORPUS_RETRIEVAL=on
-SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=empty|small-poor
-```
+## Retained research features
 
-The retrieval-enhanced and hot-only **complete editorial repair chains** are compared on cloned candidates. Retrieval is accepted only for identical structure, complete validity, exact clues, no two-letter increase and a strict final editorial improvement. Equal or worse output preserves the hot-only result.
+### Bounded full-corpus retrieval
 
-On the locked development-20 set, all three compared modes remained valid and structurally identical. `small-poor` expanded four constrained domains and surfaced fourteen candidates; none beat the complete hot-only chain, so no fallback answer entered a final grid. Runtime ratios were 1.0392 for `empty` and 1.0206 for `small-poor`. The feature remains off by default.
+`SCANWORD_FULL_CORPUS_RETRIEVAL=on` permits bounded fixed-letter pattern retrieval from the complete admitted corpus during same-geometry repair. It never reintroduces unconstrained full-pool sampling and remains off by default. See [the retrieval ledger](research/full-corpus-retrieval/README.md).
 
-The accepted evidence and three rejected local-ordering attempts are documented in [Full-corpus retrieval](research/full-corpus-retrieval/README.md).
+### Incremental clue-feasibility diagnostics
 
-## Incremental clue-feasibility diagnostics
+`SCANWORD_CLUE_FEASIBILITY=shadow` observes regional clue capacity without changing output. Direct local ranking was rejected because its modest density improvement caused panel and editorial regressions. The feature remains off by default. See [the feasibility ledger](research/clue-feasibility/README.md).
 
-Phase 5 adds an opt-in estimator at the active `ScanwordSolver.buildAttempt` boundary. It measures panel-region capacity, clue-anchor access, long-clue plausibility, overlap pressure, local panel consumption and stranded-clue risk without replacing the exact clue allocator or validator.
+### Bounded partial-state search
 
-```text
-SCANWORD_CLUE_FEASIBILITY=shadow
-SCANWORD_CLUE_FEASIBILITY_CANDIDATES=1
-```
-
-The accepted `shadow` mode evaluates only the first production-ranked placement candidate and does not alter candidate order, randomness, clue allocation or final selection. On the locked development-20 set it achieved 20/20 exact full-result parity and zero false negatives across 5,180 completed states. Its optimistic false-positive rate was 8.09%, with mean absolute errors of 4.88 clue-text cells and 1.96 external clues. Runtime ratio was 1.1182, within the phase-specific 1.15 diagnostic cap.
-
-Direct feasibility ranking was rejected despite a small average density improvement because six seeds regressed in panel count, eleven regressed editorially and runtime rose by 16.1%. The hard-capacity guard did not fire on development seeds and is not promoted. Phase 5 therefore establishes calibrated telemetry, not an output-changing search policy. The browser default remains off.
-
-The evidence, rejected variants and reproduction commands are documented in [Clue feasibility](research/clue-feasibility/README.md).
-
-## Bounded partial-state search
-
-Phase 6 adds an opt-in late-placement beam at the active attempt-construction boundary. It branches at placement 14, retains up to four states for four depths, expands at most three children per parent and enforces a hard 48-node limit for each sampled attempt.
-
-```text
-SCANWORD_PARTIAL_SEARCH=beam
-```
-
-The exact browser-default portfolio remains a complete fallback. Beam mode runs the unchanged 120-attempt baseline for both working-set sizes and adds a 60-attempt probe over separate attempt IDs. Every beam-replaced attempt retains an exact baseline replay, and final selection happens only after real clue allocation, repair, editorial cleanup and active-set portfolio comparison.
-
-On the locked development-20 set:
-
-- all off, shadow and beam results were valid, connected, exact-clue and checkpoint passing;
-- shadow achieved 20/20 exact full-result parity;
-- average panels improved from **5.30 to 4.90**;
-- six seeds improved in panel count and none regressed;
-- eight seeds improved under the complete canonical objective;
-- five selected results carried explicit beam ancestry;
-- average runtime increased from 20.35 s to 33.55 s, a 1.6484 ratio;
-- no zero-panel grid was produced.
-
-The result proves that bounded retained alternatives can produce complete-grid wins, but the cost is not suitable for browser-default promotion. Phase 6 remains off by default. The implementation, per-seed results, ancestry evidence and rejected unsafe variants are documented in [Bounded partial-state search](research/bounded-partial-search/README.md).
+`SCANWORD_PARTIAL_SEARCH=beam` adds a deterministic late-placement beam while preserving the exact greedy baseline. On development-20 it improved average panels from 5.30 to 4.90 with no complete-objective regressions, but runtime rose by about 65%, so it remains off by default. Phase 7's adaptive policy reduced additive beam work but did not make it a production default. See [bounded search](research/bounded-partial-search/README.md) and [adaptive search](research/adaptive-partial-search/README.md).
 
 ## Structural guarantees
 
-A result is accepted only when:
+A result is eligible only when:
 
 1. every contiguous letter run of length two or more is exactly one assigned answer;
-2. every letter belongs to at least one assigned answer;
+2. every letter belongs to an assigned answer;
 3. all crossing letters agree;
-4. every clue footprint points to an existing arrow and answer;
-5. every used answer has an admitted exact clue;
+4. every clue footprint resolves to a real arrow and answer start;
+5. every answer has an admitted exact clue;
 6. the answer graph has exactly one connected component;
-7. residual areas are explicit panel cells rather than unassigned letter cells.
+7. no accidental runs, orphan letters, duplicate directional occupancy or clue conflicts exist;
+8. every residual area is an explicit panel cell.
 
-The renderer supports right and down answers, dual arrow cells, one-to-four-cell clue footprints, A5 SVG export, JSON export and answer-reveal mode.
+The validator remains the acceptance authority.
 
-## Corpus 1.1
+## Corpus
 
-The committed generated corpus contains 40,966 unique clue-bearing entries:
+The generated v8 corpus contains 40,966 unique clue-bearing entries:
 
 | category group | entries |
 | --- | ---: |
@@ -165,22 +158,11 @@ The committed generated corpus contains 40,966 unique clue-bearing entries:
 | islands and island groups | 109 |
 | valleys, plateaus and volcanoes | 88 |
 
-Audit checkpoint:
-
-- zero invalid normalized answers in the generated manifest;
-- source and license metadata retained;
-- 24,457 sourced noun definitions;
-- 10,841 descriptive factual templates;
-- 5,668 generic templates, or **13.84%**, down from 38.24%;
-- 1,469 admitted non-city geographic entities;
-- 8,996 city entries with a preferred Russian GeoNames mapping available;
-- canonical letters-only exceptions recorded by source ID, including `УЛАНБАТОР`.
-
-Generated chunks are artifacts. Do not hand-edit them. Change `tools/build-bulk-lexicon-v8.py` or its documented source policy and regenerate the manifest, loader and every chunk together.
+Generated chunks are build artifacts. Change `tools/build-bulk-lexicon-v8.py` or its documented source policy and regenerate the manifest, loader and every chunk together.
 
 ## Running locally
 
-Open `index.html` directly in a modern browser, or serve the repository:
+Open `index.html`, or serve the repository:
 
 ```bash
 python3 -m http.server 8080
@@ -188,128 +170,59 @@ python3 -m http.server 8080
 
 Then open `http://localhost:8080`.
 
-The full two-candidate portfolio typically takes about 20–30 seconds in release-gate environments. Adaptive mode is available for bounded experiments:
-
-```text
-SCANWORD_VOCABULARY_PORTFOLIO_MODE=adaptive
-```
-
-## Quality gates
+## Core quality gates
 
 ```bash
 node tools/bulk-lexicon-audit.cjs
 node tools/dictionary-count-v3.cjs
+node tools/wrapper-retirement-test-v1.cjs
+node tools/construction-stage-runtime-test-v2.cjs
+SCANWORD_EXPLICIT_PIPELINE=off node tools/construction-pipeline-parity-test.cjs
+
 NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
   node tools/vocabulary-release-checkpoint.cjs 20
-NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
-  node tools/vocabulary-adaptive-checkpoint.cjs 20
-node tools/construction-pipeline-parity-test.cjs
-SCANWORD_PIPELINE_CONCURRENCY=2 \
-  node tools/construction-pipeline-checkpoint.cjs \
-  20 research-output/explicit-pipeline/development-parity.jsonl
-node tools/full-corpus-pattern-index-test.cjs
-node tools/full-corpus-pair-priority-test.cjs
-node tools/full-corpus-repair-selection-test.cjs
-SCANWORD_RETRIEVAL_CONCURRENCY=2 \
-SCANWORD_RETRIEVAL_ENFORCE=1 \
-  node tools/full-corpus-retrieval-checkpoint.cjs \
-  20 research-output/full-corpus-retrieval
-node tools/clue-feasibility-estimator-test.cjs
-node tools/clue-feasibility-shadow-parity-test.cjs
-SCANWORD_CLUE_FEASIBILITY_CONCURRENCY=2 \
-SCANWORD_CLUE_FEASIBILITY_MODES=off,shadow \
-SCANWORD_CLUE_FEASIBILITY_CANDIDATES=1 \
-  node tools/clue-feasibility-checkpoint.cjs \
-  research-output/clue-feasibility 20
-node tools/clue-feasibility-acceptance-v1.cjs \
-  research-output/clue-feasibility
-NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
-  node tools/bounded-partial-search-test.cjs
-SCANWORD_PARTIAL_SEARCH_CONCURRENCY=2 \
-SCANWORD_PARTIAL_SEARCH_MODES=off,shadow,beam \
-SCANWORD_PARTIAL_SEARCH_RATE=0.20 \
-SCANWORD_PARTIAL_SEARCH_START=14 \
-SCANWORD_PARTIAL_SEARCH_DEPTH=4 \
-SCANWORD_PARTIAL_SEARCH_BEAM=4 \
-SCANWORD_PARTIAL_SEARCH_BRANCHING=3 \
-SCANWORD_PARTIAL_SEARCH_NODES=48 \
-SCANWORD_PARTIAL_SEARCH_BEAM_ATTEMPTS=60 \
-SCANWORD_PARTIAL_SEARCH_BEAM_OFFSET=120 \
-  node tools/bounded-partial-search-checkpoint.cjs \
-  research-output/bounded-partial-search 20
-node tools/bounded-partial-search-acceptance-v1.cjs \
-  research-output/bounded-partial-search
+
+node tools/explicit-default-parity-checkpoint-v1.cjs \
+  research/baselines/seed-sets/development-20.json \
+  research-output/explicit-default/development-20.jsonl
 ```
 
-The canonical Node bootstrap mirrors browser corpus and wrapper/pipeline load order. Release records include source-corpus size, active limit, panels, answers, crossings, coverage, editorial metrics, runtime, category usage and complete structural validation.
+Run the dedicated workflow for the locked 20/50/100 promotion boundary.
 
 ## Rollback and A/B controls
 
 ```text
-SCANWORD_BULK_LEXICON=off                    use the former construction dictionary
-SCANWORD_VOCABULARY_PORTFOLIO=off            construct one active working set
-SCANWORD_VOCABULARY_PORTFOLIO_MODE=adaptive  allow the conservative fast path
-SCANWORD_EDITORIAL_REPAIR=off                disable same-geometry cleanup
-SCANWORD_CATEGORY_BALANCE=on                 enable the retained category-cap experiment
-SCANWORD_CONSTRUCTION_MODE=legacy            use the original construction path
-SCANWORD_EXPLICIT_PIPELINE=on                 enable explicit state and stage telemetry
-SCANWORD_FULL_CORPUS_RETRIEVAL=on             enable bounded constrained-pattern retrieval
-SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=empty     restrict fallback to empty hot domains
-SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=small-poor evaluate small or poor hot domains too
-SCANWORD_CLUE_FEASIBILITY=shadow              collect exact-parity clue-feasibility telemetry
-SCANWORD_CLUE_FEASIBILITY=rank                run the rejected local-ranking experiment
-SCANWORD_CLUE_FEASIBILITY=guard               run the unpromoted hard-capacity experiment
-SCANWORD_PARTIAL_SEARCH=shadow                run bounded search with exact output parity
-SCANWORD_PARTIAL_SEARCH=beam                  add the complete-pipeline bounded beam probe
+SCANWORD_EXPLICIT_PIPELINE=off                 execute the historical complete wrapper chain
+SCANWORD_VOCABULARY_PORTFOLIO_MODE=adaptive   enable conservative active-set early acceptance
+SCANWORD_FULL_CORPUS_RETRIEVAL=on              enable bounded constrained-pattern retrieval
+SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=empty      retrieve only for empty hot domains
+SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=small-poor also evaluate small or poor hot domains
+SCANWORD_CLUE_FEASIBILITY=shadow               collect exact-parity feasibility telemetry
+SCANWORD_CLUE_FEASIBILITY=rank                 run the rejected local-ranking experiment
+SCANWORD_CLUE_FEASIBILITY=guard                run the unpromoted hard-capacity experiment
+SCANWORD_PARTIAL_SEARCH=shadow                 audit bounded search with exact output parity
+SCANWORD_PARTIAL_SEARCH=beam                   add the complete-pipeline beam probe
 ```
 
-## Canonical repository structure
+## Repository map
 
 ```text
 index.html                                      browser defaults and script order
-bulk-lexicon-runtime.js                         corpus registration and metadata
 bulk-lexicon/                                   generated corpus, loader and manifest
-core.js                                         dictionary utilities and active-set selection
-dictionary-policy.js                            dictionary admission policy
-full-corpus-pattern-index-v1.js                 bounded exact-pattern retrieval index
 solver.js                                       base placement, metrics and validation
-construction-clue-feasibility-v1.js             incremental clue-capacity estimator
-construction-bounded-partial-search-v1.js       bounded partial-state beam
-construction-bounded-partial-search-fallback-v1.js exact baseline replay bridge
-construction-candidate-state-v1.js              explicit candidate-state contract
-construction-pipeline-*.js                      explicit stage orchestration and telemetry
-construction-*.js                               bounded construction and repair stages
+construction-stage-source-anchor-v2.js          pre-wrapper production source
+construction-stage-runtime-v2.js                directly ordered production stages
+construction-candidate-state-v1.js              explicit state, cloning and signatures
+construction-pipeline-v1.js                     sole production orchestrator
+construction-wrapper-retirement-audit-v1.js     ownership/default audit
+construction-*.js                               construction and repair algorithms
 editorial-*.js                                  lexical policy and repair vocabulary
-renderer.js                                     A5 SVG renderer
-ui.js                                           browser controls and exports
-tools/                                          audits, builders, tests and benchmarks
-docs/milestones/                                accepted project baselines
-research/                                       chronological experiments and negative results
-.github/workflows/                              gates and research reproduction
-AGENTS.md                                       canonical architecture and change rules
+renderer.js, ui.js                              A5 rendering, controls and exports
+research/                                       experiment ledgers and negative results
+docs/milestones/                                accepted project boundaries
+tools/                                          builders, tests and benchmarks
 ```
-
-## Research archive and branch policy
-
-Canonical experiment descriptions, manifests, reproduction commands and milestone evidence belong in `main`. Short-lived branches are working references and may be deleted after squash merge.
-
-Key dossiers:
-
-- [Closed-fill research](research/closed-fill/README.md)
-- [Explicit pipeline parity](research/explicit-pipeline/README.md)
-- [Full-corpus retrieval](research/full-corpus-retrieval/README.md)
-- [Clue feasibility](research/clue-feasibility/README.md)
-- [Bounded partial-state search](research/bounded-partial-search/README.md)
-- [Vocabulary-first program](research/vocabulary-first/README.md)
-- [Vocabulary Greatness 1.1](research/vocabulary-greatness-1.1/README.md)
-- [Lexical-quality experiments](research/lexical-quality/README.md)
 
 ## Known debt and next investigation
 
-The project does not claim zero-panel generation or publication-ready clue prose. Current priorities are:
-
-- reduce the runtime cost of bounded partial-state search without losing ancestry-proven complete-grid wins;
-- retain a bounded complete-pipeline Pareto frontier rather than selecting one candidate too early;
-- migrate successful construction and repair behavior from the historical wrapper chain into normal explicit stages;
-- reduce repeated and generic selected-grid clues without weakening structural density;
-- preserve the locked promotion and stability sets for frozen-candidate evaluation only.
+The project does not claim zero-panel generation or publication-ready clue prose. The original complete-pipeline Pareto-frontier phase was deferred while search budgets and orchestration were stabilized. The next density investigation should return to that frontier using the explicit pipeline, preserve the exact baseline candidate, and compare finalists only after clue allocation, repair, editorial cleanup and complete validation.

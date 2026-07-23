@@ -12,11 +12,15 @@ const supportedEntries = new Set([
   "bounded-partial-search-seed-v1.cjs",
   "adaptive-partial-search-test.cjs",
   "construction-stage-runtime-test-v2.cjs",
+  "wrapper-retirement-test-v1.cjs",
 ]);
 if (!supportedEntries.has(entry)) return;
 
 const root = path.resolve(__dirname, "..");
 global.window = global;
+if (process.env.SCANWORD_WRAPPER_INSTALLATION_LOCK) {
+  window.SCANWORD_WRAPPER_INSTALLATION_LOCK = process.env.SCANWORD_WRAPPER_INSTALLATION_LOCK;
+}
 
 const bulkEnabled = String(process.env.SCANWORD_BULK_LEXICON || "on").toLowerCase() !== "off";
 const scripts = [
@@ -73,14 +77,14 @@ const scripts = [
   "construction-pipeline-telemetry-v1.js",
   "construction-pipeline-stages-v1.js",
   "construction-pipeline-v1.js",
+  "construction-wrapper-retirement-audit-v1.js",
 ];
 
 for (const file of scripts) require(path.join(root, file));
 
 // benchmark-seed-v3 predates the production script order. Its own require loop
 // is allowed to hit modules already cached above, but research-only wrappers
-// must not be installed after the canonical browser runtime. Explicit-pipeline
-// mode records this boundary through SCANWORD_WRAPPER_INSTALLATION_LOCK.
+// must not be installed after the canonical browser runtime.
 const blocked = new Set([
   "construction-lexical-placement-v3.js",
   "construction-portfolio-v3.js",
@@ -93,6 +97,7 @@ const benchmarkEntrypoints = new Set([
   path.join(__dirname, "bounded-partial-search-seed-v1.cjs"),
   path.join(__dirname, "adaptive-partial-search-test.cjs"),
   path.join(__dirname, "construction-stage-runtime-test-v2.cjs"),
+  path.join(__dirname, "wrapper-retirement-test-v1.cjs"),
 ]);
 const originalLoad = Module._load;
 Module._load = function loadCanonicalBenchmarkDependency(request, parent, isMain) {
@@ -101,7 +106,7 @@ Module._load = function loadCanonicalBenchmarkDependency(request, parent, isMain
 };
 
 window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
-  version: 2,
+  version: 3,
   bulkEnabled,
   entry,
   scripts,
@@ -114,4 +119,5 @@ window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
   adaptivePartialSearch: "construction-vocabulary-portfolio-v1",
   stageSourceAnchor: "construction-stage-source-anchor-v2",
   stageRuntime: "construction-stage-runtime-v2",
+  wrapperRetirementAudit: "construction-wrapper-retirement-audit-v1",
 };
