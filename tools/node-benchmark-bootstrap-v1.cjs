@@ -10,6 +10,7 @@ const supportedEntries = new Set([
   "clue-feasibility-seed-v1.cjs",
   "bounded-partial-search-test.cjs",
   "bounded-partial-search-seed-v1.cjs",
+  "adaptive-partial-search-test.cjs",
 ]);
 if (!supportedEntries.has(entry)) return;
 
@@ -87,6 +88,7 @@ const benchmarkEntrypoints = new Set([
   path.join(__dirname, "clue-feasibility-seed-v1.cjs"),
   path.join(__dirname, "bounded-partial-search-test.cjs"),
   path.join(__dirname, "bounded-partial-search-seed-v1.cjs"),
+  path.join(__dirname, "adaptive-partial-search-test.cjs"),
 ]);
 const originalLoad = Module._load;
 Module._load = function loadCanonicalBenchmarkDependency(request, parent, isMain) {
@@ -105,4 +107,5 @@ window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
   clueFeasibility: "construction-clue-feasibility-v1",
   boundedPartialSearch: "construction-bounded-partial-search-v1",
   boundedPartialSearchFallback: "construction-bounded-partial-search-fallback-v1",
+  adaptivePartialSearch: "construction-vocabulary-portfolio-v1",
 };

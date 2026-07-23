@@ -30,6 +30,11 @@
     return String(environmentOption("SCANWORD_PARTIAL_SEARCH", "off")).toLowerCase();
   }
 
+  function partialSearchPolicy() {
+    const value = String(environmentOption("SCANWORD_PARTIAL_SEARCH_POLICY", "full")).toLowerCase();
+    return value === "adaptive" ? "adaptive" : "full";
+  }
+
   function configuredLimits() {
     const parsed = String(environmentOption("SCANWORD_VOCABULARY_PORTFOLIO_LIMITS", "2500,3500"))
       .split(",")
@@ -46,6 +51,17 @@
       minCrossings: numericOption("SCANWORD_VOCABULARY_FAST_MIN_CROSSINGS", 50),
       maxEditorialPenalty: numericOption("SCANWORD_VOCABULARY_FAST_MAX_EDITORIAL_PENALTY", 430),
       maxFormulaicShort: numericOption("SCANWORD_VOCABULARY_FAST_MAX_FORMULAIC", 0),
+    };
+  }
+
+  function partialSearchThresholds() {
+    return {
+      minimumPanels: Math.max(0, Math.floor(numericOption("SCANWORD_PARTIAL_SEARCH_MIN_PANELS", 5))),
+      secondaryPanelGap: Math.max(1, Math.floor(numericOption("SCANWORD_PARTIAL_SEARCH_SECONDARY_PANEL_GAP", 3))),
+      secondaryEditorialAdvantage: Math.max(0, Math.floor(numericOption(
+        "SCANWORD_PARTIAL_SEARCH_SECONDARY_EDITORIAL_ADVANTAGE",
+        80,
+      ))),
     };
   }
 
@@ -83,8 +99,8 @@
       || b.answers - a.answers
       || b.crossings - a.crossings
       || b.rawLetterPercent - a.rawLetterPercent
-      || a.editorialPenalty - b.editorialPenalty
       || a.formulaicShortCount - b.formulaicShortCount
+      || a.editorialPenalty - b.editorialPenalty
       || b.score - a.score
       || variantRank(a) - variantRank(b)
       || a.activeLimit - b.activeLimit;
@@ -125,19 +141,20 @@
     return withEnvironment("SCANWORD_ACTIVE_POOL_LIMIT", limit, callback);
   }
 
-  function splitAttemptBudget() {
+  function splitAttemptBudget(policyName = partialSearchPolicy()) {
     const total = Math.max(2, Math.floor(numericOption("SCANWORD_PORTFOLIO_ATTEMPTS", 120)));
     const baseline = Math.max(1, Math.floor(numericOption(
       "SCANWORD_PARTIAL_SEARCH_BASE_ATTEMPTS",
       total,
     )));
+    const beamDefault = policyName === "adaptive" ? 48 : Math.max(24, Math.ceil(total / 4));
     const beam = Math.max(1, Math.floor(numericOption(
       "SCANWORD_PARTIAL_SEARCH_BEAM_ATTEMPTS",
-      Math.max(24, Math.ceil(total / 4)),
+      beamDefault,
     )));
     const beamOffset = Math.max(0, Math.floor(numericOption(
       "SCANWORD_PARTIAL_SEARCH_BEAM_OFFSET",
-      Math.floor(total / 2),
+      total,
     )));
     return { total, baseline, beam, beamOffset };
   }
@@ -163,7 +180,24 @@
     };
   }
 
-  function attachPartialSearchPortfolio(selected, candidates, budget) {
+  function adaptiveBeamLimits(baselines, thresholds = partialSearchThresholds()) {
+    if (!baselines.length) return [];
+    const ranked = [...baselines].sort(compareCandidates);
+    const best = ranked[0];
+    if (best.summary.panels < thresholds.minimumPanels) return [];
+    const selected = [best.summary.activeLimit];
+    for (const candidate of ranked.slice(1)) {
+      const panelGap = candidate.summary.panels - best.summary.panels;
+      const editorialAdvantage = best.summary.editorialPenalty - candidate.summary.editorialPenalty;
+      if (panelGap >= thresholds.secondaryPanelGap
+        || (panelGap === 0 && editorialAdvantage >= thresholds.secondaryEditorialAdvantage)) {
+        selected.push(candidate.summary.activeLimit);
+      }
+    }
+    return [...new Set(selected)];
+  }
+
+  function attachPartialSearchPortfolio(selected, candidates, budget, plan) {
     const selectedLimit = selected.summary.activeLimit;
     const evidence = candidates.find((candidate) => (
       candidate.summary.activeLimit === selectedLimit && candidate.summary.searchVariant === "beam"
@@ -172,13 +206,17 @@
     const beamEvidence = evidence?.result?.partialSearch || null;
     const wordEvidence = (selected.result.placed || []).find((word) => word.phase6Search)?.phase6Search || null;
     selected.result.partialSearch = {
-      schemaVersion: 1,
-      search: "split-complete-pipeline-v1",
+      schemaVersion: 2,
+      search: "adaptive-complete-pipeline-v1",
       mode: "beam",
       selected: selectedEvidence?.selected || wordEvidence || null,
       aggregate: beamEvidence?.aggregate || selectedEvidence?.aggregate || null,
       portfolio: {
         budget,
+        policy: plan.policy,
+        thresholds: plan.thresholds,
+        probedLimits: plan.probedLimits,
+        skippedLimits: plan.skippedLimits,
         selectedLimit,
         selectedSearchVariant: selected.summary.searchVariant,
         selectedAttemptVariant: selected.summary.selectedPartialSearchVariant,
@@ -192,23 +230,38 @@
     const mode = portfolioMode();
     const thresholds = adaptiveThresholds();
     const searchMode = partialSearchMode();
+    const searchPolicy = partialSearchPolicy();
+    const searchThresholds = partialSearchThresholds();
     const candidates = [];
     let fastPathAccepted = false;
-    const splitBudget = searchMode === "beam" ? splitAttemptBudget() : null;
+    const splitBudget = searchMode === "beam" ? splitAttemptBudget(searchPolicy) : null;
+    const searchPlan = {
+      policy: searchPolicy,
+      thresholds: searchThresholds,
+      probedLimits: [],
+      skippedLimits: [],
+    };
 
-    for (let index = 0; index < limits.length; index += 1) {
-      const limit = limits[index];
-      if (searchMode === "beam") {
-        candidates.push(runCandidate(args, limit, "baseline", splitBudget.baseline, 0));
+    if (searchMode === "beam") {
+      const baselines = limits.map((limit) => runCandidate(args, limit, "baseline", splitBudget.baseline, 0));
+      candidates.push(...baselines);
+      const probeLimits = searchPolicy === "adaptive"
+        ? adaptiveBeamLimits(baselines, searchThresholds)
+        : [...limits];
+      searchPlan.probedLimits = probeLimits;
+      searchPlan.skippedLimits = limits.filter((limit) => !probeLimits.includes(limit));
+      for (const limit of probeLimits) {
         candidates.push(runCandidate(args, limit, "beam", splitBudget.beam, splitBudget.beamOffset));
-        continue;
       }
-
-      const candidate = runCandidate(args, limit, searchMode === "shadow" ? "shadow" : "default");
-      candidates.push(candidate);
-      if (mode === "adaptive" && index === 0 && qualifiesForAdaptiveFastPath(candidate.summary, thresholds)) {
-        fastPathAccepted = true;
-        break;
+    } else {
+      for (let index = 0; index < limits.length; index += 1) {
+        const limit = limits[index];
+        const candidate = runCandidate(args, limit, searchMode === "shadow" ? "shadow" : "default");
+        candidates.push(candidate);
+        if (mode === "adaptive" && index === 0 && qualifiesForAdaptiveFastPath(candidate.summary, thresholds)) {
+          fastPathAccepted = true;
+          break;
+        }
       }
     }
 
@@ -218,12 +271,16 @@
       ...(selected.result.constructionV2 || {}),
       vocabularyPortfolio: {
         mode: searchMode === "beam"
-          ? "panel-first-active-set-portfolio-v1-phase6-split"
+          ? searchPolicy === "adaptive"
+            ? "panel-first-active-set-portfolio-v1-phase7-adaptive-search"
+            : "panel-first-active-set-portfolio-v1-phase6-split"
           : mode === "adaptive"
             ? "panel-first-active-set-portfolio-v1-adaptive"
             : "panel-first-active-set-portfolio-v1",
         evaluationMode: mode,
         partialSearchMode: searchMode,
+        partialSearchPolicy: searchPolicy,
+        partialSearchPlan: searchPlan,
         splitAttemptBudget: splitBudget,
         limits,
         evaluatedLimits: [...new Set(candidates.map((candidate) => candidate.summary.activeLimit))],
@@ -237,7 +294,7 @@
         totalCandidateElapsedMs: candidates.reduce((sum, candidate) => sum + candidate.summary.elapsedMs, 0),
       },
     };
-    if (searchMode === "beam") attachPartialSearchPortfolio(selected, candidates, splitBudget);
+    if (searchMode === "beam") attachPartialSearchPortfolio(selected, candidates, splitBudget, searchPlan);
     return selected.result;
   }
 
@@ -251,6 +308,8 @@
     compareVocabularyPortfolioCandidatesV1: compareCandidates,
     qualifiesForAdaptiveVocabularyFastPathV1: qualifiesForAdaptiveFastPath,
     vocabularyAdaptiveThresholdsV1: adaptiveThresholds,
+    partialSearchAdaptiveThresholdsV1: partialSearchThresholds,
+    partialSearchAdaptiveBeamLimitsV1: adaptiveBeamLimits,
     __vocabularyPortfolioV1Installed: true,
   });
 })();
