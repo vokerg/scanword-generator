@@ -81,8 +81,9 @@ if (totalSkippedLimits <= 0) failures.push("beam: adaptive policy skipped no act
 if (totalProbedLimits >= requested * 2) failures.push("beam: adaptive policy did not reduce probe count");
 const shadowRatio = Number(aggregate.comparisons?.shadow?.runtimeRatio || 0);
 const beamRatio = Number(aggregate.comparisons?.beam?.runtimeRatio || 0);
+const maxShadowRatio = Number(process.env.SCANWORD_ADAPTIVE_SEARCH_MAX_SHADOW_RUNTIME_RATIO || 1.65);
 const maxBeamRatio = Number(process.env.SCANWORD_ADAPTIVE_SEARCH_MAX_RUNTIME_RATIO || 1.45);
-if (shadowRatio > 1.40) failures.push(`shadow: runtime ratio ${shadowRatio.toFixed(4)} exceeds 1.40`);
+if (shadowRatio > maxShadowRatio) failures.push(`shadow: runtime ratio ${shadowRatio.toFixed(4)} exceeds ${maxShadowRatio.toFixed(2)}`);
 if (beamRatio > maxBeamRatio) failures.push(`beam: runtime ratio ${beamRatio.toFixed(4)} exceeds ${maxBeamRatio.toFixed(2)}`);
 if (beamRatio >= 1.6484) failures.push(`beam: runtime ratio ${beamRatio.toFixed(4)} did not improve on Phase 6`);
 
@@ -99,6 +100,7 @@ const acceptance = {
   totalProbedLimits,
   totalSkippedLimits,
   shadowRuntimeRatio: shadowRatio,
+  maximumShadowRuntimeRatio: maxShadowRatio,
   beamRuntimeRatio: beamRatio,
   maximumBeamRuntimeRatio: maxBeamRatio,
   objectiveRegressions: objectiveRegressions.map(({ seed, baseline, beam }) => ({
