@@ -4,6 +4,7 @@
   const solver = window.ScanwordSolver;
   const core = window.ScanwordCore;
   const closedFill = window.ScanwordClosedFill;
+  const editorialPolicy = window.ScanwordEditorialLexicalPolicyV3;
   if (!solver || !core || !closedFill || solver.__constructionStageRuntimeV2Installed) return;
 
   function environmentOption(name, fallback) {
@@ -18,6 +19,10 @@
 
   function constructionMode() {
     return String(environmentOption("SCANWORD_CONSTRUCTION_MODE", "legacy"));
+  }
+
+  function completePipelineFrontierEnabled() {
+    return String(environmentOption("SCANWORD_COMPLETE_PIPELINE_FRONTIER", "off")).toLowerCase() === "on";
   }
 
   function withEnvironment(name, value, callback) {
@@ -190,12 +195,31 @@
     return best;
   }
 
-  function applyBaselineGuard(portfolio, args) {
-    const requestedMode = constructionMode();
-    if (requestedMode !== "portfolio") return portfolio;
-    const legacy = withEnvironment("SCANWORD_CONSTRUCTION_MODE", "legacy", () => (
+  function cloneCompleteCandidate(result) {
+    const pool = result.pool || [];
+    const source = { ...result, pool: [] };
+    let clone;
+    if (typeof structuredClone === "function") {
+      clone = structuredClone(source);
+    } else {
+      clone = JSON.parse(JSON.stringify(source));
+    }
+    clone.pool = pool;
+    return clone;
+  }
+
+  function generateLegacyGuardCandidate(args) {
+    if (constructionMode() !== "portfolio" || typeof solver.generateLegacySingleCandidateV2 !== "function") return null;
+    return withEnvironment("SCANWORD_CONSTRUCTION_MODE", "legacy", () => (
       solver.generateLegacySingleCandidateV2(...args)
     ));
+  }
+
+  function applyBaselineGuard(portfolio, args, legacyOverride = null) {
+    const requestedMode = constructionMode();
+    if (requestedMode !== "portfolio") return portfolio;
+    const legacy = legacyOverride ? cloneCompleteCandidate(legacyOverride) : generateLegacyGuardCandidate(args);
+    if (!legacy) return portfolio;
     const selectedPortfolio = compareGuardCandidates(portfolio, legacy) <= 0;
     const result = selectedPortfolio ? portfolio : legacy;
     result.constructionV2 = {
@@ -278,47 +302,209 @@
     }
   }
 
+  function runPreGuardStages(result, args, stages) {
+    const seed = args[0];
+    let current = result;
+    if (typeof solver.polishPortfolioResult === "function") {
+      current = runResultStage(stages, "portfolio-polish", current, (candidate) => solver.polishPortfolioResult(candidate, seed));
+    }
+    if (typeof solver.repackClueFootprints === "function") {
+      current = runResultStage(stages, "clue-repack", current, (candidate) => solver.repackClueFootprints(candidate, seed));
+    }
+    if (typeof solver.adaptiveRepackClueFootprints === "function") {
+      current = runResultStage(stages, "adaptive-clue-repack", current, (candidate) => solver.adaptiveRepackClueFootprints(candidate, seed));
+    }
+    if (typeof solver.absorbResidualPanels === "function") {
+      current = runResultStage(stages, "clue-tail-absorption", current, (candidate) => solver.absorbResidualPanels(candidate, seed));
+    }
+    if (typeof solver.reflowClueFootprints === "function") {
+      current = runResultStage(stages, "clue-reflow", current, (candidate) => solver.reflowClueFootprints(candidate, seed));
+    }
+    if (typeof solver.pairReflowClueFootprints === "function") {
+      current = runResultStage(stages, "clue-pair-reflow", current, (candidate) => solver.pairReflowClueFootprints(candidate, seed));
+    }
+    if (typeof solver.generateTargetedVictimVariants === "function") {
+      current = runResultStage(stages, "targeted-victim-repair", current, (candidate) => applyTargetedVictim(candidate, args));
+    }
+    return current;
+  }
+
+  function runGuardAndEditorialStages(result, args, stages, sharedLegacy = null) {
+    let current = result;
+    if (typeof solver.generateLegacySingleCandidateV2 === "function") {
+      current = runResultStage(stages, "baseline-guard", current, (candidate) => applyBaselineGuard(candidate, args, sharedLegacy));
+    }
+    if (String(environmentOption("SCANWORD_EDITORIAL_REPAIR", "off")).toLowerCase() === "on"
+      && typeof solver.applyEditorialRepairV3 === "function") {
+      current = runResultStage(stages, "editorial-repair", current, (candidate) => solver.applyEditorialRepairV3(candidate));
+    }
+    return current;
+  }
+
+  function selectedGridClueDebt(result) {
+    return Number(
+      result.selectedGridClueQuality?.clueDebt
+      ?? result.selectedGridClueMetrics?.clueDebt
+      ?? result.clueQuality?.selectedGridDebt
+      ?? 0,
+    );
+  }
+
+  function finalistSummary(result, frontierIndex, provenance, elapsedMs, stages) {
+    const metrics = solver.resultMetrics(result);
+    const editorial = editorialPolicy?.summarize?.(result.placed || []) || {};
+    const exactClues = (result.placed || []).every((entry) => entry.hasExactClue);
+    result.validation = metrics.validation;
+    result.components = metrics.components;
+    result.score = metrics.score;
+    result.intersections = metrics.intersections;
+    return {
+      frontierIndex,
+      provenance,
+      elapsedMs,
+      stages,
+      valid: Boolean(metrics.validation?.valid),
+      connected: metrics.components === 1,
+      exactClues,
+      panels: Number(result.panelCells || 0),
+      answers: Number(result.placed?.length || 0),
+      crossings: Number(metrics.intersections || result.intersections || 0),
+      rawLetterCoverage: Number(result.rawLetterCoverage || 0),
+      formulaicShortCount: Number(editorial.formulaicShortCount || 0),
+      editorialPenalty: Number(editorial.editorialPenalty || 0),
+      clueDebt: selectedGridClueDebt(result),
+      score: Number(metrics.score || result.score || 0),
+      weakFill: weakFillCount(result),
+      clueTextCells: Number(result.clueTextCells || 0),
+    };
+  }
+
+  function compareCompletePipelineFinalists(first, second) {
+    const a = first.summary || first;
+    const b = second.summary || second;
+    if (a.valid !== b.valid) return a.valid ? -1 : 1;
+    if (a.connected !== b.connected) return a.connected ? -1 : 1;
+    if (a.exactClues !== b.exactClues) return a.exactClues ? -1 : 1;
+    return a.panels - b.panels
+      || b.answers - a.answers
+      || b.crossings - a.crossings
+      || b.rawLetterCoverage - a.rawLetterCoverage
+      || a.formulaicShortCount - b.formulaicShortCount
+      || a.editorialPenalty - b.editorialPenalty
+      || a.clueDebt - b.clueDebt
+      || b.score - a.score
+      || a.frontierIndex - b.frontierIndex;
+  }
+
+  function finalDominates(first, second) {
+    const a = first.summary || first;
+    const b = second.summary || second;
+    if (!a.valid || !a.connected || !a.exactClues) return false;
+    const noWorse = a.panels <= b.panels
+      && a.answers >= b.answers
+      && a.crossings >= b.crossings
+      && a.rawLetterCoverage >= b.rawLetterCoverage
+      && a.formulaicShortCount <= b.formulaicShortCount
+      && a.editorialPenalty <= b.editorialPenalty
+      && a.clueDebt <= b.clueDebt;
+    if (!noWorse) return false;
+    return a.panels < b.panels
+      || a.answers > b.answers
+      || a.crossings > b.crossings
+      || a.rawLetterCoverage > b.rawLetterCoverage
+      || a.formulaicShortCount < b.formulaicShortCount
+      || a.editorialPenalty < b.editorialPenalty
+      || a.clueDebt < b.clueDebt;
+  }
+
+  function runCompletePipelineFrontier(initial, args, stages) {
+    const payload = initial?.__completePipelineFrontierV1;
+    if (!completePipelineFrontierEnabled() || !payload?.candidates?.length || payload.candidates.length < 2) return null;
+
+    const started = Date.now();
+    const legacyStarted = Date.now();
+    const sharedLegacy = generateLegacyGuardCandidate(args);
+    const legacyGuardElapsedMs = Date.now() - legacyStarted;
+    const processed = [];
+
+    for (let index = 0; index < payload.candidates.length; index += 1) {
+      const sourceCandidate = payload.candidates[index];
+      const candidateStarted = Date.now();
+      const candidateStages = [];
+      let result = cloneCompleteCandidate(sourceCandidate);
+      result = runPreGuardStages(result, args, candidateStages);
+      result = runGuardAndEditorialStages(result, args, candidateStages, sharedLegacy);
+      const provenance = payload.telemetry?.members?.[index]?.provenance || {
+        sourceIndex: index,
+        attempt: Number(sourceCandidate.attempt || 0),
+        attemptNumber: Number(sourceCandidate.attempt || 0) + 1,
+        partialSearchVariant: sourceCandidate.partialSearchVariant || "default",
+        victimReplacement: sourceCandidate.victimReplacement || null,
+      };
+      const summary = finalistSummary(result, index, provenance, Date.now() - candidateStarted, candidateStages);
+      processed.push({ result, summary });
+    }
+
+    const eligible = processed.filter(({ summary }) => summary.valid && summary.connected && summary.exactClues);
+    const ranked = [...(eligible.length ? eligible : processed)].sort(compareCompletePipelineFinalists);
+    const selected = ranked[0];
+    const selectedSourceIndex = selected.summary.frontierIndex;
+    const finalDominance = processed.map((candidate) => {
+      const dominator = processed.find((other) => other !== candidate && finalDominates(other, candidate));
+      return {
+        frontierIndex: candidate.summary.frontierIndex,
+        dominated: Boolean(dominator),
+        dominatedBy: dominator?.summary?.frontierIndex ?? null,
+      };
+    });
+
+    selected.result.constructionV2 = {
+      ...(selected.result.constructionV2 || {}),
+      completePipelineFrontier: {
+        schemaVersion: 1,
+        mode: "bounded-complete-pipeline-frontier-v1",
+        width: payload.candidates.length,
+        exactBaselinePreserved: true,
+        baselineFrontierIndex: 0,
+        selectedFrontierIndex: selectedSourceIndex,
+        selectionChanged: selectedSourceIndex !== 0,
+        legacyGuardElapsedMs,
+        constructionFrontier: payload.telemetry,
+        finalDominance,
+        candidates: processed.map(({ summary }) => summary),
+      },
+    };
+    stages.push(stageDescriptor(
+      "complete-pipeline-frontier",
+      initial,
+      selected.result,
+      Date.now() - started,
+      selectedSourceIndex === 0 ? "baseline-retained" : "alternative-selected",
+    ));
+    return selected.result;
+  }
+
+  function runSinglePipeline(result, args, stages) {
+    let current = runPreGuardStages(result, args, stages);
+    current = runGuardAndEditorialStages(current, args, stages);
+    return current;
+  }
+
   function generateSingleCandidate(...args) {
     if (constructionMode() !== "portfolio") return solver.generateLegacySingleCandidateV2(...args);
     const stages = [];
     const started = Date.now();
-    let result = generateConstructionPortfolio(args, stages);
-    const seed = args[0];
-
-    if (typeof solver.polishPortfolioResult === "function") {
-      result = runResultStage(stages, "portfolio-polish", result, (current) => solver.polishPortfolioResult(current, seed));
-    }
-    if (typeof solver.repackClueFootprints === "function") {
-      result = runResultStage(stages, "clue-repack", result, (current) => solver.repackClueFootprints(current, seed));
-    }
-    if (typeof solver.adaptiveRepackClueFootprints === "function") {
-      result = runResultStage(stages, "adaptive-clue-repack", result, (current) => solver.adaptiveRepackClueFootprints(current, seed));
-    }
-    if (typeof solver.absorbResidualPanels === "function") {
-      result = runResultStage(stages, "clue-tail-absorption", result, (current) => solver.absorbResidualPanels(current, seed));
-    }
-    if (typeof solver.reflowClueFootprints === "function") {
-      result = runResultStage(stages, "clue-reflow", result, (current) => solver.reflowClueFootprints(current, seed));
-    }
-    if (typeof solver.pairReflowClueFootprints === "function") {
-      result = runResultStage(stages, "clue-pair-reflow", result, (current) => solver.pairReflowClueFootprints(current, seed));
-    }
-    if (typeof solver.generateTargetedVictimVariants === "function") {
-      result = runResultStage(stages, "targeted-victim-repair", result, (current) => applyTargetedVictim(current, args));
-    }
-    if (typeof solver.generateLegacySingleCandidateV2 === "function") {
-      result = runResultStage(stages, "baseline-guard", result, (current) => applyBaselineGuard(current, args));
-    }
-    if (String(environmentOption("SCANWORD_EDITORIAL_REPAIR", "off")).toLowerCase() === "on"
-      && typeof solver.applyEditorialRepairV3 === "function") {
-      result = runResultStage(stages, "editorial-repair", result, (current) => solver.applyEditorialRepairV3(current));
-    }
+    const initial = generateConstructionPortfolio(args, stages);
+    let result = runCompletePipelineFrontier(initial, args, stages);
+    if (!result) result = runSinglePipeline(initial, args, stages);
 
     result.constructionV2 = {
       ...(result.constructionV2 || {}),
       explicitStageRuntime: {
-        schemaVersion: 2,
-        mode: "direct-single-candidate-stage-runtime-v2",
+        schemaVersion: 3,
+        mode: result.constructionV2?.completePipelineFrontier
+          ? "direct-complete-pipeline-frontier-v1"
+          : "direct-single-candidate-stage-runtime-v2",
         elapsedMs: Date.now() - started,
         stages,
       },
@@ -330,11 +516,14 @@
     generateExplicitSingleCandidateV2: generateSingleCandidate,
     applyTargetedVictimStageV2: applyTargetedVictim,
     applyBaselineGuardStageV2: applyBaselineGuard,
+    compareCompletePipelineFinalistsV1: compareCompletePipelineFinalists,
+    completePipelineFinalDominatesV1: finalDominates,
+    cloneCompletePipelineCandidateV1: cloneCompleteCandidate,
     __constructionStageRuntimeV2Installed: true,
   });
 
   window.ScanwordConstructionStageRuntimeV2 = {
-    version: 2,
+    version: 3,
     generateSingleCandidate,
   };
 })();
