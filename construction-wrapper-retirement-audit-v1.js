@@ -30,7 +30,7 @@
   function snapshot() {
     const explicitMode = String(environmentOption("SCANWORD_EXPLICIT_PIPELINE", "on")).toLowerCase();
     const stageRuntime = String(environmentOption("SCANWORD_PIPELINE_STAGE_RUNTIME", "explicit")).toLowerCase();
-    if (explicitMode === "on" && !window.SCANWORD_WRAPPER_INSTALLATION_LOCK) {
+    if (!window.SCANWORD_WRAPPER_INSTALLATION_LOCK) {
       window.SCANWORD_WRAPPER_INSTALLATION_LOCK = "explicit-pipeline-v1";
     }
     const installationLock = window.SCANWORD_WRAPPER_INSTALLATION_LOCK || null;
@@ -56,13 +56,13 @@
       executionOwnerDirect: operationalChecks.executionOwnerDirect,
       activeGenerateBestOwnerExplicit: operationalChecks.activeGenerateBestOwnerExplicit,
       rollbackChainRetained: operationalChecks.rollbackChainRetained,
-      rollbackUnlocked: installationLock == null,
+      installationLockExplicit: operationalChecks.installationLockExplicit,
     };
     const passed = rollbackMode
       ? Object.values(rollbackChecks).every(Boolean)
       : Object.values({ ...defaultChecks, ...operationalChecks }).every(Boolean);
     return {
-      schemaVersion: 3,
+      schemaVersion: 4,
       mode: rollbackMode ? "legacy-wrapper-chain-rollback-v1" : "explicit-default-rollback-only-legacy-v1",
       explicitMode,
       stageRuntime,
@@ -82,7 +82,7 @@
   }
 
   window.ScanwordWrapperRetirementAuditV1 = {
-    version: 3,
+    version: 4,
     snapshot,
     report,
   };
