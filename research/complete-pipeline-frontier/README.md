@@ -2,21 +2,15 @@
 
 ## Question
 
-Can a small non-dominated set of already-valid construction candidates survive the complete downstream repair and editorial chain and produce a better final grid than the current early single-candidate selection?
+Can a small non-dominated set of construction candidates survive the complete downstream repair and editorial chain and produce a better final grid than the current early single-candidate selection?
 
 ## Baseline
 
-Phase 9 makes the explicit orchestrator the canonical production owner. Within each active vocabulary set, `construction-portfolio.js` currently performs construction, clue allocation and pre-layout victim repair, ranks complete checkpoint-passing candidates, and returns one local winner. `construction-stage-runtime-v2.js` then runs polish, clue-footprint repairs, targeted residual-victim repair, the preserved legacy guard and same-geometry editorial repair only for that winner.
+Phase 9 makes the explicit orchestrator the canonical production owner. Within each active vocabulary set, `construction-portfolio.js` performs construction, clue allocation and pre-layout victim repair, ranks complete checkpoint-passing candidates, and returns one local winner. `construction-stage-runtime-v2.js` then runs polish, clue-footprint repairs, targeted residual-victim repair, the preserved legacy guard and same-geometry editorial repair only for that winner.
 
-That boundary can delete a candidate whose construction metrics are non-dominated but whose downstream repair potential is better.
+That boundary can delete a candidate whose current complete metrics are worse but whose residual topology has more downstream repair potential.
 
-## Hypothesis
-
-Retain a bounded Pareto set at the construction-portfolio exit, preserve the exact Phase 9 winner as immutable member zero, and run the unchanged downstream production chain independently for every retained finalist. Select only after complete validity, connectivity, exact clues and the canonical final objective are known.
-
-## Current implementation boundary
-
-The feature is opt-in:
+## Feature controls
 
 ```text
 SCANWORD_COMPLETE_PIPELINE_FRONTIER=on
@@ -29,21 +23,9 @@ Browser default remains:
 SCANWORD_COMPLETE_PIPELINE_FRONTIER=off
 ```
 
-Construction-level frontier dimensions are:
+The exact Phase 9 winner must remain immutable frontier member zero. The historical guard candidate is generated once and cloned for each finalist. Frontier width may multiply only the downstream chain, not unrestricted construction restarts or legacy guard generation.
 
-```text
-minimize residual panels
-maximize letter cells
-minimize weak fill
-minimize clue-text cells
-maximize external clue capacity
-maximize crossings
-maximize answers
-```
-
-The exact current construction winner is always frontier member zero. Later members may be retained only when they are not dominated, and the complete set is bounded by deterministic canonical order.
-
-Every retained member then receives:
+## Downstream finalist chain
 
 ```text
 portfolio polish
@@ -57,8 +39,6 @@ portfolio polish
 -> same-geometry editorial repair
 -> complete final validation and comparison
 ```
-
-The historical guard candidate is generated once and cloned for each finalist. Frontier width therefore multiplies only the downstream chain, not the exact legacy baseline or unrestricted construction restarts.
 
 ## Final comparison
 
@@ -76,12 +56,82 @@ Only candidates that are valid, connected and exact-clue-only are eligible. Fina
 
 No weighted scalar score is used to hide the frontier.
 
-## Telemetry
+## Attempt 1 — strict complete-candidate Pareto frontier
+
+### Hypothesis
+
+Retain non-dominated candidates at the existing construction-portfolio exit using:
+
+```text
+minimize residual panels
+maximize letter cells
+minimize weak fill
+minimize clue-text cells
+maximize external clue capacity
+maximize crossings
+maximize answers
+```
+
+### Preserved implementation and evidence
+
+```text
+implementation head: e212992d3d2a915a2c41d963b918d19ad89fb035
+archive ref:         refs/heads/research/archive-phase-10-complete-candidate-frontier-negative-2026-07-23
+workflow run:        30040602957
+artifact ID:         8577076298
+artifact digest:     sha256:2b62492e6f133c0f58bed51cc206434c5749f40f6e6f40449321667f345981f5
+```
+
+### Development-20 result
+
+| metric | result |
+| --- | ---: |
+| completed pairs | 20/20 |
+| invalid / disconnected / non-exact | 0 |
+| canonical regressions | 0 |
+| canonical wins | 0 |
+| exact ties | 20 |
+| output changes | 0 |
+| downstream selection changes | 0 |
+| retained construction candidates | 1 on every seed |
+| baseline elapsed | 90.696 s |
+| candidate elapsed | 90.205 s |
+| runtime ratio | 0.9946 |
+
+### Decision
+
+Reject this frontier definition.
+
+The strict vector did not produce a frontier in production data: the existing construction winner dominated every other checkpoint-passing candidate on all twenty development seeds. The downstream multi-finalist chain therefore never ran. The result proves exact parity and safe default-off integration, but it provides no evidence for candidate retention or density improvement.
+
+Do not increase width. Width was not the limiting factor; dominance eliminated every alternative before the width bound applied.
+
+## Attempt 2 — repair-potential topology frontier
+
+### New hypothesis
+
+Current panel count and letter count are insufficient proxies for downstream opportunity. A candidate with a small panel disadvantage may be more repairable when its residual cells are concentrated, connected and free of isolated singleton panels.
+
+The next construction frontier will retain candidates under explicit repair-potential dimensions in addition to complete metrics:
+
+```text
+minimize residual panel regions
+minimize isolated panels
+maximize residual concentration = largest panel region / residual panels
+preserve clue-area and lexical dimensions
+```
+
+This is a new topology hypothesis, not arbitrary width expansion. Member zero remains the exact Phase 9 winner, width remains four, and final selection remains unchanged.
+
+The diagnostic telemetry must record why each alternative survives—especially panel-region, isolated-panel or concentration trade-offs—and must remain visible even when only member zero is retained.
+
+## Telemetry requirements
 
 The selected result records:
 
 - construction frontier vectors and provenance;
 - every dominance or width rejection;
+- residual-region topology and repair-potential dimensions;
 - per-finalist downstream stages and elapsed time;
 - final dominance relationships;
 - selected frontier index;
@@ -109,7 +159,7 @@ Mandatory diagnostic gate:
 - aggregate runtime ratio no greater than 2.50;
 - deterministic bounded frontier telemetry.
 
-Promotion additionally requires at least one reproducible complete-grid win caused by a retained alternative. If the diagnostic run produces no changed selection or no canonical win, preserve the result and revise the hypothesis rather than widening the frontier blindly.
+Promotion additionally requires at least one reproducible complete-grid win caused by a retained alternative. If repair-potential dimensions still retain no alternatives or never change final selection, preserve the negative result and move the frontier earlier rather than weakening dominance indefinitely.
 
 ## Reproduction
 
@@ -127,7 +177,7 @@ SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH=4 \
 
 ## Known limitation
 
-This first frontier boundary retains candidates after exact clue allocation and construction-level victim repair. It prevents downstream repair/editorial candidate deletion, but it does **not yet** move exact clue allocation to only the bounded frontier finalists. The roadmap's more efficient long-term sequence remains:
+The current frontier boundary retains candidates after exact clue allocation and construction-level victim repair. It tests downstream candidate deletion, but it does **not yet** move exact clue allocation to only bounded structural finalists. The roadmap's more efficient long-term sequence remains:
 
 ```text
 structural alternatives
@@ -136,8 +186,8 @@ structural alternatives
 -> exact clue allocation only for finalists
 ```
 
-Do not claim that optimization until a later implementation proves identical correctness and measures the saved allocation work.
+If the repair-potential complete-candidate frontier is also empty or unproductive, the next justified redesign is that earlier structural boundary—not a larger complete-candidate width.
 
 ## Status
 
-Implementation and deterministic contract tests are present on `r-and-d/phase-10-complete-pipeline-frontier`. The development-20 diagnostic evidence is pending. The feature is not accepted and remains off by default.
+Attempt 1 is a preserved negative result. Attempt 2 is in progress on `r-and-d/phase-10-complete-pipeline-frontier`. The feature remains off by default and is not accepted.
