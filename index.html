@@ -23,77 +23,33 @@
     <section class="workspace">
       <aside class="panel controls-panel">
         <h2>Generation settings</h2>
-
-        <label>
-          Seed
-          <input id="seed" type="text" value="arrowword-vocabulary-first-001" />
-        </label>
-
+        <label>Seed<input id="seed" type="text" value="arrowword-vocabulary-first-001" /></label>
         <div class="field-row">
-          <label>
-            Columns
-            <input id="cols" type="number" min="11" max="19" value="13" />
-          </label>
-          <label>
-            Rows
-            <input id="rows" type="number" min="13" max="27" value="17" />
-          </label>
+          <label>Columns<input id="cols" type="number" min="11" max="19" value="13" /></label>
+          <label>Rows<input id="rows" type="number" min="13" max="27" value="17" /></label>
         </div>
-
         <div class="field-row">
-          <label>
-            Maximum working set
-            <input id="poolSize" type="number" min="1000" max="10000" value="3500" />
-          </label>
-          <label>
-            Minimum answers
-            <input id="targetWords" type="number" min="12" max="60" value="30" />
-          </label>
+          <label>Maximum working set<input id="poolSize" type="number" min="1000" max="10000" value="3500" /></label>
+          <label>Minimum answers<input id="targetWords" type="number" min="12" max="60" value="30" /></label>
         </div>
-
-        <label>
-          Clue-cell density, %
-          <input id="clueDensity" type="number" min="16" max="38" value="27" disabled />
-        </label>
-
-        <label class="check-row">
-          <input id="showAnswers" type="checkbox" />
-          <span>Reveal answers</span>
-        </label>
-
+        <label>Clue-cell density, %<input id="clueDensity" type="number" min="16" max="38" value="27" disabled /></label>
+        <label class="check-row"><input id="showAnswers" type="checkbox" /><span>Reveal answers</span></label>
         <button id="generate" class="primary">Generate</button>
-
-        <div class="button-grid">
-          <button id="downloadSvg">Download SVG</button>
-          <button id="downloadJson">Download JSON</button>
-        </div>
-
+        <div class="button-grid"><button id="downloadSvg">Download SVG</button><button id="downloadJson">Download JSON</button></div>
         <div id="stats" class="stats" aria-live="polite"></div>
-
         <div class="note">
           <strong>Vocabulary-first 1.1:</strong> 40,966 attributed entries are available before construction, including
-          filtered natural and administrative entities. The default pipeline compares 2,500- and 3,500-entry working
-          sets panel-first, then removes avoidable formulaic short fill without changing the selected geometry.
+          filtered natural and administrative entities. The explicit production pipeline compares 2,500- and 3,500-entry
+          working sets panel-first, then removes avoidable formulaic short fill without changing the selected geometry.
         </div>
       </aside>
-
       <section class="preview-panel">
-        <div class="preview-toolbar">
-          <div><span class="dot"></span>A5 preview · 148 × 210 mm</div>
-          <span id="generationStatus">ready</span>
-        </div>
+        <div class="preview-toolbar"><div><span class="dot"></span>A5 preview · 148 × 210 mm</div><span id="generationStatus">ready</span></div>
         <div id="preview" class="paper-wrap"></div>
       </section>
     </section>
-
     <section class="panel words-panel">
-      <div class="section-heading">
-        <div>
-          <p class="eyebrow">RESULT</p>
-          <h2>Assigned answers</h2>
-        </div>
-        <p>The table exposes every clue, answer, direction, and start coordinate for review.</p>
-      </div>
+      <div class="section-heading"><div><p class="eyebrow">RESULT</p><h2>Assigned answers</h2></div><p>The table exposes every clue, answer, direction, and start coordinate for review.</p></div>
       <div id="wordsTable" class="table-wrap"></div>
     </section>
   </main>
@@ -107,7 +63,9 @@
     window.SCANWORD_VOCABULARY_PORTFOLIO = "on";
     window.SCANWORD_VOCABULARY_PORTFOLIO_LIMITS = "2500,3500";
     window.SCANWORD_VOCABULARY_PORTFOLIO_MODE = "full";
-    window.SCANWORD_EXPLICIT_PIPELINE = "off";
+    window.SCANWORD_EXPLICIT_PIPELINE = "on";
+    window.SCANWORD_PIPELINE_STAGE_RUNTIME = "explicit";
+    window.SCANWORD_WRAPPER_INSTALLATION_LOCK = "explicit-pipeline-v1";
     window.SCANWORD_FULL_CORPUS_RETRIEVAL = "off";
     window.SCANWORD_FULL_CORPUS_RETRIEVAL_MODE = "empty";
     window.SCANWORD_CLUE_FEASIBILITY = "off";
@@ -167,6 +125,7 @@
   <script src="construction-pipeline-telemetry-v1.js"></script>
   <script src="construction-pipeline-stages-v1.js"></script>
   <script src="construction-pipeline-v1.js"></script>
+  <script src="construction-wrapper-retirement-audit-v1.js"></script>
   <script src="renderer.js"></script>
   <script src="ui.js"></script>
 </body>
