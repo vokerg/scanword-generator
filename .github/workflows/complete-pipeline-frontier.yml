@@ -1,0 +1,97 @@
+name: Complete pipeline frontier
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - construction-portfolio.js
+      - construction-stage-runtime-v2.js
+      - index.html
+      - tools/construction-pipeline-seed-v1.cjs
+      - tools/complete-pipeline-frontier-test-v1.cjs
+      - tools/complete-pipeline-frontier-checkpoint-v1.cjs
+      - tools/node-benchmark-bootstrap-v1.cjs
+      - research/complete-pipeline-frontier/**
+      - .github/workflows/complete-pipeline-frontier.yml
+  workflow_dispatch:
+
+concurrency:
+  group: complete-pipeline-frontier-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check syntax and default controls
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          node --check construction-portfolio.js
+          node --check construction-stage-runtime-v2.js
+          node --check tools/construction-pipeline-seed-v1.cjs
+          node --check tools/complete-pipeline-frontier-test-v1.cjs
+          node --check tools/complete-pipeline-frontier-checkpoint-v1.cjs
+          grep -q 'SCANWORD_COMPLETE_PIPELINE_FRONTIER = "off"' index.html
+          grep -q 'SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH = 4' index.html
+
+      - name: Test bounded frontier contracts
+        run: node tools/complete-pipeline-frontier-test-v1.cjs
+
+      - name: Preserve Phase 9 direct runtime
+        run: node tools/construction-stage-runtime-test-v2.cjs
+
+  development:
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_FRONTIER_CONCURRENCY: 4
+      SCANWORD_FRONTIER_RUNTIME_RATIO: 2.50
+      SCANWORD_FRONTIER_SEED_TIMEOUT_MS: 1200000
+      SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH: 4
+      SCANWORD_FRONTIER_REQUIRE_WIN: 0
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run locked development-20 A/B checkpoint
+        run: |
+          set -o pipefail
+          mkdir -p research-output/complete-pipeline-frontier
+          node tools/complete-pipeline-frontier-checkpoint-v1.cjs \
+            research/baselines/seed-sets/development-20.json \
+            research-output/complete-pipeline-frontier/development-20.jsonl \
+            | tee research-output/complete-pipeline-frontier/development-console.jsonl
+
+      - name: Publish frontier evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: complete-pipeline-frontier-development-${{ env.SOURCE_SHA }}
+          path: research-output/complete-pipeline-frontier/
+          if-no-files-found: error
