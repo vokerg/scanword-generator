@@ -23,7 +23,28 @@ Browser default remains:
 SCANWORD_COMPLETE_PIPELINE_FRONTIER=off
 ```
 
-The exact Phase 9 winner must remain immutable frontier member zero. The historical guard candidate is generated once and cloned for each finalist. Frontier width may multiply only the downstream chain, not unrestricted construction restarts or legacy guard generation.
+The exact Phase 9 winner is immutable frontier member zero. The historical guard candidate is generated once and cloned for each finalist. Frontier width multiplies only the downstream chain, not unrestricted construction restarts or legacy guard generation.
+
+## Retained construction frontier
+
+The accepted development candidate uses complete metrics plus explicit repair-potential topology:
+
+```text
+minimize residual panels
+maximize letter cells
+minimize weak fill
+minimize clue-text cells
+maximize external clue capacity
+maximize crossings
+maximize answers
+minimize residual panel regions
+minimize isolated panels
+maximize residual concentration = largest panel region / residual panels
+```
+
+A candidate with a small current panel disadvantage may therefore survive when its residual cells are more concentrated or less fragmented and can be repaired more effectively downstream.
+
+The frontier is bounded to four candidates by deterministic canonical order. Every dominance and width rejection records its vector and provenance.
 
 ## Downstream finalist chain
 
@@ -56,76 +77,82 @@ Only candidates that are valid, connected and exact-clue-only are eligible. Fina
 
 No weighted scalar score is used to hide the frontier.
 
-## Attempt 1 — strict complete-candidate Pareto frontier
+## Harness defect preserved
 
-### Hypothesis
-
-Retain non-dominated candidates at the existing construction-portfolio exit using:
+Two early green runs were invalid as frontier evidence because `tools/complete-pipeline-frontier-checkpoint-v1.cjs` did not load the locked browser-equivalent environment. `SCANWORD_CONSTRUCTION_MODE` therefore defaulted to `legacy`, and both A/B sides bypassed `construction-portfolio.js`.
 
 ```text
-minimize residual panels
-maximize letter cells
-minimize weak fill
-minimize clue-text cells
-maximize external clue capacity
-maximize crossings
-maximize answers
+runs:        30040602957, 30041156501
+old head:    e212992d3d2a915a2c41d963b918d19ad89fb035
+archive ref: refs/heads/research/archive-phase-10-complete-candidate-frontier-negative-2026-07-23
 ```
 
-### Preserved implementation and evidence
+Those runs produced identical output and no frontier telemetry. They are retained only as evidence of the benchmark defect, not as an algorithmic negative result. The checkpoint now imports `research/baselines/v8-production-1.1/config.json`, requires `SCANWORD_CONSTRUCTION_MODE=portfolio`, and fails when frontier telemetry is absent.
+
+The archive branch name was created before the harness defect was diagnosed; the ledger supersedes that label.
+
+## Frozen development candidate
 
 ```text
-implementation head: e212992d3d2a915a2c41d963b918d19ad89fb035
-archive ref:         refs/heads/research/archive-phase-10-complete-candidate-frontier-negative-2026-07-23
-workflow run:        30040602957
-artifact ID:         8577076298
-artifact digest:     sha256:2b62492e6f133c0f58bed51cc206434c5749f40f6e6f40449321667f345981f5
+implementation head: df537dd5f47712062fb6224d4e42cb67e41876b3
+archive ref:         refs/heads/research/archive-phase-10-complete-pipeline-frontier-evidence-2026-07-23
+workflow run:        30041412327
+artifact ID:         8577595347
+artifact digest:     sha256:4fb0d6398cfdf5bd2f16f990969aa712242a68ec7dec9539d5600f54ba895429
+baseline:            v8-production-1.1-explicit-browser-equivalent
 ```
 
-### Development-20 result
+## Valid development-20 result
 
-| metric | result |
-| --- | ---: |
-| completed pairs | 20/20 |
-| invalid / disconnected / non-exact | 0 |
-| canonical regressions | 0 |
-| canonical wins | 0 |
-| exact ties | 20 |
-| output changes | 0 |
-| downstream selection changes | 0 |
-| retained construction candidates | 1 on every seed |
-| baseline elapsed | 90.696 s |
-| candidate elapsed | 90.205 s |
-| runtime ratio | 0.9946 |
+| metric | Phase 9 | frontier | result |
+| --- | ---: | ---: | ---: |
+| complete pairs | 20 | 20 | 20/20 |
+| invalid / disconnected / non-exact | 0 | 0 | green |
+| canonical wins | — | — | **16** |
+| canonical ties | — | — | 4 |
+| canonical regressions | — | — | **0** |
+| output changes | — | — | 16 |
+| downstream selection changes | — | — | 16 |
+| average residual panels | 5.30 | **4.65** | -0.65 |
+| average answers | 47.45 | **48.35** | +0.90 |
+| average crossings | 51.70 | **52.00** | +0.30 |
+| average raw-letter coverage | 0.5063 | 0.5041 | -0.0023 |
+| average formulaic short count | 0.00 | 0.05 | +0.05 |
+| average editorial penalty | 408.9 | 424.6 | +15.7 |
+| aggregate elapsed | 903.752 s | 1,055.255 s | ratio **1.1676** |
 
-### Decision
-
-Reject this frontier definition.
-
-The strict vector did not produce a frontier in production data: the existing construction winner dominated every other checkpoint-passing candidate on all twenty development seeds. The downstream multi-finalist chain therefore never ran. The result proves exact parity and safe default-off integration, but it provides no evidence for candidate retention or density improvement.
-
-Do not increase width. Width was not the limiting factor; dominance eliminated every alternative before the width bound applied.
-
-## Attempt 2 — repair-potential topology frontier
-
-### New hypothesis
-
-Current panel count and letter count are insufficient proxies for downstream opportunity. A candidate with a small panel disadvantage may be more repairable when its residual cells are concentrated, connected and free of isolated singleton panels.
-
-The next construction frontier will retain candidates under explicit repair-potential dimensions in addition to complete metrics:
+All twenty seeds considered between 77 and 129 checkpoint-passing construction candidates and retained exactly four bounded frontier members. Final selected member distribution was:
 
 ```text
-minimize residual panel regions
-minimize isolated panels
-maximize residual concentration = largest panel region / residual panels
-preserve clue-area and lexical dimensions
+member 0: 4 seeds
+member 1: 5 seeds
+member 2: 4 seeds
+member 3: 7 seeds
 ```
 
-This is a new topology hypothesis, not arbitrary width expansion. Member zero remains the exact Phase 9 winner, width remains four, and final selection remains unchanged.
+The structural hierarchy explains the disclosed editorial trade-offs: candidates with fewer panels, or equal panels with more answers/crossings, may legitimately outrank a lower editorial penalty. Per-seed comparison still reports every editorial change. No seed regressed under the complete canonical objective.
 
-The diagnostic telemetry must record why each alternative survives—especially panel-region, isolated-panel or concentration trade-offs—and must remain visible even when only member zero is retained.
+Notable examples:
 
-## Telemetry requirements
+- `v8-dev-017`: 6 → 2 panels, 47 → 48 answers;
+- `v8-dev-013` and `v8-dev-014`: two-panel reductions;
+- `v8-dev-003`: equal 3 panels, 47 → 48 answers and 52 → 53 crossings;
+- `v8-dev-019`: equal 4 panels and answer/crossing counts, but better raw coverage and editorial penalty.
+
+## Development decision
+
+Freeze the repair-potential frontier candidate and proceed to locked promotion-50 and stability-100. The development gate is decisively satisfied:
+
+- complete validity, connectivity and exact clues;
+- zero canonical regressions;
+- sixteen reproducible retained-alternative wins;
+- bounded width four;
+- exact Phase 9 fallback preserved;
+- runtime ratio below the phase cap.
+
+The browser default remains off until promotion and stability are green.
+
+## Telemetry
 
 The selected result records:
 
@@ -140,26 +167,26 @@ The selected result records:
 
 The heavy transient candidate set is non-enumerable and is not serialized into normal production result payloads.
 
-## Development protocol
+## Promotion protocol
 
-The locked Phase 2 `development-20` set is used for iteration. Each seed compares:
+The locked seed sets run sequentially:
 
 ```text
-Phase 9 exact path: SCANWORD_COMPLETE_PIPELINE_FRONTIER=off
-candidate path:     SCANWORD_COMPLETE_PIPELINE_FRONTIER=on, width 4
+development-20
+-> promotion-50
+-> stability-100
 ```
 
-Mandatory diagnostic gate:
+Every set requires:
 
-- 20/20 complete results;
+- all runs complete;
 - 100% validity;
 - one connected component;
 - exact clues only;
 - zero regression under the canonical complete objective;
-- aggregate runtime ratio no greater than 2.50;
-- deterministic bounded frontier telemetry.
-
-Promotion additionally requires at least one reproducible complete-grid win caused by a retained alternative. If repair-potential dimensions still retain no alternatives or never change final selection, preserve the negative result and move the frontier earlier rather than weakening dominance indefinitely.
+- at least one retained-alternative win;
+- deterministic bounded frontier telemetry;
+- aggregate runtime ratio no greater than 1.35.
 
 ## Reproduction
 
@@ -168,8 +195,9 @@ node tools/complete-pipeline-frontier-test-v1.cjs
 node tools/construction-stage-runtime-test-v2.cjs
 
 SCANWORD_FRONTIER_CONCURRENCY=4 \
-SCANWORD_FRONTIER_RUNTIME_RATIO=2.50 \
+SCANWORD_FRONTIER_RUNTIME_RATIO=1.35 \
 SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH=4 \
+SCANWORD_FRONTIER_REQUIRE_WIN=1 \
   node tools/complete-pipeline-frontier-checkpoint-v1.cjs \
   research/baselines/seed-sets/development-20.json \
   research-output/complete-pipeline-frontier/development-20.jsonl
@@ -177,7 +205,7 @@ SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH=4 \
 
 ## Known limitation
 
-The current frontier boundary retains candidates after exact clue allocation and construction-level victim repair. It tests downstream candidate deletion, but it does **not yet** move exact clue allocation to only bounded structural finalists. The roadmap's more efficient long-term sequence remains:
+The current frontier boundary retains candidates after exact clue allocation and construction-level victim repair. It solves measured downstream candidate deletion, but it does **not yet** move exact clue allocation to only bounded structural finalists. The more efficient long-term sequence remains:
 
 ```text
 structural alternatives
@@ -186,8 +214,8 @@ structural alternatives
 -> exact clue allocation only for finalists
 ```
 
-If the repair-potential complete-candidate frontier is also empty or unproductive, the next justified redesign is that earlier structural boundary—not a larger complete-candidate width.
+That optimization is not part of the frozen Phase 10 candidate and must not be claimed without separate parity and cost evidence.
 
 ## Status
 
-Attempt 1 is a preserved negative result. Attempt 2 is in progress on `r-and-d/phase-10-complete-pipeline-frontier`. The feature remains off by default and is not accepted.
+Development candidate frozen. Promotion-50 and stability-100 are pending on the exact documentation head. The feature remains off by default and is not yet merged.
