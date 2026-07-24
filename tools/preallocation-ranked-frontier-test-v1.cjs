@@ -65,7 +65,7 @@ function fixture() {
   Object.defineProperty(result, "__completePipelineFrontierV1", {
     value: {
       candidates: [
-        { grid: second.state.grid, placed: second.state.placed },
+        { grid: first.state.grid, placed: first.state.placed },
         { grid: victim.state.grid, placed: victim.state.placed },
       ],
     },
@@ -107,7 +107,7 @@ try {
   assert.equal(telemetry.current.phase10BaseRecall, 1);
   assert.equal(telemetry.current.phase10FrontierRecall, 1);
   assert.equal(telemetry.current.safeToFilterObservedPhase10Frontier, true);
-  assert.deepEqual(telemetry.current.memberAllocationIndexes, [3, 1]);
+  assert.deepEqual(telemetry.current.memberAllocationIndexes, [3, 0]);
   assert.equal(telemetry.sweep.find((entry) => entry.width === 1).safeToFilterObservedPhase10Frontier, false);
   assert.equal(telemetry.sweep.find((entry) => entry.width === 2).safeToFilterObservedPhase10Frontier, true);
 
