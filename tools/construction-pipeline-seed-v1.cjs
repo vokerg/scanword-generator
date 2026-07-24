@@ -104,6 +104,10 @@ const summary = {
   preallocationRepairPotentialFrontierPortfolio: global.ScanwordPreallocationRepairPotentialV1?.currentPortfolioAggregate?.()
     || result.constructionV2?.preallocationRepairPotentialFrontierPortfolio
     || null,
+  preallocationRankedFrontier: result.constructionV2?.preallocationRankedFrontier || null,
+  preallocationRankedFrontierPortfolio: global.ScanwordPreallocationRankedFrontierV1?.currentPortfolioAggregate?.()
+    || result.constructionV2?.preallocationRankedFrontierPortfolio
+    || null,
   retirementAudit: global.ScanwordWrapperRetirementAuditV1?.snapshot?.() || null,
 };
 console.log(JSON.stringify(summary));
