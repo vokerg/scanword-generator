@@ -58,7 +58,8 @@ jobs:
         run: |
           node tools/complete-pipeline-frontier-test-v1.cjs
           node tools/construction-stage-runtime-test-v2.cjs
-          node tools/wrapper-retirement-test-v1.cjs
+          NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
+            node tools/wrapper-retirement-test-v1.cjs
 
   development-shadow:
     needs: unit
