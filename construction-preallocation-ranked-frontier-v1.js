@@ -10,6 +10,7 @@
   const previousGeneratePortfolio = solver.generatePortfolio.bind(solver);
   const sessions = new Map();
   let latestAggregate = null;
+  let latestError = null;
   let active = false;
 
   function environmentOption(name, fallback) {
@@ -197,7 +198,7 @@
         ? +(projectedAllocationElapsedMsSaved / allocationElapsedMs).toFixed(4)
         : 0,
       phase10FrontierAllocationCount: phase10Count,
-      phase10FrontierRetained,
+      phase10FrontierRetained: phase10Retained,
       phase10FrontierRecall: phase10Count ? +(phase10Retained / phase10Count).toFixed(4) : null,
       phase10RequiredBaseCount: baseCount,
       phase10RequiredBasesRetained: basesRetained,
@@ -222,55 +223,81 @@
     for (const candidate of result?.__completePipelineFrontierV1?.candidates || []) apply(candidate);
   }
 
+  function attachError(result, error) {
+    const report = {
+      schemaVersion: 1,
+      mode: "shadow",
+      authoritative: false,
+      failOpen: true,
+      error: String(error?.stack || error),
+    };
+    latestError = report;
+    const apply = (candidate) => {
+      if (!candidate || typeof candidate !== "object") return;
+      candidate.constructionV2 = {
+        ...(candidate.constructionV2 || {}),
+        preallocationRankedFrontierError: report,
+      };
+    };
+    apply(result);
+    for (const candidate of result?.__completePipelineFrontierV1?.candidates || []) apply(candidate);
+  }
+
   function generatePortfolio(...args) {
     if (mode() !== "shadow" || active) return previousGeneratePortfolio(...args);
     active = true;
     try {
       const result = previousGeneratePortfolio(...args);
-      const observations = result?.constructionV2?.preallocationStructuralFrontier?.__observations;
-      if (!Array.isArray(observations) || !observations.length) return result;
-      const currentWidth = configuredWidth();
-      const current = evaluateWidth(result, observations, currentWidth);
-      const sweep = diagnosticWidths().map((requestedWidth) => evaluateWidth(result, observations, requestedWidth));
-      const telemetry = {
-        schemaVersion: 1,
-        mode: "shadow",
-        authoritative: false,
-        ordering: "phase10-repair-potential-ranked-no-dominance-v1",
-        stageModel: "base-rank-then-victim-rank-v1",
-        current,
-        sweep,
-      };
-      attach(result, telemetry);
-
-      const key = sessionKey(args);
-      const currentRunKey = runKey();
-      let session = sessions.get(key);
-      if (!session || session.runKeys.has(currentRunKey)) {
-        session = { runKeys: new Set(), runs: [], results: [], aggregate: {} };
-        sessions.set(key, session);
-      }
-      session.runKeys.add(currentRunKey);
-      session.runs.push({
-        activePoolLimit: String(environmentOption("SCANWORD_ACTIVE_POOL_LIMIT", "default")),
-        current,
-        sweep,
-      });
-      session.results.push(result);
-      aggregate(session, currentWidth);
-      for (const previousResult of session.results) {
-        previousResult.constructionV2 = {
-          ...(previousResult.constructionV2 || {}),
-          preallocationRankedFrontierPortfolio: session.aggregate,
+      try {
+        const observations = result?.constructionV2?.preallocationStructuralFrontier?.__observations;
+        if (!Array.isArray(observations) || !observations.length) return result;
+        const currentWidth = configuredWidth();
+        const current = evaluateWidth(result, observations, currentWidth);
+        const sweep = diagnosticWidths().map((requestedWidth) => evaluateWidth(result, observations, requestedWidth));
+        const telemetry = {
+          schemaVersion: 1,
+          mode: "shadow",
+          authoritative: false,
+          ordering: "phase10-repair-potential-ranked-no-dominance-v1",
+          stageModel: "base-rank-then-victim-rank-v1",
+          current,
+          sweep,
         };
-        for (const candidate of previousResult.__completePipelineFrontierV1?.candidates || []) {
-          candidate.constructionV2 = {
-            ...(candidate.constructionV2 || {}),
+        attach(result, telemetry);
+
+        const key = sessionKey(args);
+        const currentRunKey = runKey();
+        let session = sessions.get(key);
+        if (!session || session.runKeys.has(currentRunKey)) {
+          session = { runKeys: new Set(), runs: [], results: [], aggregate: {} };
+          sessions.set(key, session);
+        }
+        session.runKeys.add(currentRunKey);
+        session.runs.push({
+          activePoolLimit: String(environmentOption("SCANWORD_ACTIVE_POOL_LIMIT", "default")),
+          current,
+          sweep,
+        });
+        session.results.push(result);
+        aggregate(session, currentWidth);
+        for (const previousResult of session.results) {
+          previousResult.constructionV2 = {
+            ...(previousResult.constructionV2 || {}),
             preallocationRankedFrontierPortfolio: session.aggregate,
           };
+          for (const candidate of previousResult.__completePipelineFrontierV1?.candidates || []) {
+            candidate.constructionV2 = {
+              ...(candidate.constructionV2 || {}),
+              preallocationRankedFrontierPortfolio: session.aggregate,
+            };
+          }
         }
+        latestError = null;
+        return result;
+      } catch (error) {
+        attachError(result, error);
+        return result;
       }
-      return result;
     } finally {
       active = false;
     }
@@ -280,6 +307,7 @@
   Object.assign(solver, {
     selectPreallocationRankedFrontierV1: selectRanked,
     currentPreallocationRankedFrontierPortfolioV1: () => latestAggregate,
+    currentPreallocationRankedFrontierErrorV1: () => latestError,
     __preallocationRankedFrontierV1Installed: true,
   });
 
@@ -290,5 +318,6 @@
     diagnosticWidths,
     select: selectRanked,
     currentPortfolioAggregate: () => latestAggregate,
+    currentError: () => latestError,
   };
 })();
