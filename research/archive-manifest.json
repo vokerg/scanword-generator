@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "status": "active",
-  "auditedDate": "2026-07-23",
+  "auditedDate": "2026-07-24",
   "mainRef": "refs/remotes/origin/main",
   "auditedMainCommit": "8ae6f69df60eba4a0fc36399a42ab3418c77edae",
   "policy": {
@@ -123,10 +123,16 @@
       "contains": ["f77be9fed8223925819830fad6956f1018717bbb"]
     },
     {
-      "name": "phase-10-complete-pipeline-frontier-accepted-evidence",
+      "name": "phase-10-complete-pipeline-frontier-implementation",
       "ref": "refs/heads/research/archive-phase-10-complete-pipeline-frontier-evidence-2026-07-23",
       "commit": "df537dd5f47712062fb6224d4e42cb67e41876b3",
       "contains": ["df537dd5f47712062fb6224d4e42cb67e41876b3"]
+    },
+    {
+      "name": "phase-10-complete-pipeline-frontier-acceptance",
+      "ref": "refs/heads/research/archive-phase-10-complete-pipeline-frontier-acceptance-2026-07-24",
+      "commit": "499a242bf5e4b84aa01148a6e1db042fc50ea44a",
+      "contains": ["499a242bf5e4b84aa01148a6e1db042fc50ea44a"]
     }
   ]
 }
