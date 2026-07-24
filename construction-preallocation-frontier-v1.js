@@ -5,6 +5,7 @@
   if (!solver || typeof solver.generatePortfolio !== "function" || solver.__preallocationStructuralFrontierV1Installed) return;
 
   const originalGeneratePortfolio = solver.generatePortfolio.bind(solver);
+  const portfolioSessions = new Map();
   let active = false;
 
   function environmentOption(name, fallback) {
@@ -234,16 +235,146 @@
     return result;
   }
 
-  function phase10FrontierIndexes(result, observations) {
+  function provenanceKey(provenance) {
+    const variant = provenance?.partialSearchVariant || "default";
+    if (provenance?.attempt != null) return `${provenance.attempt}:${variant}`;
+    return `build:${provenance?.buildIndex ?? "unknown"}:${variant}`;
+  }
+
+  function isVictimObservation(observation) {
+    return observation?.provenance?.source === "victim-replacement";
+  }
+
+  function phase10FrontierObservations(result, observations) {
     const candidates = result?.__completePipelineFrontierV1?.candidates || [];
-    if (!candidates.length) return [];
-    const indexes = [];
+    const matched = [];
     for (const candidate of candidates) {
       const observation = observations.find((entry) => entry.state?.grid === candidate.grid
         || entry.state?.placed === candidate.placed);
-      if (observation) indexes.push(observation.allocationIndex);
+      if (observation && !matched.includes(observation)) matched.push(observation);
     }
-    return [...new Set(indexes)].sort((a, b) => a - b);
+    return matched;
+  }
+
+  function portfolioSessionKey(args) {
+    return JSON.stringify([
+      args[0] ?? null,
+      Number(args[1] || 0),
+      Number(args[2] || 0),
+      Number(args[3] || 0),
+      Number(args[4] || 0),
+      Number(args[5] || 0),
+    ]);
+  }
+
+  function portfolioRunKey() {
+    return JSON.stringify([
+      String(environmentOption("SCANWORD_ACTIVE_POOL_LIMIT", "default")),
+      String(environmentOption("SCANWORD_PARTIAL_SEARCH", "off")),
+      String(environmentOption("SCANWORD_PORTFOLIO_ATTEMPTS", "default")),
+      String(environmentOption("SCANWORD_PORTFOLIO_ATTEMPT_OFFSET", "0")),
+    ]);
+  }
+
+  function compactPortfolioRun(telemetry) {
+    return {
+      activePoolLimit: String(environmentOption("SCANWORD_ACTIVE_POOL_LIMIT", "default")),
+      partialSearchMode: String(environmentOption("SCANWORD_PARTIAL_SEARCH", "off")),
+      attemptBudget: String(environmentOption("SCANWORD_PORTFOLIO_ATTEMPTS", "default")),
+      attemptOffset: String(environmentOption("SCANWORD_PORTFOLIO_ATTEMPT_OFFSET", "0")),
+      allocationCalls: telemetry.allocationCalls,
+      structuralEvaluations: telemetry.structuralEvaluations,
+      retained: telemetry.retained,
+      projectedCallsSaved: telemetry.projectedCallsSaved,
+      allocationElapsedMs: telemetry.allocationElapsedMs,
+      projectedAllocationElapsedMsSaved: telemetry.projectedAllocationElapsedMsSaved,
+      phase10FrontierAllocationCount: telemetry.phase10FrontierAllocationIndexes.length,
+      phase10FrontierRetained: telemetry.phase10FrontierRetained,
+      phase10RequiredBaseCount: telemetry.phase10RequiredBaseKeys.length,
+      phase10RequiredBasesRetained: telemetry.phase10RequiredBasesRetained,
+      phase10FrontierRecall: telemetry.phase10FrontierRecall,
+      phase10BaseRecall: telemetry.phase10BaseRecall,
+      safeToFilterObservedPhase10Frontier: telemetry.safeToFilterObservedPhase10Frontier,
+      errors: telemetry.errors.length,
+    };
+  }
+
+  function attachPortfolioAggregate(result, telemetry, args) {
+    const key = portfolioSessionKey(args);
+    const runKey = portfolioRunKey();
+    let session = portfolioSessions.get(key);
+    if (!session || session.runKeys.has(runKey)) {
+      session = { runKeys: new Set(), runs: [], results: [], aggregate: {} };
+      portfolioSessions.set(key, session);
+    }
+    session.runKeys.add(runKey);
+    session.runs.push(compactPortfolioRun(telemetry));
+    session.results.push(result);
+
+    const allocationCalls = session.runs.reduce((sum, run) => sum + run.allocationCalls, 0);
+    const structuralEvaluations = session.runs.reduce((sum, run) => sum + run.structuralEvaluations, 0);
+    const retainedAllocations = session.runs.reduce((sum, run) => sum + run.retained, 0);
+    const projectedCallsSaved = session.runs.reduce((sum, run) => sum + run.projectedCallsSaved, 0);
+    const allocationElapsedMs = session.runs.reduce((sum, run) => sum + run.allocationElapsedMs, 0);
+    const projectedAllocationElapsedMsSaved = session.runs.reduce(
+      (sum, run) => sum + run.projectedAllocationElapsedMsSaved,
+      0,
+    );
+    const phase10FrontierAllocationCount = session.runs.reduce(
+      (sum, run) => sum + run.phase10FrontierAllocationCount,
+      0,
+    );
+    const phase10FrontierRetained = session.runs.reduce((sum, run) => sum + run.phase10FrontierRetained, 0);
+    const phase10RequiredBaseCount = session.runs.reduce((sum, run) => sum + run.phase10RequiredBaseCount, 0);
+    const phase10RequiredBasesRetained = session.runs.reduce(
+      (sum, run) => sum + run.phase10RequiredBasesRetained,
+      0,
+    );
+    Object.assign(session.aggregate, {
+      schemaVersion: 1,
+      mode: telemetry.mode,
+      authoritative: false,
+      stageModel: telemetry.stageModel,
+      runCount: session.runs.length,
+      width: telemetry.width,
+      allocationCalls,
+      structuralEvaluations,
+      retainedAllocations,
+      projectedCallsSaved,
+      projectedCallReduction: allocationCalls ? +(projectedCallsSaved / allocationCalls).toFixed(4) : 0,
+      allocationElapsedMs: +allocationElapsedMs.toFixed(3),
+      projectedAllocationElapsedMsSaved: +projectedAllocationElapsedMsSaved.toFixed(3),
+      projectedAllocationTimeReduction: allocationElapsedMs
+        ? +(projectedAllocationElapsedMsSaved / allocationElapsedMs).toFixed(4)
+        : 0,
+      phase10FrontierAllocationCount,
+      phase10FrontierRetained,
+      phase10FrontierRecall: phase10FrontierAllocationCount
+        ? +(phase10FrontierRetained / phase10FrontierAllocationCount).toFixed(4)
+        : null,
+      phase10RequiredBaseCount,
+      phase10RequiredBasesRetained,
+      phase10BaseRecall: phase10RequiredBaseCount
+        ? +(phase10RequiredBasesRetained / phase10RequiredBaseCount).toFixed(4)
+        : null,
+      safeToFilterObservedPhase10Frontier: session.runs.length > 0
+        && session.runs.every((run) => run.safeToFilterObservedPhase10Frontier),
+      errors: session.runs.reduce((sum, run) => sum + run.errors, 0),
+      runs: session.runs,
+    });
+
+    const attach = (candidate) => {
+      if (!candidate || typeof candidate !== "object") return;
+      candidate.constructionV2 = {
+        ...(candidate.constructionV2 || {}),
+        preallocationStructuralFrontierPortfolio: session.aggregate,
+      };
+    };
+    for (const previousResult of session.results) {
+      attach(previousResult);
+      for (const candidate of previousResult.__completePipelineFrontierV1?.candidates || []) attach(candidate);
+    }
+    return result;
   }
 
   function generatePortfolio(...args) {
@@ -356,27 +487,60 @@
       }
 
       const result = originalGeneratePortfolio(...args);
-      const selection = selectStructuralFrontier(observations, width());
+      const requestedWidth = width();
+      const baseObservations = observations.filter((observation) => !isVictimObservation(observation));
+      const victimObservations = observations.filter(isVictimObservation);
+      const baseSelection = selectStructuralFrontier(baseObservations, requestedWidth);
+      const retainedBaseKeys = new Set(baseSelection.members.map((observation) => provenanceKey(observation.provenance)));
+      const eligibleVictimObservations = victimObservations.filter((observation) => (
+        retainedBaseKeys.has(provenanceKey(observation.provenance))
+      ));
+      const selection = selectStructuralFrontier(
+        [...baseSelection.members, ...eligibleVictimObservations],
+        requestedWidth,
+      );
       const retainedIndexes = new Set(selection.members.map((entry) => entry.allocationIndex));
-      const phase10Indexes = phase10FrontierIndexes(result, observations);
+      const phase10Observations = phase10FrontierObservations(result, observations);
+      const phase10Indexes = phase10Observations.map((observation) => observation.allocationIndex).sort((a, b) => a - b);
       const phase10Retained = phase10Indexes.filter((index) => retainedIndexes.has(index));
+      const phase10RequiredBaseKeys = [...new Set(phase10Observations.map((observation) => (
+        provenanceKey(observation.provenance)
+      )))].sort();
+      const phase10RequiredBasesRetained = phase10RequiredBaseKeys.filter((key) => retainedBaseKeys.has(key));
       const allocationElapsedMs = observations.reduce((sum, entry) => sum + entry.allocationElapsedMs, 0);
       const estimatorElapsedMs = observations.reduce((sum, entry) => sum + entry.estimatorElapsedMs, 0);
       const projectedCallsSaved = Math.max(0, observations.length - selection.members.length);
       const projectedAllocationElapsedMsSaved = observations
         .filter((entry) => !retainedIndexes.has(entry.allocationIndex))
         .reduce((sum, entry) => sum + entry.allocationElapsedMs, 0);
+      const phase10FrontierRecall = phase10Indexes.length
+        ? +(phase10Retained.length / phase10Indexes.length).toFixed(4)
+        : null;
+      const phase10BaseRecall = phase10RequiredBaseKeys.length
+        ? +(phase10RequiredBasesRetained.length / phase10RequiredBaseKeys.length).toFixed(4)
+        : null;
       const telemetry = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         mode: currentMode,
         authoritative: false,
         estimator: "regional-bounds-local-delta-v1",
         boundary: "immediately-before-assignClueTextCellsV2",
+        stageModel: "base-frontier-then-victim-frontier-v1",
         width: selection.width,
         allocationCalls: observations.length,
         estimatorElapsedMs: +estimatorElapsedMs.toFixed(3),
         allocationElapsedMs: +allocationElapsedMs.toFixed(3),
         structuralEvaluations: observations.length - errors.filter((entry) => entry.stage === "estimate").length,
+        baseFrontier: {
+          width: baseSelection.width,
+          considered: baseSelection.considered,
+          retained: baseSelection.retained,
+          members: baseSelection.members.map(compactObservation),
+          rejected: baseSelection.rejected,
+        },
+        observedVictimVariants: victimObservations.length,
+        eligibleObservedVictimVariants: eligibleVictimObservations.length,
+        observedVictimCoverageLimitedToPhase10Generation: true,
         retained: selection.retained,
         projectedCallsSaved,
         projectedCallReduction: observations.length
@@ -388,10 +552,13 @@
           : 0,
         phase10FrontierAllocationIndexes: phase10Indexes,
         phase10FrontierRetained: phase10Retained.length,
-        phase10FrontierRecall: phase10Indexes.length
-          ? +(phase10Retained.length / phase10Indexes.length).toFixed(4)
-          : null,
-        safeToFilterObservedPhase10Frontier: phase10Indexes.length > 0 && phase10Retained.length === phase10Indexes.length,
+        phase10FrontierRecall,
+        phase10RequiredBaseKeys,
+        phase10RequiredBasesRetained: phase10RequiredBasesRetained.length,
+        phase10BaseRecall,
+        safeToFilterObservedPhase10Frontier: phase10Indexes.length > 0
+          && phase10Retained.length === phase10Indexes.length
+          && phase10RequiredBasesRetained.length === phase10RequiredBaseKeys.length,
         members: selection.members.map(compactObservation),
         rejected: selection.rejected,
         errors,
@@ -401,7 +568,8 @@
         enumerable: false,
         configurable: true,
       });
-      return attachTelemetry(result, telemetry);
+      const attached = attachTelemetry(result, telemetry);
+      return attachPortfolioAggregate(attached, telemetry, args);
     } finally {
       if (originalAssign) solver.assignClueTextCellsV2 = originalAssign;
       if (originalBuild) solver.buildAttempt = originalBuild;
