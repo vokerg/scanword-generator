@@ -97,6 +97,7 @@ const summary = {
   stageRuntime: result.constructionV2?.explicitStageRuntime || null,
   completePipelineFrontier: result.constructionV2?.completePipelineFrontier || null,
   preallocationStructuralFrontier: result.constructionV2?.preallocationStructuralFrontier || null,
+  preallocationStructuralFrontierPortfolio: result.constructionV2?.preallocationStructuralFrontierPortfolio || null,
   retirementAudit: global.ScanwordWrapperRetirementAuditV1?.snapshot?.() || null,
 };
 console.log(JSON.stringify(summary));
