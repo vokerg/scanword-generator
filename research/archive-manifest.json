@@ -3,7 +3,7 @@
   "status": "active",
   "auditedDate": "2026-07-24",
   "mainRef": "refs/remotes/origin/main",
-  "auditedMainCommit": "8ae6f69df60eba4a0fc36399a42ab3418c77edae",
+  "auditedMainCommit": "c09c1694c9656f5003a823085d57663a641f57ed",
   "policy": {
     "historicalBranchNamesAreLabelsUnlessListed": true,
     "requiredRefsMustResolveExactly": true,
