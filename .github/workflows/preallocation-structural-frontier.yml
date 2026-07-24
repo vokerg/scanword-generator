@@ -91,12 +91,11 @@ jobs:
     timeout-minutes: 180
     env:
       SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      SCANWORD_PREALLOCATION_CONCURRENCY: 1
-      SCANWORD_PREALLOCATION_SEED_LIMIT: 1
-      SCANWORD_PREALLOCATION_FILTER_RUNTIME_RATIO: 1.15
+      SCANWORD_PREALLOCATION_CONCURRENCY: 4
+      SCANWORD_PREALLOCATION_FILTER_RUNTIME_RATIO: 1.05
       SCANWORD_PREALLOCATION_SEED_TIMEOUT_MS: 1200000
       SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER_WIDTH: 96
-      SCANWORD_PREALLOCATION_MIN_CALL_REDUCTION: 0.25
+      SCANWORD_PREALLOCATION_MIN_CALL_REDUCTION: 0.40
     steps:
       - name: Check out exact candidate head
         uses: actions/checkout@v4
@@ -108,7 +107,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Run one locked filter smoke seed
+      - name: Run locked development-20 filter checkpoint
         run: |
           set -o pipefail
           test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
