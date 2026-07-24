@@ -49,6 +49,7 @@ const scripts = [
   "construction-portfolio.js",
   "construction-preallocation-frontier-v1.js",
   "construction-preallocation-repair-potential-v1.js",
+  "construction-preallocation-ranked-frontier-v1.js",
   "construction-polish.js",
   "construction-clue-repack.js",
   "construction-clue-adaptive.js",
@@ -108,7 +109,7 @@ Module._load = function loadCanonicalBenchmarkDependency(request, parent, isMain
 };
 
 window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
-  version: 5,
+  version: 6,
   bulkEnabled,
   entry,
   scripts,
@@ -122,6 +123,7 @@ window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
   stageSourceAnchor: "construction-stage-source-anchor-v2",
   preallocationStructuralFrontier: "construction-preallocation-frontier-v1",
   preallocationRepairPotential: "construction-preallocation-repair-potential-v1",
+  preallocationRankedFrontier: "construction-preallocation-ranked-frontier-v1",
   stageRuntime: "construction-stage-runtime-v2",
   wrapperRetirementAudit: "construction-wrapper-retirement-audit-v1",
 };
