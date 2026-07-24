@@ -34,7 +34,7 @@ function install() {
   ];
   global.ScanwordSolver = {
     buildAttempt() {
-      return states[build++];
+      return states[build++ % states.length];
     },
     cloneVictimState(input) {
       return input;
@@ -76,11 +76,14 @@ try {
   process.env.SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER = "shadow";
   process.env.SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER_WIDTH = "3";
   const { calls } = install();
+  process.env.SCANWORD_ACTIVE_POOL_LIMIT = "2500";
   const result = global.ScanwordSolver.generatePortfolio("fixture", 1, 1, 1, 1);
   const telemetry = result.constructionV2.preallocationStructuralFrontier;
   assert.deepEqual(calls, ["a", "b", "v"]);
   assert.equal(telemetry.mode, "shadow");
   assert.equal(telemetry.authoritative, false);
+  assert.equal(telemetry.stageModel, "base-frontier-then-victim-frontier-v1");
+  assert.equal(telemetry.baseFrontier.retained, 2);
   assert.equal(telemetry.allocationCalls, 3);
   assert.equal(telemetry.retained, 3);
   assert.equal(telemetry.phase10FrontierRecall, 1);
@@ -88,6 +91,17 @@ try {
   assert.equal(telemetry.members.some((entry) => entry.provenance.source.startsWith("build-attempt")), true);
   assert.equal(telemetry.members.some((entry) => entry.provenance.source === "victim-replacement"), true);
   assert.equal(global.ScanwordSolver.selectPreallocationStructuralFrontierV1(telemetry.__observations, 1).members.length, 1);
+  const firstAggregate = result.constructionV2.preallocationStructuralFrontierPortfolio;
+  assert.equal(firstAggregate.runCount, 1);
+  process.env.SCANWORD_ACTIVE_POOL_LIMIT = "3500";
+  const second = global.ScanwordSolver.generatePortfolio("fixture", 1, 1, 1, 1);
+  assert.equal(firstAggregate.runCount, 2);
+  assert.equal(second.constructionV2.preallocationStructuralFrontierPortfolio, firstAggregate);
+  assert.equal(firstAggregate.allocationCalls, 6);
+  assert.equal(firstAggregate.safeToFilterObservedPhase10Frontier, true);
+  process.env.SCANWORD_ACTIVE_POOL_LIMIT = "2500";
+  const reset = global.ScanwordSolver.generatePortfolio("fixture", 1, 1, 1, 1);
+  assert.equal(reset.constructionV2.preallocationStructuralFrontierPortfolio.runCount, 1);
 
   process.env.SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER = "off";
   install();
@@ -97,4 +111,5 @@ try {
 } finally {
   delete process.env.SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER;
   delete process.env.SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER_WIDTH;
+  delete process.env.SCANWORD_ACTIVE_POOL_LIMIT;
 }
