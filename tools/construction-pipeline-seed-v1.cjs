@@ -61,6 +61,7 @@ const grid = normalizedGrid(result);
 const placed = normalizedPlaced(result);
 const cluePayload = placed.map(({ answer, clue, hasExactClue }) => ({ answer, clue, hasExactClue }));
 const editorial = global.ScanwordEditorialLexicalPolicyV3?.summarize?.(result.placed || []) || {};
+const constructionV2 = result.constructionV2 || {};
 const summary = {
   seed,
   mode: String(process.env.SCANWORD_EXPLICIT_PIPELINE || "off").toLowerCase(),
@@ -93,21 +94,28 @@ const summary = {
       id, answer, direction, clueRow, clueCol, startRow, startCol, cells,
     })),
   }),
+  constructionV2Mode: constructionV2.mode || null,
+  constructionV2Error: constructionV2.error || constructionV2.explicitStageRuntimeError || null,
   pipeline: result.constructionPipelineV1 || null,
-  stageRuntime: result.constructionV2?.explicitStageRuntime || null,
-  completePipelineFrontier: result.constructionV2?.completePipelineFrontier || null,
-  preallocationStructuralFrontier: result.constructionV2?.preallocationStructuralFrontier || null,
+  stageRuntime: constructionV2.explicitStageRuntime || null,
+  completePipelineFrontier: constructionV2.completePipelineFrontier || null,
+  preallocationStructuralFrontier: constructionV2.preallocationStructuralFrontier || null,
   preallocationStructuralFrontierPortfolio: global.ScanwordPreallocationStructuralFrontierV1?.currentPortfolioAggregate?.()
-    || result.constructionV2?.preallocationStructuralFrontierPortfolio
+    || constructionV2.preallocationStructuralFrontierPortfolio
     || null,
-  preallocationRepairPotentialFrontier: result.constructionV2?.preallocationRepairPotentialFrontier || null,
+  preallocationRepairPotentialFrontier: constructionV2.preallocationRepairPotentialFrontier || null,
   preallocationRepairPotentialFrontierPortfolio: global.ScanwordPreallocationRepairPotentialV1?.currentPortfolioAggregate?.()
-    || result.constructionV2?.preallocationRepairPotentialFrontierPortfolio
+    || constructionV2.preallocationRepairPotentialFrontierPortfolio
     || null,
-  preallocationRankedFrontier: result.constructionV2?.preallocationRankedFrontier || null,
+  preallocationRankedFrontier: constructionV2.preallocationRankedFrontier || null,
   preallocationRankedFrontierPortfolio: global.ScanwordPreallocationRankedFrontierV1?.currentPortfolioAggregate?.()
-    || result.constructionV2?.preallocationRankedFrontierPortfolio
+    || constructionV2.preallocationRankedFrontierPortfolio
     || null,
+  preallocationInstallation: {
+    structural: Boolean(global.ScanwordSolver.__preallocationStructuralFrontierV1Installed),
+    repairPotential: Boolean(global.ScanwordSolver.__preallocationRepairPotentialV1Installed),
+    ranked: Boolean(global.ScanwordSolver.__preallocationRankedFrontierV1Installed),
+  },
   retirementAudit: global.ScanwordWrapperRetirementAuditV1?.snapshot?.() || null,
 };
 console.log(JSON.stringify(summary));
