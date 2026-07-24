@@ -11,8 +11,12 @@ const baselineConfigFile = path.join(root, "research/baselines/v8-production-1.1
 const seedPayload = JSON.parse(fs.readFileSync(seedFile, "utf8"));
 const baselineConfig = JSON.parse(fs.readFileSync(baselineConfigFile, "utf8"));
 const canonicalEnvironment = baselineConfig.environment || {};
-const seeds = Array.isArray(seedPayload) ? seedPayload : seedPayload.seeds;
-if (!Array.isArray(seeds) || !seeds.length) throw new Error(`No seeds found in ${seedFile}`);
+const allSeeds = Array.isArray(seedPayload) ? seedPayload : seedPayload.seeds;
+if (!Array.isArray(allSeeds) || !allSeeds.length) throw new Error(`No seeds found in ${seedFile}`);
+const seedLimit = Math.max(1, Math.min(allSeeds.length, Math.floor(Number(
+  process.env.SCANWORD_PREALLOCATION_SEED_LIMIT || allSeeds.length,
+))));
+const seeds = allSeeds.slice(0, seedLimit);
 
 const concurrency = Math.max(1, Math.floor(Number(process.env.SCANWORD_PREALLOCATION_CONCURRENCY || 4)));
 const timeoutMs = Math.max(60_000, Math.floor(Number(process.env.SCANWORD_PREALLOCATION_SEED_TIMEOUT_MS || 1_200_000)));
@@ -86,6 +90,10 @@ function compact(summary) {
     placedDigest: summary.placedDigest,
     clueDigest: summary.clueDigest,
     geometryDigest: summary.geometryDigest,
+    constructionV2Mode: summary.constructionV2Mode || null,
+    constructionV2Error: summary.constructionV2Error || null,
+    preallocationInstallation: summary.preallocationInstallation || null,
+    stageRuntime: summary.stageRuntime || null,
   };
 }
 
@@ -136,7 +144,7 @@ async function worker() {
       );
       const recallValid = !requireCurrentRecall || telemetry?.safeToFilterObservedPhase10Frontier === true;
       results[index] = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         seed,
         status: exactParity && telemetryValid && recallValid ? "ok" : "failed",
         baseline: compact(baseline),
@@ -152,7 +160,7 @@ async function worker() {
       };
     } catch (error) {
       results[index] = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         seed,
         status: "error",
         error: String(error?.stack || error),
@@ -205,11 +213,13 @@ async function worker() {
   const passed = failures.length === 0 && runtimeRatio <= runtimeCap;
   const summary = {
     type: "summary",
-    schemaVersion: 1,
+    schemaVersion: 2,
     phase: "preallocation-ranked-frontier-shadow-v1",
     baselineId: baselineConfig.baselineId,
     seedSet: seedPayload.name || path.basename(seedFile),
+    availableSeeds: allSeeds.length,
     seeds: results.length,
+    seedLimit,
     passedSeeds: results.length - failures.length,
     failures: failures.length,
     executedSeeds: executed.length,
