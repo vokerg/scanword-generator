@@ -1,0 +1,101 @@
+name: Preallocation structural frontier
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - construction-preallocation-frontier-v1.js
+      - index.html
+      - tools/construction-pipeline-seed-v1.cjs
+      - tools/preallocation-structural-frontier-test-v1.cjs
+      - tools/preallocation-structural-frontier-checkpoint-v1.cjs
+      - tools/node-benchmark-bootstrap-v1.cjs
+      - research/preallocation-structural-frontier/**
+      - .github/workflows/preallocation-structural-frontier.yml
+  workflow_dispatch:
+
+concurrency:
+  group: preallocation-structural-frontier-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check Phase 11 syntax and default-off boundary
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          node --check construction-preallocation-frontier-v1.js
+          node --check tools/preallocation-structural-frontier-test-v1.cjs
+          node --check tools/preallocation-structural-frontier-checkpoint-v1.cjs
+          node --check tools/construction-pipeline-seed-v1.cjs
+          node --check tools/node-benchmark-bootstrap-v1.cjs
+          grep -q 'SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER = "off"' index.html
+          grep -q 'construction-preallocation-frontier-v1.js' index.html
+          grep -q 'construction-preallocation-frontier-v1.js' tools/node-benchmark-bootstrap-v1.cjs
+
+      - name: Test deterministic shadow contracts
+        run: node tools/preallocation-structural-frontier-test-v1.cjs
+
+      - name: Preserve accepted Phase 10 contracts
+        run: |
+          node tools/complete-pipeline-frontier-test-v1.cjs
+          node tools/construction-stage-runtime-test-v2.cjs
+          node tools/wrapper-retirement-test-v1.cjs
+
+  development-shadow:
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_PREALLOCATION_CONCURRENCY: 4
+      SCANWORD_PREALLOCATION_RUNTIME_RATIO: 1.12
+      SCANWORD_PREALLOCATION_SEED_TIMEOUT_MS: 1200000
+      SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER_WIDTH: 16
+      SCANWORD_PREALLOCATION_REQUIRE_PHASE10_RECALL: 1
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run locked development-20 shadow checkpoint
+        run: |
+          set -o pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          mkdir -p research-output/preallocation-structural-frontier
+          node tools/preallocation-structural-frontier-checkpoint-v1.cjs \
+            research/baselines/seed-sets/development-20.json \
+            research-output/preallocation-structural-frontier/development-20.jsonl \
+            | tee research-output/preallocation-structural-frontier/development-console.jsonl
+
+      - name: Publish development evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preallocation-structural-frontier-development-${{ env.SOURCE_SHA }}
+          path: research-output/preallocation-structural-frontier/
+          if-no-files-found: error
