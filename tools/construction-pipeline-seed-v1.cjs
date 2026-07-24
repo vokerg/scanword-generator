@@ -65,6 +65,7 @@ const summary = {
   seed,
   mode: String(process.env.SCANWORD_EXPLICIT_PIPELINE || "off").toLowerCase(),
   frontierMode: String(process.env.SCANWORD_COMPLETE_PIPELINE_FRONTIER || "off").toLowerCase(),
+  preallocationMode: String(process.env.SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER || "off").toLowerCase(),
   elapsedMs: Date.now() - started,
   valid: Boolean(result.validation?.valid),
   components: Number(result.components || 0),
@@ -95,6 +96,10 @@ const summary = {
   pipeline: result.constructionPipelineV1 || null,
   stageRuntime: result.constructionV2?.explicitStageRuntime || null,
   completePipelineFrontier: result.constructionV2?.completePipelineFrontier || null,
+  preallocationStructuralFrontier: result.constructionV2?.preallocationStructuralFrontier || null,
+  preallocationStructuralFrontierPortfolio: global.ScanwordPreallocationStructuralFrontierV1?.currentPortfolioAggregate?.()
+    || result.constructionV2?.preallocationStructuralFrontierPortfolio
+    || null,
   retirementAudit: global.ScanwordWrapperRetirementAuditV1?.snapshot?.() || null,
 };
 console.log(JSON.stringify(summary));

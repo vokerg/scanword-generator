@@ -47,6 +47,7 @@ const scripts = [
   "construction-victim-depth2.js",
   "construction-stage-source-anchor-v2.js",
   "construction-portfolio.js",
+  "construction-preallocation-frontier-v1.js",
   "construction-polish.js",
   "construction-clue-repack.js",
   "construction-clue-adaptive.js",
@@ -106,7 +107,7 @@ Module._load = function loadCanonicalBenchmarkDependency(request, parent, isMain
 };
 
 window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
-  version: 3,
+  version: 4,
   bulkEnabled,
   entry,
   scripts,
@@ -118,6 +119,7 @@ window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
   boundedPartialSearchFallback: "construction-bounded-partial-search-fallback-v1",
   adaptivePartialSearch: "construction-vocabulary-portfolio-v1",
   stageSourceAnchor: "construction-stage-source-anchor-v2",
+  preallocationStructuralFrontier: "construction-preallocation-frontier-v1",
   stageRuntime: "construction-stage-runtime-v2",
   wrapperRetirementAudit: "construction-wrapper-retirement-audit-v1",
 };
