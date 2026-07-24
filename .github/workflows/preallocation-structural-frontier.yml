@@ -84,7 +84,8 @@ jobs:
     timeout-minutes: 180
     env:
       SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      SCANWORD_PREALLOCATION_CONCURRENCY: 4
+      SCANWORD_PREALLOCATION_CONCURRENCY: 1
+      SCANWORD_PREALLOCATION_SEED_LIMIT: 1
       SCANWORD_PREALLOCATION_RUNTIME_RATIO: 1.12
       SCANWORD_PREALLOCATION_SEED_TIMEOUT_MS: 1200000
       SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER_WIDTH: 16
@@ -101,7 +102,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Run locked development-20 rank-only width sweep
+      - name: Run one locked rank-only debug seed
         run: |
           set -o pipefail
           test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
