@@ -111,10 +111,12 @@ const summary = {
   preallocationRankedFrontierPortfolio: global.ScanwordPreallocationRankedFrontierV1?.currentPortfolioAggregate?.()
     || constructionV2.preallocationRankedFrontierPortfolio
     || null,
+  preallocationFilter: constructionV2.preallocationFilter || null,
   preallocationInstallation: {
     structural: Boolean(global.ScanwordSolver.__preallocationStructuralFrontierV1Installed),
     repairPotential: Boolean(global.ScanwordSolver.__preallocationRepairPotentialV1Installed),
     ranked: Boolean(global.ScanwordSolver.__preallocationRankedFrontierV1Installed),
+    filter: Boolean(global.ScanwordSolver.__preallocationFilterV1Installed),
   },
   retirementAudit: global.ScanwordWrapperRetirementAuditV1?.snapshot?.() || null,
 };
