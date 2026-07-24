@@ -30,10 +30,15 @@ In `shadow` mode the module:
 1. observes each structural state immediately before `assignClueTextCellsV2`;
 2. evaluates the existing `regional-bounds-local-delta-v1` estimator;
 3. records deterministic provenance for build attempts, baseline fallbacks and victim-replacement variants;
-4. constructs a bounded hypothetical structural frontier;
-5. runs every exact allocation exactly as Phase 10 does;
-6. attaches telemetry without changing candidate selection or output;
-7. measures exact allocation calls, allocation time, projected calls/time saved and recall of the accepted Phase 10 construction frontier.
+4. constructs a bounded base-state frontier before considering victim variants;
+5. admits only victim variants whose parent base survived that first stage, then constructs the final structural frontier;
+6. runs every exact allocation exactly as Phase 10 does;
+7. aggregates telemetry across every seed-specific vocabulary working set without changing candidate selection or output;
+8. measures exact allocation calls, allocation time, projected calls/time saved, parent-base recall and final recall of the accepted Phase 10 construction frontier.
+
+The staged model mirrors the implementable dependency chain: base structural retention must precede victim generation. It does not use a flat frontier that can retain a victim while discarding its parent. Observed victim coverage is explicitly limited to variants that Phase 10 generated; authoritative filtering would generate victim variants from the retained base frontier before the final structural decision.
+
+Telemetry is also aggregated across the complete vocabulary portfolio, so reported allocation savings cover both canonical 2,500- and 3,500-entry working-set runs rather than only the finally selected run.
 
 The heavy observation objects are non-enumerable. Normal result payloads contain compact vectors, provenance and rejection reasons only.
 
@@ -77,7 +82,9 @@ The shadow checkpoint requires:
 - estimator telemetry for every exact allocation call;
 - a bounded hypothetical frontier;
 - projected allocation-call savings;
+- full recall of all parent bases required by Phase 10 victim finalists;
 - full recall of all Phase 10 construction-frontier members when recall gating is enabled;
+- portfolio-wide accounting across all canonical working-set runs;
 - aggregate runtime ratio no greater than the configured cap.
 
 This is not a promotion gate. A shadow result cannot reduce real work and must not be presented as a production optimization.
