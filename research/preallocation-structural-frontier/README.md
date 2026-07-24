@@ -44,7 +44,7 @@ The heavy observation objects are non-enumerable. Normal result payloads contain
 
 ## Structural vector
 
-The shadow frontier uses explicit dimensions rather than a weighted scalar:
+The first shadow frontier used explicit dimensions rather than a weighted scalar:
 
 ```text
 necessary feasibility pass
@@ -59,16 +59,68 @@ overlap and maximum-cell pressure
 
 Deterministic allocation order is the final tie-breaker.
 
+## Rejected checkpoint A — estimator-first width 16
+
+Exact implementation head:
+
+```text
+b577dc849aaa36f1b9777c9792e120e38ba2eb8c
+```
+
+Workflow run: `30091733180`  
+Artifact: `8596292320`  
+Artifact digest: `sha256:73b78c9d1707cc2f25230c76eced026919e88e820568bfa82d119cb206343d11`
+
+The locked development-20 run produced exact complete-output parity on all 20 seeds. All per-seed output differences were empty, all outputs were valid, connected and exact-clue-only, and aggregate shadow runtime was `0.9825x` the off baseline.
+
+The hypothesis failed decisively on recall:
+
+| metric | result |
+| --- | ---: |
+| exact allocation calls observed | 10,321 |
+| hypothetical calls removed at width 16 | 9,681 (93.80%) |
+| measured allocation time represented by removed calls | 92.75% |
+| Phase 10 frontier members retained | 4 / 160 (2.50%) |
+| Phase 10 required parent bases retained | 4 / 101 (3.96%) |
+| seeds with full Phase 10 recall | 0 / 20 |
+
+The estimator-first truncation favored sparse states with low zero-domain and long-impossible counts. Phase 10 winners were commonly denser states with more residual estimator debt but much stronger repair potential. The projected savings were therefore unsafe and must not be promoted.
+
+The original checkpoint aggregate incorrectly discarded parity, runtime and allocation totals when recall failed. The per-seed evidence remained intact; the harness is corrected in the next checkpoint so negative results retain all measured data.
+
+## Hypothesis B — repair-potential-first truncation
+
+`construction-preallocation-repair-potential-v1.js` adds a second shadow-only diagnostic over the same observations. It preserves the rejected estimator-first record and changes only the hypothetical width ordering:
+
+```text
+fewer panels
+more letters, answers and crossings
+better residual topology
+then feasibility bounds and pressure
+```
+
+The estimator remains present as advisory dimensions and necessary-bound telemetry, but it no longer outranks the accepted Phase 10 repair-potential geometry during width truncation.
+
+The diagnostic reports a deterministic width sweep:
+
+```text
+8, 16, 24, 32, 48, 64, 96, 128, 192, 256
+```
+
+The next locked development checkpoint must establish whether any bounded width reaches full parent and Phase 10 frontier recall while preserving meaningful allocation savings. If no useful width does, the pre-allocation estimator boundary is rejected and Phase 10 remains unchanged.
+
 ## Development gate
 
 Run:
 
 ```bash
 node tools/preallocation-structural-frontier-test-v1.cjs
+node tools/preallocation-repair-potential-test-v1.cjs
 
 SCANWORD_PREALLOCATION_CONCURRENCY=4 \
 SCANWORD_PREALLOCATION_RUNTIME_RATIO=1.12 \
 SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER_WIDTH=16 \
+SCANWORD_PREALLOCATION_DIAGNOSTIC_WIDTHS=8,16,24,32,48,64,96,128,192,256 \
 SCANWORD_PREALLOCATION_REQUIRE_PHASE10_RECALL=1 \
   node tools/preallocation-structural-frontier-checkpoint-v1.cjs \
   research/baselines/seed-sets/development-20.json \
@@ -91,4 +143,4 @@ This is not a promotion gate. A shadow result cannot reduce real work and must n
 
 ## Next decision
 
-If development-20 shows full Phase 10 frontier recall with meaningful projected savings, implement a separately gated filtering mode that allocates only retained structural finalists and preserves an explicit Phase 10 rollback. If recall is incomplete, preserve the evidence and revise the vector or boundary before any authoritative filtering.
+If the repair-potential development sweep shows full Phase 10 frontier recall with meaningful projected savings, freeze the smallest safe width and implement a separately gated filtering mode that allocates only retained structural finalists with an explicit Phase 10 rollback. If recall remains incomplete at useful widths, preserve the negative result and reject or redesign the pre-allocation boundary before any authoritative filtering.
