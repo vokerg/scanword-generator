@@ -99,6 +99,7 @@ try {
   assert.equal(second.constructionV2.preallocationStructuralFrontierPortfolio, firstAggregate);
   assert.equal(firstAggregate.allocationCalls, 6);
   assert.equal(firstAggregate.safeToFilterObservedPhase10Frontier, true);
+  assert.equal(global.ScanwordPreallocationStructuralFrontierV1.currentPortfolioAggregate(), firstAggregate);
   process.env.SCANWORD_ACTIVE_POOL_LIMIT = "2500";
   const reset = global.ScanwordSolver.generatePortfolio("fixture", 1, 1, 1, 1);
   assert.equal(reset.constructionV2.preallocationStructuralFrontierPortfolio.runCount, 1);
