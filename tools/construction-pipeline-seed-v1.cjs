@@ -100,6 +100,10 @@ const summary = {
   preallocationStructuralFrontierPortfolio: global.ScanwordPreallocationStructuralFrontierV1?.currentPortfolioAggregate?.()
     || result.constructionV2?.preallocationStructuralFrontierPortfolio
     || null,
+  preallocationRepairPotentialFrontier: result.constructionV2?.preallocationRepairPotentialFrontier || null,
+  preallocationRepairPotentialFrontierPortfolio: global.ScanwordPreallocationRepairPotentialV1?.currentPortfolioAggregate?.()
+    || result.constructionV2?.preallocationRepairPotentialFrontierPortfolio
+    || null,
   retirementAudit: global.ScanwordWrapperRetirementAuditV1?.snapshot?.() || null,
 };
 console.log(JSON.stringify(summary));
