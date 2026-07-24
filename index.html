@@ -10,11 +10,11 @@
   <main class="app-shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">ARROWORD GENERATOR · VOCABULARY-FIRST 1.1</p>
+        <p class="eyebrow">ARROWORD GENERATOR · COMPLETE FRONTIER 1.3</p>
         <h1>Dense, structurally valid arrowword grids</h1>
         <p class="lead">
           Builds one connected answer graph from an attributed Russian corpus, compares bounded seed-specific working
-          sets, and applies a same-geometry editorial cleanup before selecting the final grid.
+          sets, and carries a repair-potential frontier through the complete clue and repair pipeline.
         </p>
       </div>
       <div class="badge">A5<br />SVG + JSON</div>
@@ -38,9 +38,9 @@
         <div class="button-grid"><button id="downloadSvg">Download SVG</button><button id="downloadJson">Download JSON</button></div>
         <div id="stats" class="stats" aria-live="polite"></div>
         <div class="note">
-          <strong>Vocabulary-first 1.1:</strong> 40,966 attributed entries are available before construction, including
-          filtered natural and administrative entities. The explicit production pipeline compares 2,500- and 3,500-entry
-          working sets panel-first, then removes avoidable formulaic short fill without changing the selected geometry.
+          <strong>Complete frontier 1.3:</strong> 40,966 attributed entries feed deterministic 2,500- and 3,500-entry
+          working sets. Up to four non-dominated repair-potential candidates complete clue allocation, repair, editorial
+          cleanup and validation before the final panel-first decision.
         </div>
       </aside>
       <section class="preview-panel">
@@ -66,6 +66,8 @@
     window.SCANWORD_EXPLICIT_PIPELINE = "on";
     window.SCANWORD_PIPELINE_STAGE_RUNTIME = "explicit";
     window.SCANWORD_WRAPPER_INSTALLATION_LOCK = "explicit-pipeline-v1";
+    window.SCANWORD_COMPLETE_PIPELINE_FRONTIER = "on";
+    window.SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH = 4;
     window.SCANWORD_FULL_CORPUS_RETRIEVAL = "off";
     window.SCANWORD_FULL_CORPUS_RETRIEVAL_MODE = "empty";
     window.SCANWORD_CLUE_FEASIBILITY = "off";

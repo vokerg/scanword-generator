@@ -29,6 +29,14 @@
     return Number.isFinite(value) && value >= 0 ? Math.floor(value) : fallback;
   }
 
+  function frontierEnabled() {
+    return String(environmentOption("SCANWORD_COMPLETE_PIPELINE_FRONTIER", "off")).toLowerCase() === "on";
+  }
+
+  function frontierWidth() {
+    return Math.min(8, Math.max(1, numericOption("SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH", 4)));
+  }
+
   function countWeakFill(placed, poolByAnswer) {
     return placed.reduce((total, word) => total + Number(Boolean(poolByAnswer.get(word.answer)?.weakFill)), 0);
   }
@@ -105,6 +113,123 @@
       || String(a.partialSearchVariant).localeCompare(String(b.partialSearchVariant));
   }
 
+  function frontierVector(candidate, poolByAnswer) {
+    const panels = Number(candidate.panelCells || 0);
+    const largestPanelRegion = Number(candidate.largestPanelRegion || 0);
+    return {
+      panels,
+      letters: Number(candidate.letterCells || 0),
+      weakFill: countWeakFill(candidate.placed || [], poolByAnswer),
+      clueTextCells: Number(candidate.clueTextCells || 0),
+      externalClues: Number(candidate.externalClueTexts || 0),
+      crossings: Number(candidate.intersections || 0),
+      answers: Number(candidate.placed?.length || 0),
+      panelRegions: Number(candidate.panelRegions || 0),
+      isolatedPanels: Number(candidate.isolatedPanels || 0),
+      largestPanelRegion,
+      residualConcentration: panels > 0 ? +(largestPanelRegion / panels).toFixed(6) : 1,
+    };
+  }
+
+  function dominatesVector(first, second) {
+    const noWorse = first.panels <= second.panels
+      && first.letters >= second.letters
+      && first.weakFill <= second.weakFill
+      && first.clueTextCells <= second.clueTextCells
+      && first.externalClues >= second.externalClues
+      && first.crossings >= second.crossings
+      && first.answers >= second.answers
+      && first.panelRegions <= second.panelRegions
+      && first.isolatedPanels <= second.isolatedPanels
+      && first.residualConcentration >= second.residualConcentration;
+    if (!noWorse) return false;
+    return first.panels < second.panels
+      || first.letters > second.letters
+      || first.weakFill < second.weakFill
+      || first.clueTextCells < second.clueTextCells
+      || first.externalClues > second.externalClues
+      || first.crossings > second.crossings
+      || first.answers > second.answers
+      || first.panelRegions < second.panelRegions
+      || first.isolatedPanels < second.isolatedPanels
+      || first.residualConcentration > second.residualConcentration;
+  }
+
+  function candidateProvenance(candidate, sourceIndex) {
+    return {
+      sourceIndex,
+      attempt: Number(candidate.attempt || 0),
+      attemptNumber: Number(candidate.attempt || 0) + 1,
+      partialSearchVariant: candidate.partialSearchVariant || "default",
+      victimReplacement: candidate.victimReplacement || null,
+      phase6CandidateKey: candidate.phase6CandidateKey || null,
+    };
+  }
+
+  function selectCompletePipelineFrontier(candidates, poolByAnswer, width = frontierWidth()) {
+    const ranked = [...candidates].sort((a, b) => compareCandidates(a, b, poolByAnswer));
+    if (!ranked.length) return { candidates: [], telemetry: { width, considered: 0, retained: 0, rejected: [] } };
+
+    const selected = [ranked[0]];
+    const rejected = [];
+    const vectorByCandidate = new Map(ranked.map((candidate) => [candidate, frontierVector(candidate, poolByAnswer)]));
+
+    for (let index = 1; index < ranked.length; index += 1) {
+      const candidate = ranked[index];
+      const vector = vectorByCandidate.get(candidate);
+      const dominatorIndex = selected.findIndex((retained) => dominatesVector(vectorByCandidate.get(retained), vector));
+      if (dominatorIndex >= 0) {
+        rejected.push({
+          provenance: candidateProvenance(candidate, index),
+          reason: "dominated",
+          dominatedBy: candidateProvenance(selected[dominatorIndex], ranked.indexOf(selected[dominatorIndex])),
+          vector,
+        });
+        continue;
+      }
+
+      for (let selectedIndex = selected.length - 1; selectedIndex >= 1; selectedIndex -= 1) {
+        const retained = selected[selectedIndex];
+        if (!dominatesVector(vector, vectorByCandidate.get(retained))) continue;
+        selected.splice(selectedIndex, 1);
+        rejected.push({
+          provenance: candidateProvenance(retained, ranked.indexOf(retained)),
+          reason: "dominated-by-later-frontier-member",
+          dominatedBy: candidateProvenance(candidate, index),
+          vector: vectorByCandidate.get(retained),
+        });
+      }
+
+      selected.push(candidate);
+      selected.sort((a, b) => compareCandidates(a, b, poolByAnswer));
+      if (selected.length > width) {
+        const removed = selected.pop();
+        rejected.push({
+          provenance: candidateProvenance(removed, ranked.indexOf(removed)),
+          reason: "frontier-width",
+          vector: vectorByCandidate.get(removed),
+        });
+      }
+    }
+
+    return {
+      candidates: selected,
+      telemetry: {
+        schemaVersion: 2,
+        mode: "repair-potential-complete-construction-frontier-v2",
+        width,
+        considered: ranked.length,
+        retained: selected.length,
+        baselinePreserved: selected[0] === ranked[0],
+        members: selected.map((candidate) => ({
+          provenance: candidateProvenance(candidate, ranked.indexOf(candidate)),
+          vector: vectorByCandidate.get(candidate),
+        })),
+        rejected,
+      },
+    };
+  }
+
   function addTelemetry(target, source) {
     for (const key of [
       "victimsConsidered",
@@ -150,6 +275,16 @@
     const checkpointAnswers = Math.max(targetWords, Math.min(40, Math.floor(area / 5)));
     const checkpointPanels = Math.ceil(area * 0.09);
     const checkpointActive = area >= 200 ? 0.90 : 0.88;
+    const coverageCheckpoint = {
+      passed: true,
+      minimumAnswers: checkpointAnswers,
+      minimumActive: checkpointActive,
+      minimumAnswerCoverage: 0.65,
+      minimumClueTextCells: 45,
+      minimumExternalClues: 24,
+      maximumPanels: checkpointPanels,
+      requiredComponents: 1,
+    };
     const passesCheckpoint = (candidate) => Boolean(candidate
       && candidate.placed.length >= checkpointAnswers
       && candidate.fillRatio >= checkpointActive
@@ -282,18 +417,7 @@
 
     candidates.sort((a, b) => compareCandidates(a, b, poolByAnswer));
     const best = candidates[0];
-    best.attemptBudget = attempts;
-    best.coverageCheckpoint = {
-      passed: true,
-      minimumAnswers: checkpointAnswers,
-      minimumActive: checkpointActive,
-      minimumAnswerCoverage: 0.65,
-      minimumClueTextCells: 45,
-      minimumExternalClues: 24,
-      maximumPanels: checkpointPanels,
-      requiredComponents: 1,
-    };
-    best.constructionV2 = {
+    const constructionTelemetryFor = (candidate) => ({
       mode: "portfolio-panel-first-v2",
       attemptsBuilt: attempts,
       attemptOffset,
@@ -304,15 +428,40 @@
       checkpointValid,
       minimumObservedPanels,
       maximumObservedRawLetterCoverage: maximumObservedRawLetters,
-      selectedAttempt: best.attempt + 1,
-      selectedPanels: best.panelCells,
-      selectedRawLetterCoverage: best.rawLetterCoverage,
-      selectedWeakFillCount: countWeakFill(best.placed, poolByAnswer),
-      selectedVictimReplacement: best.victimReplacement || null,
-      selectedPartialSearchVariant: best.partialSearchVariant,
+      selectedAttempt: candidate.attempt + 1,
+      selectedPanels: candidate.panelCells,
+      selectedRawLetterCoverage: candidate.rawLetterCoverage,
+      selectedWeakFillCount: countWeakFill(candidate.placed, poolByAnswer),
+      selectedVictimReplacement: candidate.victimReplacement || null,
+      selectedPartialSearchVariant: candidate.partialSearchVariant,
       victimReplacement: victimTelemetry,
-    };
-    return solver.attachValidationReport(best, seed, {
+    });
+
+    best.attemptBudget = attempts;
+    best.coverageCheckpoint = coverageCheckpoint;
+    best.constructionV2 = constructionTelemetryFor(best);
+
+    const frontierSelection = frontierEnabled()
+      ? selectCompletePipelineFrontier(candidates, poolByAnswer, frontierWidth())
+      : null;
+    if (frontierSelection) {
+      for (const candidate of frontierSelection.candidates) {
+        candidate.attemptBudget = attempts;
+        candidate.coverageCheckpoint = coverageCheckpoint;
+        candidate.constructionV2 = {
+          ...constructionTelemetryFor(candidate),
+          completePipelineConstructionFrontier: frontierSelection.telemetry,
+        };
+        candidate.completePipelineConstructionFrontierV1 = frontierSelection.telemetry;
+      }
+      best.constructionV2 = {
+        ...best.constructionV2,
+        completePipelineConstructionFrontier: frontierSelection.telemetry,
+      };
+      best.completePipelineConstructionFrontierV1 = frontierSelection.telemetry;
+    }
+
+    const validated = solver.attachValidationReport(best, seed, {
       mode: "portfolio-panel-first-v2",
       rollbackDepthUsed: best.victimReplacement?.depth || 0,
       regionsBefore: closedFill.extractResidualRegions(best).length,
@@ -323,6 +472,25 @@
       regionsSolved: best.victimReplacement ? 1 : 0,
       portfolio: best.constructionV2,
     });
+
+    if (frontierSelection) {
+      validated.completePipelineConstructionFrontierV1 = frontierSelection.telemetry;
+      validated.constructionV2 = {
+        ...(validated.constructionV2 || {}),
+        completePipelineConstructionFrontier: frontierSelection.telemetry,
+      };
+      const frontierCandidates = frontierSelection.candidates.map((candidate) => candidate === best ? validated : candidate);
+      Object.defineProperty(validated, "__completePipelineFrontierV1", {
+        value: {
+          schemaVersion: 2,
+          candidates: frontierCandidates,
+          telemetry: frontierSelection.telemetry,
+        },
+        enumerable: false,
+        configurable: true,
+      });
+    }
+    return validated;
   }
 
   solver.generateBest = (...args) => {
@@ -348,6 +516,10 @@
 
   Object.assign(solver, {
     generatePortfolio,
+    selectCompletePipelineFrontierV1: selectCompletePipelineFrontier,
+    completePipelineFrontierVectorV1: frontierVector,
+    completePipelineFrontierDominatesV1: dominatesVector,
+    completePipelineFrontierWidthV1: frontierWidth,
     __constructionPortfolioInstalled: true,
   });
 })();

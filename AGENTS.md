@@ -6,38 +6,56 @@ This file is the canonical operating guide for the repository root and every sub
 
 - `main` is the only long-lived development branch.
 - Accepted baselines live in `docs/milestones/`.
-- Experiments and negative results live in `research/` and must remain reproducible.
-- Runtime behavior is determined by `index.html`, Node bootstrap order, feature flags and the latest milestone, not merely by file presence.
+- Experiments, harness defects and negative results live in `research/` and must remain reproducible.
+- Runtime behavior is determined by `index.html`, Node bootstrap order, explicit environment flags and the latest milestone, not merely by file presence.
 - Never weaken the complete validator to make an experiment pass.
 
 ## Current baseline
 
-Explicit pipeline 1.2:
+Complete frontier 1.3:
 
 ```text
 40,966-entry attributed corpus v8
 -> deterministic active sets at 2,500 and 3,500 entries
--> directly ordered construction, clue and repair runtime
--> same-geometry editorial repair
--> panel-first complete-candidate selection
+-> indexed construction and exact clue allocation
+-> width-four repair-potential frontier
+-> directly ordered clue, repair and editorial runtime per finalist
 -> complete validation
+-> canonical panel-first final comparison
 ```
 
-Canonical defaults:
+Canonical browser defaults:
 
 ```text
 SCANWORD_EXPLICIT_PIPELINE=on
 SCANWORD_PIPELINE_STAGE_RUNTIME=explicit
 SCANWORD_WRAPPER_INSTALLATION_LOCK=explicit-pipeline-v1
+SCANWORD_COMPLETE_PIPELINE_FRONTIER=on
+SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH=4
 SCANWORD_FULL_CORPUS_RETRIEVAL=off
 SCANWORD_CLUE_FEASIBILITY=off
 SCANWORD_PARTIAL_SEARCH=off
 ```
 
-Canonical decision: `docs/milestones/v1.2-explicit-pipeline-default.md`.
+Exact Phase 9 rollback:
+
+```text
+SCANWORD_COMPLETE_PIPELINE_FRONTIER=off
+```
+
+Historical wrapper-chain rollback:
+
+```text
+SCANWORD_EXPLICIT_PIPELINE=off
+```
+
+Node benchmarks must set frontier mode explicitly. Do not silently change locked historical baseline configurations.
+
+Canonical decision: `docs/milestones/v1.3-complete-pipeline-frontier.md`.
 
 Primary evidence ledgers:
 
+- `research/complete-pipeline-frontier/README.md`
 - `research/explicit-default/README.md`
 - `research/direct-stage-runtime/README.md`
 - `research/adaptive-partial-search/README.md`
@@ -59,9 +77,52 @@ installation lock:          explicit-pipeline-v1
 
 `construction-pipeline-v1.js` is the sole active global production owner. No later module may replace `ScanwordSolver.generateBest`.
 
-`SCANWORD_EXPLICIT_PIPELINE=off` selects the historical complete wrapper chain as a rollback source. It does not release the installation lock or permit wrappers to become the active owner.
+`SCANWORD_EXPLICIT_PIPELINE=off` selects the historical complete wrapper chain as a rollback source. It does not release the installation lock.
 
 New algorithms must enter through an explicit stage or an existing explicitly owned production module. Do not add another global `generateBest` wrapper.
+
+## Accepted complete-pipeline frontier
+
+`construction-portfolio.js` retains at most four checkpoint-passing complete candidates. The exact Phase 9 local winner is immutable member zero.
+
+The frontier vector includes:
+
+```text
+residual panels
+letter cells
+weak fill
+clue-text cells
+external clue capacity
+crossings
+answers
+panel-region count
+isolated panels
+residual concentration
+```
+
+Retention must be deterministic. Record every dominance rejection, width rejection and candidate provenance. Never remove member zero.
+
+Every retained finalist executes:
+
+```text
+portfolio polish
+-> clue-footprint repack
+-> adaptive clue repack
+-> clue-tail absorption
+-> single-footprint reflow
+-> pair-footprint reflow
+-> targeted residual-victim repair
+-> shared exact legacy guard
+-> same-geometry editorial repair
+-> complete validation
+-> canonical final comparison
+```
+
+Generate the legacy guard once and clone it per finalist. Do not multiply unrestricted construction attempts or legacy generation by frontier width.
+
+Only valid, connected, exact-clue candidates are eligible. Complete ties must select the lowest frontier index, preserving member zero.
+
+The heavy transient frontier must remain non-enumerable or otherwise excluded from normal serialized result payloads.
 
 ## Explicit stage boundary
 
@@ -76,23 +137,7 @@ production-stage-source
 -> comparison
 ```
 
-The direct production source executes:
-
-```text
-pre-portfolio construction source
--> construction portfolio
--> portfolio polish
--> clue-footprint repack
--> adaptive clue repack
--> clue-tail absorption
--> single-footprint clue reflow
--> pair clue reflow
--> targeted residual-victim repair
--> baseline guard
--> editorial repair
-```
-
-The middle CandidateState stages currently audit and materialize the complete direct result. This stable ownership boundary does not imply that every historical repair implementation has already been rewritten as a pure state transformation.
+The accepted frontier currently begins after exact clue allocation and construction-level victim repair. This does not imply that every historical repair implementation is a pure CandidateState transformation.
 
 New stage contracts should use:
 
@@ -106,7 +151,7 @@ Preserve copy-on-write, explicit cloning or otherwise auditable state ownership.
 
 ## Browser and Node load order
 
-Changing script order is architectural. The required conceptual order is:
+Changing script order is architectural. Required conceptual order:
 
 ```text
 base dictionaries and bulk corpus
@@ -114,17 +159,17 @@ base dictionaries and bulk corpus
 -> lexical policy and full-corpus pattern index
 -> solver and construction-v2 runtime
 -> clue-feasibility estimator
--> bounded partial-state beam and exact replay bridge
--> construction and clue-repair algorithms
+-> bounded partial-state beam and replay bridge
+-> construction portfolio and repair algorithms
 -> editorial demand and repair algorithms
--> vocabulary portfolio
 -> direct stage source anchor and runtime
--> CandidateState, stage telemetry and explicit pipeline
+-> vocabulary portfolio
+-> CandidateState, telemetry and explicit pipeline
 -> wrapper-retirement audit
 -> renderer and UI
 ```
 
-The Node benchmark bootstrap must mirror browser ownership and defaults.
+The Node benchmark bootstrap must mirror module ownership. Feature mode remains explicit in benchmark environments so historical baselines are reproducible.
 
 ## Production modules
 
@@ -132,9 +177,10 @@ The Node benchmark bootstrap must mirror browser ownership and defaults.
 - `dictionary-policy.js`: clue and lexical admission.
 - `solver.js`: base construction, scoring, metrics and complete validation.
 - `construction-v2.js`: indexed attempt construction and exact clue-footprint allocation.
+- `construction-portfolio.js`: complete construction ranking and repair-potential frontier retention.
+- `construction-stage-source-anchor-v2.js`: exact pre-wrapper production source.
+- `construction-stage-runtime-v2.js`: directly ordered finalist processing and final comparison.
 - `construction-vocabulary-portfolio-v1.js`: active-set portfolio and complete candidate comparison.
-- `construction-stage-source-anchor-v2.js`: captures the exact pre-wrapper production source.
-- `construction-stage-runtime-v2.js`: directly invokes accepted production stages in order.
 - `construction-candidate-state-v1.js`: explicit state contract, cloning, provenance and signatures.
 - `construction-pipeline-stages-v1.js`: CandidateState stage functions.
 - `construction-pipeline-telemetry-v1.js`: stage timing, candidate counts and signatures.
@@ -142,7 +188,7 @@ The Node benchmark bootstrap must mirror browser ownership and defaults.
 - `construction-wrapper-retirement-audit-v1.js`: default, ownership and rollback audit.
 - `renderer.js`, `ui.js`: A5 SVG rendering, controls and export.
 
-Check `index.html` before treating any retained research module as an active default.
+Check `index.html` before treating any retained research module as an active browser default.
 
 ## Two-level vocabulary retrieval
 
@@ -162,27 +208,15 @@ Never expose the complete corpus to unconstrained uniform sampling.
 
 ## Clue-feasibility estimation
 
-The exact allocator and validator remain authoritative.
+The exact allocator and validator remain authoritative. `shadow` mode may observe production candidates without changing output. The rejected local `rank` policy and unpromoted `guard` policy must not be presented as accepted defaults.
 
-Accepted `shadow` mode may observe one production-ranked placement candidate while preserving placement order, random calls and exact output. The `rank` experiment is rejected; the `guard` experiment is unpromoted. Any future output-changing use must be evaluated as a complete bounded-search policy, not justified by local estimator scores.
+Future clue-feasibility use should support an earlier bounded structural frontier, not replace measured complete-grid decisions.
 
 ## Bounded partial-state search
 
-The accepted late-placement beam:
+The retained late-placement beam preserves exact greedy replay and uses separate probe attempt IDs. It remains off by default because its accepted density gain is too expensive.
 
-```text
-branch point:        placement 14
-beam depth:          4
-beam width:          4
-branching factor:    3
-maximum nodes:       48 per sampled attempt
-baseline attempts:   120 per active set
-probe attempt IDs:   separate from baseline
-```
-
-Every beam-replaced attempt retains an exact greedy replay. Final selection occurs only after real clue allocation, repair, editorial cleanup and active-set portfolio comparison. Exact baseline wins complete ties.
-
-Phase 7's adaptive policy may skip additive probes based only on deterministic baseline evidence. It must never reduce the exact production baseline or conceal fallback ancestry.
+Every search replacement must preserve the baseline candidate and expose fallback ancestry. Partial estimates may guide exploration but may not replace complete final comparison.
 
 ## Structural invariants
 
@@ -205,12 +239,13 @@ Compare complete valid candidates lexicographically:
 2. more answers;
 3. more crossings;
 4. greater raw-letter coverage;
-5. fewer formulaic short answers and lower short-answer editorial penalty;
-6. lower selected-grid clue debt when measured;
-7. higher existing solver score;
-8. deterministic tie-breakers with exact-baseline preference on complete ties.
+5. fewer formulaic short answers;
+6. lower editorial penalty;
+7. lower selected-grid clue debt when measured;
+8. higher existing solver score;
+9. deterministic tie-breakers with exact member-zero preference.
 
-Partial-state estimates may guide bounded exploration but may not replace measured complete-grid promotion decisions.
+Do not replace this boundary with an opaque weighted score.
 
 ## Feature flags and rollback
 
@@ -218,6 +253,8 @@ Partial-state estimates may guide bounded exploration but may not replace measur
 SCANWORD_EXPLICIT_PIPELINE=on|off
 SCANWORD_PIPELINE_STAGE_RUNTIME=explicit
 SCANWORD_WRAPPER_INSTALLATION_LOCK=explicit-pipeline-v1
+SCANWORD_COMPLETE_PIPELINE_FRONTIER=on|off
+SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH=<positive integer>
 SCANWORD_VOCABULARY_PORTFOLIO_MODE=full|adaptive
 SCANWORD_FULL_CORPUS_RETRIEVAL=on|off
 SCANWORD_FULL_CORPUS_RETRIEVAL_MODE=empty|small-poor
@@ -225,24 +262,29 @@ SCANWORD_CLUE_FEASIBILITY=off|shadow|rank|guard
 SCANWORD_PARTIAL_SEARCH=off|shadow|beam
 ```
 
-A/B flags must never silently change browser defaults.
+A/B flags must never silently rewrite locked historical evidence.
 
 ## Required checks
 
-For production ownership or explicit-stage changes:
+For frontier or direct-stage changes:
 
 ```bash
+node tools/complete-pipeline-frontier-test-v1.cjs
+SCANWORD_COMPLETE_PIPELINE_FRONTIER=off \
+  node tools/construction-stage-runtime-test-v2.cjs
 node tools/wrapper-retirement-test-v1.cjs
-node tools/construction-stage-runtime-test-v2.cjs
-SCANWORD_EXPLICIT_PIPELINE=off node tools/construction-pipeline-parity-test.cjs
 ```
 
-For the explicit default promotion boundary:
+For the complete frontier acceptance boundary:
 
 ```bash
-node tools/explicit-default-parity-checkpoint-v1.cjs \
+SCANWORD_FRONTIER_CONCURRENCY=4 \
+SCANWORD_FRONTIER_RUNTIME_RATIO=1.35 \
+SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH=4 \
+SCANWORD_FRONTIER_REQUIRE_WIN=1 \
+  node tools/complete-pipeline-frontier-checkpoint-v1.cjs \
   research/baselines/seed-sets/development-20.json \
-  research-output/explicit-default/development-20.jsonl
+  research-output/complete-pipeline-frontier/development-20.jsonl
 ```
 
 Use the dedicated workflow for promotion-50 and stability-100.
@@ -267,22 +309,22 @@ Every substantive experiment must record:
 - corpus digest, seed set, environment and budgets;
 - acceptance criteria;
 - aggregate and per-seed regressions;
-- runtime median/p95/max where meaningful;
+- runtime median, p95 and max where meaningful;
 - examples, counterexamples and failure modes;
 - workflow run, artifact ID, digest and exact evidence commit;
 - promotion, rejection or deferral boundary.
 
-Keep negative results. Do not rewrite them out of history.
+Keep negative results and harness defects. Do not rewrite them out of history.
 
-Do not tune on locked promotion or stability seeds. Use development seeds for iteration, promotion for a frozen candidate and stability only after promotion.
+Do not tune on locked promotion or stability seeds. Use development for iteration, promotion for a frozen candidate and stability only after promotion.
 
 ## Archive and integration policy
 
 1. Work on a short-lived branch from current `main`.
 2. Run the phase gate on the exact implementation head.
-3. Preserve the accepted implementation with an immutable `research/archive-...` ref before documentation-only commits.
-4. Update the research ledger, archive manifest, README, AGENTS and milestone when affected.
-5. Confirm browser/Node defaults and production ownership.
+3. Preserve accepted implementation with an immutable `research/archive-...` ref before documentation-only commits.
+4. Update the research ledger, archive manifest, README, AGENTS and milestone.
+5. Confirm browser defaults, explicit Node benchmark mode and production ownership.
 6. Run exact final-head CI.
 7. Squash-merge to `main`.
 8. Verify the squash commit and post-merge checks.
@@ -292,17 +334,14 @@ Only `main` should remain permanently. Archive refs are immutable evidence and a
 
 ## Next architectural investigation
 
-The original complete-pipeline Pareto-frontier phase was deferred while search-budget calibration and orchestration migration were completed. The next density branch should restore that work using the explicit pipeline:
+Move frontier retention earlier without changing accepted semantics:
 
 ```text
-exact baseline candidate
-+ bounded structural finalists
--> exact clue allocation
--> bounded repair
--> same-geometry editorial cleanup
--> complete validation
--> bounded non-dominated frontier
--> final canonical comparison
+structural alternatives
+-> cheap clue-feasibility filter
+-> bounded structural frontier
+-> exact clue allocation only for finalists
+-> accepted complete-pipeline frontier
 ```
 
-Do not begin broad release or publication-quality claims before that deferred density boundary is explicitly accepted or rejected.
+The next phase must measure exact allocation work saved and prove complete parity or a separately accepted quality improvement. Do not claim zero-panel generation or publication-ready clue prose.
