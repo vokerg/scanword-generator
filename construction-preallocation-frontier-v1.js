@@ -6,6 +6,7 @@
 
   const originalGeneratePortfolio = solver.generatePortfolio.bind(solver);
   const portfolioSessions = new Map();
+  let latestPortfolioAggregate = null;
   let active = false;
 
   function environmentOption(name, fallback) {
@@ -362,6 +363,7 @@
       errors: session.runs.reduce((sum, run) => sum + run.errors, 0),
       runs: session.runs,
     });
+    latestPortfolioAggregate = session.aggregate;
 
     const attach = (candidate) => {
       if (!candidate || typeof candidate !== "object") return;
@@ -586,6 +588,7 @@
     preallocationStructuralDominatesV1: dominatesStructural,
     preallocationStructuralFrontierModeV1: mode,
     preallocationStructuralFrontierWidthV1: width,
+    currentPreallocationStructuralFrontierPortfolioV1: () => latestPortfolioAggregate,
     __preallocationStructuralFrontierV1Installed: true,
   });
 
@@ -596,5 +599,6 @@
     select: selectStructuralFrontier,
     vector: structuralVector,
     dominates: dominatesStructural,
+    currentPortfolioAggregate: () => latestPortfolioAggregate,
   };
 })();
