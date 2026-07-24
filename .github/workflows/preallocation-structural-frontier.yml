@@ -7,11 +7,14 @@ on:
     paths:
       - construction-preallocation-frontier-v1.js
       - construction-preallocation-repair-potential-v1.js
+      - construction-preallocation-ranked-frontier-v1.js
       - index.html
       - tools/construction-pipeline-seed-v1.cjs
       - tools/preallocation-structural-frontier-test-v1.cjs
       - tools/preallocation-repair-potential-test-v1.cjs
+      - tools/preallocation-ranked-frontier-test-v1.cjs
       - tools/preallocation-structural-frontier-checkpoint-v1.cjs
+      - tools/preallocation-ranked-frontier-checkpoint-v1.cjs
       - tools/node-benchmark-bootstrap-v1.cjs
       - research/preallocation-structural-frontier/**
       - .github/workflows/preallocation-structural-frontier.yml
@@ -46,21 +49,27 @@ jobs:
           test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           node --check construction-preallocation-frontier-v1.js
           node --check construction-preallocation-repair-potential-v1.js
+          node --check construction-preallocation-ranked-frontier-v1.js
           node --check tools/preallocation-structural-frontier-test-v1.cjs
           node --check tools/preallocation-repair-potential-test-v1.cjs
+          node --check tools/preallocation-ranked-frontier-test-v1.cjs
           node --check tools/preallocation-structural-frontier-checkpoint-v1.cjs
+          node --check tools/preallocation-ranked-frontier-checkpoint-v1.cjs
           node --check tools/construction-pipeline-seed-v1.cjs
           node --check tools/node-benchmark-bootstrap-v1.cjs
           grep -q 'SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER = "off"' index.html
           grep -q 'construction-preallocation-frontier-v1.js' index.html
           grep -q 'construction-preallocation-repair-potential-v1.js' index.html
+          grep -q 'construction-preallocation-ranked-frontier-v1.js' index.html
           grep -q 'construction-preallocation-frontier-v1.js' tools/node-benchmark-bootstrap-v1.cjs
           grep -q 'construction-preallocation-repair-potential-v1.js' tools/node-benchmark-bootstrap-v1.cjs
+          grep -q 'construction-preallocation-ranked-frontier-v1.js' tools/node-benchmark-bootstrap-v1.cjs
 
       - name: Test deterministic shadow contracts
         run: |
           node tools/preallocation-structural-frontier-test-v1.cjs
           node tools/preallocation-repair-potential-test-v1.cjs
+          node tools/preallocation-ranked-frontier-test-v1.cjs
 
       - name: Preserve accepted Phase 10 contracts
         run: |
@@ -79,8 +88,8 @@ jobs:
       SCANWORD_PREALLOCATION_RUNTIME_RATIO: 1.12
       SCANWORD_PREALLOCATION_SEED_TIMEOUT_MS: 1200000
       SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER_WIDTH: 16
-      SCANWORD_PREALLOCATION_DIAGNOSTIC_WIDTHS: 8,16,24,32,48,64,96,128,192,256
-      SCANWORD_PREALLOCATION_REQUIRE_PHASE10_RECALL: 1
+      SCANWORD_PREALLOCATION_DIAGNOSTIC_WIDTHS: 8,16,24,32,48,64,96,128,160,192,224,256,288,320
+      SCANWORD_PREALLOCATION_REQUIRE_PHASE10_RECALL: 0
     steps:
       - name: Check out exact candidate head
         uses: actions/checkout@v4
@@ -92,15 +101,15 @@ jobs:
         with:
           node-version: 22
 
-      - name: Run locked development-20 shadow checkpoint
+      - name: Run locked development-20 rank-only width sweep
         run: |
           set -o pipefail
           test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           mkdir -p research-output/preallocation-structural-frontier
-          node tools/preallocation-structural-frontier-checkpoint-v1.cjs \
+          node tools/preallocation-ranked-frontier-checkpoint-v1.cjs \
             research/baselines/seed-sets/development-20.json \
-            research-output/preallocation-structural-frontier/development-20.jsonl \
-            | tee research-output/preallocation-structural-frontier/development-console.jsonl
+            research-output/preallocation-structural-frontier/ranked-development-20.jsonl \
+            | tee research-output/preallocation-structural-frontier/ranked-development-console.jsonl
 
       - name: Publish development evidence
         if: always()
