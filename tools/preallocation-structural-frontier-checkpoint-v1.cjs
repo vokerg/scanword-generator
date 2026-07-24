@@ -111,40 +111,53 @@ async function worker() {
     try {
       const baseline = await runSeed(seed, "off");
       const shadow = await runSeed(seed, "shadow");
-      const selectedTelemetry = shadow.preallocationStructuralFrontier;
-      const telemetry = shadow.preallocationStructuralFrontierPortfolio;
+      const estimatorTelemetry = shadow.preallocationStructuralFrontierPortfolio;
+      const selectedTelemetry = shadow.preallocationRepairPotentialFrontier;
+      const telemetry = shadow.preallocationRepairPotentialFrontierPortfolio;
       const differences = exactDifferences(baseline, shadow);
-      const telemetryValid = Boolean(selectedTelemetry
+      const outputValid = Boolean(shadow.valid && shadow.components === 1 && shadow.exactCluesOnly);
+      const exactParity = differences.length === 0 && outputValid;
+      const telemetryValid = Boolean(
+        estimatorTelemetry
+        && estimatorTelemetry.mode === "shadow"
+        && estimatorTelemetry.authoritative === false
+        && selectedTelemetry
+        && selectedTelemetry.ordering === "phase10-repair-potential-first-v1"
         && selectedTelemetry.stageModel === "base-frontier-then-victim-frontier-v1"
         && telemetry
         && telemetry.mode === "shadow"
         && telemetry.authoritative === false
+        && telemetry.ordering === "phase10-repair-potential-first-v1"
         && telemetry.stageModel === "base-frontier-then-victim-frontier-v1"
         && telemetry.runCount >= 2
         && telemetry.allocationCalls > 0
-        && telemetry.structuralEvaluations === telemetry.allocationCalls
         && telemetry.retainedAllocations >= telemetry.runCount
-        && telemetry.runs?.every((run) => run.retained >= 1 && run.retained <= structuralWidth)
+        && telemetry.runs?.every((run) => run.current?.retained >= 1 && run.current.retained <= structuralWidth)
         && telemetry.projectedCallsSaved > 0
-        && telemetry.errors === 0);
+        && Array.isArray(telemetry.sweep)
+        && telemetry.sweep.some((entry) => entry.width === structuralWidth)
+      );
       const recallValid = !requireRecall || telemetry?.safeToFilterObservedPhase10Frontier === true;
       const record = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         seed,
-        status: differences.length || !telemetryValid || !recallValid ? "failed" : "ok",
+        status: !exactParity || !telemetryValid || !recallValid ? "failed" : "ok",
         baseline: compact(baseline),
         shadow: compact(shadow),
         runtimeRatio: baseline.elapsedMs ? +(shadow.elapsedMs / baseline.elapsedMs).toFixed(4) : null,
         differences,
+        outputValid,
+        exactParity,
         telemetryValid,
         recallValid,
+        estimatorTelemetry: estimatorTelemetry || null,
         selectedTelemetry: selectedTelemetry || null,
         telemetry: telemetry || null,
       };
       results[index] = record;
     } catch (error) {
       results[index] = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         seed,
         status: "error",
         error: String(error?.stack || error),
@@ -158,12 +171,14 @@ async function worker() {
 
 (async () => {
   await Promise.all(Array.from({ length: Math.min(concurrency, seeds.length) }, () => worker()));
-  const completed = results.filter((record) => record?.status === "ok");
+  const passedRecords = results.filter((record) => record?.status === "ok");
   const failures = results.filter((record) => record?.status !== "ok");
-  const baselineMs = completed.reduce((sum, record) => sum + record.baseline.elapsedMs, 0);
-  const shadowMs = completed.reduce((sum, record) => sum + record.shadow.elapsedMs, 0);
+  const executed = results.filter((record) => record?.baseline && record?.shadow);
+  const parityRecords = executed.filter((record) => record.exactParity);
+  const telemetryRecords = executed.filter((record) => record.telemetryValid).map((record) => record.telemetry);
+  const baselineMs = executed.reduce((sum, record) => sum + record.baseline.elapsedMs, 0);
+  const shadowMs = executed.reduce((sum, record) => sum + record.shadow.elapsedMs, 0);
   const runtimeRatio = baselineMs ? shadowMs / baselineMs : Infinity;
-  const telemetryRecords = completed.map((record) => record.telemetry);
   const allocationCalls = telemetryRecords.reduce((sum, telemetry) => sum + telemetry.allocationCalls, 0);
   const projectedCallsSaved = telemetryRecords.reduce((sum, telemetry) => sum + telemetry.projectedCallsSaved, 0);
   const allocationElapsedMs = telemetryRecords.reduce((sum, telemetry) => sum + telemetry.allocationElapsedMs, 0);
@@ -171,18 +186,45 @@ async function worker() {
     (sum, telemetry) => sum + telemetry.projectedAllocationElapsedMsSaved,
     0,
   );
-  const fullRecall = completed.filter((record) => record.telemetry.safeToFilterObservedPhase10Frontier).length;
+  const fullRecall = telemetryRecords.filter((telemetry) => telemetry.safeToFilterObservedPhase10Frontier).length;
+  const widths = [...new Set(telemetryRecords.flatMap((telemetry) => telemetry.sweep.map((entry) => entry.width)))].sort((a, b) => a - b);
+  const widthSweep = widths.map((width) => {
+    const entries = telemetryRecords.map((telemetry) => telemetry.sweep.find((entry) => entry.width === width)).filter(Boolean);
+    const calls = entries.reduce((sum, entry) => sum + entry.allocationCalls, 0);
+    const saved = entries.reduce((sum, entry) => sum + entry.projectedCallsSaved, 0);
+    const frontierCount = entries.reduce((sum, entry) => sum + entry.phase10FrontierAllocationCount, 0);
+    const frontierRetained = entries.reduce((sum, entry) => sum + entry.phase10FrontierRetained, 0);
+    const baseCount = entries.reduce((sum, entry) => sum + entry.phase10RequiredBaseCount, 0);
+    const basesRetained = entries.reduce((sum, entry) => sum + entry.phase10RequiredBasesRetained, 0);
+    return {
+      width,
+      seedRunCount: entries.length,
+      allocationCalls: calls,
+      retainedAllocations: entries.reduce((sum, entry) => sum + entry.retainedAllocations, 0),
+      projectedCallsSaved: saved,
+      projectedCallReduction: calls ? +(saved / calls).toFixed(4) : 0,
+      phase10FrontierAllocationCount: frontierCount,
+      phase10FrontierRetained: frontierRetained,
+      phase10FrontierRecall: frontierCount ? +(frontierRetained / frontierCount).toFixed(4) : null,
+      phase10RequiredBaseCount: baseCount,
+      phase10RequiredBasesRetained: basesRetained,
+      phase10BaseRecall: baseCount ? +(basesRetained / baseCount).toFixed(4) : null,
+      fullRecallSeeds: entries.filter((entry) => entry.safeToFilterObservedPhase10Frontier).length,
+    };
+  });
   const passed = failures.length === 0 && runtimeRatio <= runtimeCap;
   const summary = {
     type: "summary",
-    schemaVersion: 1,
-    phase: "preallocation-structural-frontier-staged-shadow-v1",
+    schemaVersion: 2,
+    phase: "preallocation-repair-potential-shadow-v1",
     baselineId: baselineConfig.baselineId,
     seedSet: seedPayload.name || path.basename(seedFile),
     seeds: results.length,
-    passedSeeds: completed.length,
+    passedSeeds: passedRecords.length,
     failures: failures.length,
-    exactParityRate: results.length ? +(completed.length / results.length).toFixed(4) : 0,
+    executedSeeds: executed.length,
+    exactParitySeeds: parityRecords.length,
+    exactParityRate: results.length ? +(parityRecords.length / results.length).toFixed(4) : 0,
     structuralWidth,
     requireRecall,
     fullPhase10FrontierRecallSeeds: fullRecall,
@@ -198,6 +240,7 @@ async function worker() {
     shadowElapsedMs: shadowMs,
     runtimeRatio: +runtimeRatio.toFixed(4),
     runtimeCap,
+    widthSweep,
     passed,
   };
   fs.appendFileSync(outputFile, `${JSON.stringify(summary)}\n`);
