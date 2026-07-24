@@ -111,17 +111,22 @@ async function worker() {
     try {
       const baseline = await runSeed(seed, "off");
       const shadow = await runSeed(seed, "shadow");
-      const telemetry = shadow.preallocationStructuralFrontier;
+      const selectedTelemetry = shadow.preallocationStructuralFrontier;
+      const telemetry = shadow.preallocationStructuralFrontierPortfolio;
       const differences = exactDifferences(baseline, shadow);
-      const telemetryValid = Boolean(telemetry
+      const telemetryValid = Boolean(selectedTelemetry
+        && selectedTelemetry.stageModel === "base-frontier-then-victim-frontier-v1"
+        && telemetry
         && telemetry.mode === "shadow"
         && telemetry.authoritative === false
+        && telemetry.stageModel === "base-frontier-then-victim-frontier-v1"
+        && telemetry.runCount >= 2
         && telemetry.allocationCalls > 0
         && telemetry.structuralEvaluations === telemetry.allocationCalls
-        && telemetry.retained >= 1
-        && telemetry.retained <= structuralWidth
+        && telemetry.retainedAllocations >= telemetry.runCount
+        && telemetry.runs?.every((run) => run.retained >= 1 && run.retained <= structuralWidth)
         && telemetry.projectedCallsSaved > 0
-        && telemetry.errors?.length === 0);
+        && telemetry.errors === 0);
       const recallValid = !requireRecall || telemetry?.safeToFilterObservedPhase10Frontier === true;
       const record = {
         schemaVersion: 1,
@@ -133,6 +138,7 @@ async function worker() {
         differences,
         telemetryValid,
         recallValid,
+        selectedTelemetry: selectedTelemetry || null,
         telemetry: telemetry || null,
       };
       results[index] = record;
@@ -170,7 +176,7 @@ async function worker() {
   const summary = {
     type: "summary",
     schemaVersion: 1,
-    phase: "preallocation-structural-frontier-shadow-v1",
+    phase: "preallocation-structural-frontier-staged-shadow-v1",
     baselineId: baselineConfig.baselineId,
     seedSet: seedPayload.name || path.basename(seedFile),
     seeds: results.length,
