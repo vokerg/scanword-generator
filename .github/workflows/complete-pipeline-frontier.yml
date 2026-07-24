@@ -15,6 +15,9 @@ on:
       - research/baselines/v8-production-1.1/config.json
       - research/complete-pipeline-frontier/**
       - research/archive-manifest.json
+      - docs/milestones/**
+      - README.md
+      - AGENTS.md
       - .github/workflows/complete-pipeline-frontier.yml
   workflow_dispatch:
 
@@ -42,7 +45,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Check syntax and default controls
+      - name: Check syntax and accepted defaults
         run: |
           test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           node --check construction-portfolio.js
@@ -50,14 +53,15 @@ jobs:
           node --check tools/construction-pipeline-seed-v1.cjs
           node --check tools/complete-pipeline-frontier-test-v1.cjs
           node --check tools/complete-pipeline-frontier-checkpoint-v1.cjs
-          grep -q 'SCANWORD_COMPLETE_PIPELINE_FRONTIER = "off"' index.html
+          grep -q 'SCANWORD_COMPLETE_PIPELINE_FRONTIER = "on"' index.html
           grep -q 'SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH = 4' index.html
+          grep -q 'SCANWORD_COMPLETE_PIPELINE_FRONTIER=off' docs/milestones/v1.3-complete-pipeline-frontier.md
           grep -q '"SCANWORD_CONSTRUCTION_MODE": "portfolio"' research/baselines/v8-production-1.1/config.json
 
       - name: Test bounded frontier contracts
         run: node tools/complete-pipeline-frontier-test-v1.cjs
 
-      - name: Preserve Phase 9 direct runtime
+      - name: Preserve Phase 9 rollback runtime
         run: node tools/construction-stage-runtime-test-v2.cjs
 
   development:
