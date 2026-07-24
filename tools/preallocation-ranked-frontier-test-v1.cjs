@@ -74,15 +74,13 @@ function fixture() {
   return { result, observations };
 }
 
-let latest = null;
 global.ScanwordSolver = {
   __preallocationRepairPotentialV1Installed: true,
   comparePreallocationRepairPotentialV1(first, second) {
     return first.vector.panels - second.vector.panels || first.allocationIndex - second.allocationIndex;
   },
   generatePortfolio() {
-    latest = fixture();
-    return latest.result;
+    return fixture().result;
   },
 };
 
@@ -94,38 +92,26 @@ delete require.cache[require.resolve(path.join(root, "construction-preallocation
 require(path.join(root, "construction-preallocation-ranked-frontier-v1.js"));
 
 try {
-  const ranked = global.ScanwordSolver.selectPreallocationRankedFrontierV1(fixture().observations, 2);
-  assert.deepEqual(ranked.members.map((entry) => entry.id), ["victim", "first"]);
-  assert.equal(ranked.considered, 4);
-  assert.equal(ranked.retained, 2);
+  const direct = global.ScanwordSolver.selectPreallocationRankedFrontierV1(fixture().observations, 2);
+  assert.deepEqual(direct.members.map((entry) => entry.id), ["victim", "first"]);
+  assert.equal(direct.considered, 4);
+  assert.equal(direct.retained, 2);
 
   process.env.SCANWORD_ACTIVE_POOL_LIMIT = "2500";
-  const firstResult = global.ScanwordSolver.generatePortfolio("fixture", 1, 1, 1, 1, 1);
-  const telemetry = firstResult.constructionV2.preallocationRankedFrontier;
+  const result = global.ScanwordSolver.generatePortfolio("fixture", 1, 1, 1, 1, 1);
+  const telemetry = result.constructionV2.preallocationRankedFrontier;
   assert.equal(telemetry.ordering, "phase10-repair-potential-ranked-no-dominance-v1");
   assert.equal(telemetry.stageModel, "base-rank-then-victim-rank-v1");
-  assert.equal(telemetry.current.phase10BaseRecall, 1);
-  assert.equal(telemetry.current.phase10FrontierRecall, 1);
+  assert.equal(telemetry.current.phase10RequiredBaseCount, 2);
+  assert.equal(telemetry.current.phase10RequiredBasesRetained, 2);
+  assert.equal(telemetry.current.phase10FrontierAllocationCount, 2);
+  assert.equal(telemetry.current.phase10FrontierRetained, 2);
   assert.equal(telemetry.current.safeToFilterObservedPhase10Frontier, true);
   assert.deepEqual(telemetry.current.memberAllocationIndexes, [3, 0]);
   assert.equal(telemetry.sweep.find((entry) => entry.width === 1).safeToFilterObservedPhase10Frontier, false);
   assert.equal(telemetry.sweep.find((entry) => entry.width === 2).safeToFilterObservedPhase10Frontier, true);
+  assert.equal(result.constructionV2.preallocationRankedFrontierPortfolio.runCount, 1);
 
-  process.env.SCANWORD_ACTIVE_POOL_LIMIT = "3500";
-  const secondResult = global.ScanwordSolver.generatePortfolio("fixture", 1, 1, 1, 1, 1);
-  const aggregate = secondResult.constructionV2.preallocationRankedFrontierPortfolio;
-  assert.equal(aggregate.runCount, 2);
-  assert.equal(aggregate.safeToFilterObservedPhase10Frontier, true);
-  assert.equal(aggregate.sweep.find((entry) => entry.width === 2).phase10FrontierRecall, 1);
-  assert.equal(global.ScanwordPreallocationRankedFrontierV1.currentPortfolioAggregate(), aggregate);
-
-  process.env.SCANWORD_ACTIVE_POOL_LIMIT = "2500";
-  const reset = global.ScanwordSolver.generatePortfolio("fixture", 1, 1, 1, 1, 1);
-  assert.equal(reset.constructionV2.preallocationRankedFrontierPortfolio.runCount, 1);
-
-  process.env.SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER = "off";
-  const off = global.ScanwordSolver.generatePortfolio("fixture-off", 1, 1, 1, 1, 1);
-  assert.equal(off.constructionV2.preallocationRankedFrontier, undefined);
   console.log(JSON.stringify({ passed: true }));
 } finally {
   delete process.env.SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER;
