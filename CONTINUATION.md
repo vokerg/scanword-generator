@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-25
 
-This file is the first handoff to read in a new chat or coding session. All accepted production code, retained research code, evidence ledgers, tests, rollback controls and the next plan are on `main` after PR #24 is squash-merged.
+This file is the first handoff to read in a new chat or coding session. All accepted production code, retained research code, evidence ledgers, tests, rollback controls and the next plan are on `main`. Phase 11 was squash-merged through PR #24 as commit `9e79abb50f3b360e8a7a07292557cecb7f516174`.
 
 ## Current production baseline
 
@@ -146,13 +146,16 @@ Phase 11 and superseded unmerged lines are preserved at:
 
 ```text
 research/archive-phase-11-preallocation-structural-filter-evidence-2026-07-25
+research/archive-phase-11-preallocation-structural-filter-closure-2026-07-25
+research/archive-phase-11-preallocation-structural-filter-final-2026-07-25
+research/archive-phase-11-integration-main-2026-07-25
 research/archive-superseded-explicit-pipeline-roadmap-2026-07-25
 research/archive-superseded-phase-8-explicit-stage-migration-2026-07-25
 research/archive-superseded-selected-grid-editorial-quality-1.2-2026-07-25
 research/archive-superseded-vocabulary-greatness-1.1-2026-07-25
 ```
 
-The old planning PR #11 is closed as superseded. PR #24 is the single logical Phase 11 integration block and must be squash-merged. After the merge, start Phase 12 from the new `main` squash commit.
+The old planning PR #11 is closed as superseded. PR #24 was squash-merged into `main` as `9e79abb50f3b360e8a7a07292557cecb7f516174`. Start Phase 12 only from the current `main` head.
 
 ## Non-negotiable rules
 
