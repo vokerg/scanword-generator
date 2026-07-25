@@ -141,6 +141,12 @@
       "contains": ["5f8fb8dcb446d1dcf13e1ef5fc1cee0c151906e4"]
     },
     {
+      "name": "phase-11-preallocation-filter-closure",
+      "ref": "refs/heads/research/archive-phase-11-preallocation-structural-filter-closure-2026-07-25",
+      "commit": "7670d088d01db2b2a8b4a0f26c0b635e5c7a8239",
+      "contains": ["7670d088d01db2b2a8b4a0f26c0b635e5c7a8239"]
+    },
+    {
       "name": "superseded-explicit-pipeline-roadmap",
       "ref": "refs/heads/research/archive-superseded-explicit-pipeline-roadmap-2026-07-25",
       "commit": "843a30066357d4766d9f5f33489a11fa65236a4b",
