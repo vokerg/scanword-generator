@@ -23,6 +23,9 @@ const timeoutMs = Math.max(60_000, Math.floor(Number(process.env.SCANWORD_PREALL
 const runtimeCap = Math.max(0.1, Number(process.env.SCANWORD_PREALLOCATION_FILTER_RUNTIME_RATIO || 1.15));
 const width = Math.max(1, Math.floor(Number(process.env.SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER_WIDTH || 96)));
 const minimumCallReduction = Math.max(0, Number(process.env.SCANWORD_PREALLOCATION_MIN_CALL_REDUCTION || 0.25));
+const expectedFilterRuns = [...new Set(String(
+  canonicalEnvironment.SCANWORD_VOCABULARY_PORTFOLIO_LIMITS || "2500,3500",
+).split(",").map(Number).filter((value) => Number.isFinite(value) && value > 0))].length;
 const seedRunner = path.join(root, "tools/construction-pipeline-seed-v1.cjs");
 const bootstrap = path.join(root, "tools/node-benchmark-bootstrap-v1.cjs");
 
@@ -75,6 +78,8 @@ function runSeed(seed, preallocationMode) {
 function compact(summary) {
   return {
     elapsedMs: summary.elapsedMs,
+    exactAllocationCalls: Number(summary.exactAllocationCalls || 0),
+    exactAllocationElapsedMs: Number(summary.exactAllocationElapsedMs || 0),
     valid: summary.valid,
     components: summary.components,
     exactCluesOnly: summary.exactCluesOnly,
@@ -116,36 +121,60 @@ async function worker() {
       const baseline = await runSeed(seed, "off");
       const filtered = await runSeed(seed, "filter");
       const telemetry = filtered.preallocationFilter;
+      const portfolio = filtered.preallocationFilterPortfolio;
       const differences = exactDifferences(baseline, filtered);
       const outputValid = Boolean(filtered.valid && filtered.components === 1 && filtered.exactCluesOnly);
       const exactParity = outputValid && differences.length === 0;
+      const baselineAllocationCalls = Number(baseline.exactAllocationCalls || 0);
+      const filteredAllocationCalls = Number(filtered.exactAllocationCalls || 0);
+      const actualCallsSaved = Math.max(0, baselineAllocationCalls - filteredAllocationCalls);
+      const actualCallReduction = baselineAllocationCalls
+        ? +(actualCallsSaved / baselineAllocationCalls).toFixed(4)
+        : null;
+      const runTelemetryValid = Array.isArray(portfolio?.runs)
+        && portfolio.runs.length === expectedFilterRuns
+        && portfolio.runs.every((entry) => entry
+          && entry.mode === "filter"
+          && entry.authoritative === true
+          && entry.width === width
+          && entry.fallbackUsed === false);
       const telemetryValid = Boolean(
         telemetry
         && telemetry.mode === "filter"
         && telemetry.authoritative === true
         && telemetry.width === width
         && telemetry.fallbackUsed === false
-        && telemetry.exactAllocationCalls > 0
-        && telemetry.unrestrictedAllocationUpperBound >= telemetry.exactAllocationCalls
-        && telemetry.callsSavedAgainstObservedSchedule > 0
-        && telemetry.callReductionAgainstObservedSchedule >= minimumCallReduction
+        && portfolio
+        && portfolio.runCount === expectedFilterRuns
+        && portfolio.fallbackRuns === 0
+        && runTelemetryValid
+        && portfolio.exactAllocationCalls === filteredAllocationCalls
+        && baselineAllocationCalls > 0
+        && filteredAllocationCalls > 0
+        && filteredAllocationCalls <= baselineAllocationCalls
+        && actualCallReduction >= minimumCallReduction
       );
       results[index] = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         seed,
         status: exactParity && telemetryValid ? "ok" : "failed",
         baseline: compact(baseline),
         filtered: compact(filtered),
         runtimeRatio: baseline.elapsedMs ? +(filtered.elapsedMs / baseline.elapsedMs).toFixed(4) : null,
+        baselineAllocationCalls,
+        filteredAllocationCalls,
+        actualCallsSaved,
+        actualCallReduction,
         differences,
         outputValid,
         exactParity,
         telemetryValid,
-        telemetry: telemetry || null,
+        selectedTelemetry: telemetry || null,
+        filterPortfolio: portfolio || null,
       };
     } catch (error) {
       results[index] = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         seed,
         status: "error",
         error: String(error?.stack || error),
@@ -162,27 +191,30 @@ async function worker() {
   const failures = results.filter((record) => record?.status !== "ok");
   const executed = results.filter((record) => record?.baseline && record?.filtered);
   const parity = executed.filter((record) => record.exactParity);
-  const telemetryRecords = executed.filter((record) => record.telemetryValid).map((record) => record.telemetry);
   const baselineMs = executed.reduce((sum, record) => sum + record.baseline.elapsedMs, 0);
   const filteredMs = executed.reduce((sum, record) => sum + record.filtered.elapsedMs, 0);
   const runtimeRatio = baselineMs ? filteredMs / baselineMs : Infinity;
-  const exactAllocationCalls = telemetryRecords.reduce((sum, telemetry) => sum + telemetry.exactAllocationCalls, 0);
-  const unrestrictedAllocationUpperBound = telemetryRecords.reduce(
-    (sum, telemetry) => sum + telemetry.unrestrictedAllocationUpperBound,
+  const baselineAllocationCalls = executed.reduce((sum, record) => sum + record.baselineAllocationCalls, 0);
+  const filteredAllocationCalls = executed.reduce((sum, record) => sum + record.filteredAllocationCalls, 0);
+  const callsSaved = Math.max(0, baselineAllocationCalls - filteredAllocationCalls);
+  const callReduction = baselineAllocationCalls ? callsSaved / baselineAllocationCalls : 0;
+  const fallbackRuns = executed.reduce((sum, record) => sum + Number(record.filterPortfolio?.fallbackRuns || 0), 0);
+  const fallbackSeeds = executed.filter((record) => Number(record.filterPortfolio?.fallbackRuns || 0) > 0).length;
+  const observedScheduleUpperBound = executed.reduce(
+    (sum, record) => sum + Number(record.filterPortfolio?.unrestrictedAllocationUpperBound || 0),
     0,
   );
-  const callsSaved = telemetryRecords.reduce((sum, telemetry) => sum + telemetry.callsSavedAgainstObservedSchedule, 0);
-  const callReduction = unrestrictedAllocationUpperBound
-    ? callsSaved / unrestrictedAllocationUpperBound
-    : 0;
-  const fallbackSeeds = executed.filter((record) => record.telemetry?.fallbackUsed).length;
+  const observedScheduleCallsSaved = executed.reduce(
+    (sum, record) => sum + Number(record.filterPortfolio?.callsSavedAgainstObservedSchedule || 0),
+    0,
+  );
   const passed = failures.length === 0
     && runtimeRatio <= runtimeCap
     && callReduction >= minimumCallReduction
-    && fallbackSeeds === 0;
+    && fallbackRuns === 0;
   const summary = {
     type: "summary",
-    schemaVersion: 1,
+    schemaVersion: 2,
     phase: "preallocation-filter-v1",
     baselineId: baselineConfig.baselineId,
     seedSet: seedPayload.name || path.basename(seedFile),
@@ -190,17 +222,24 @@ async function worker() {
     seeds: results.length,
     seedLimit,
     width,
+    expectedFilterRunsPerSeed: expectedFilterRuns,
     passedSeeds: results.length - failures.length,
     failures: failures.length,
     executedSeeds: executed.length,
     exactParitySeeds: parity.length,
     exactParityRate: results.length ? +(parity.length / results.length).toFixed(4) : 0,
     fallbackSeeds,
-    exactAllocationCalls,
-    unrestrictedAllocationUpperBound,
+    fallbackRuns,
+    baselineExactAllocationCalls: baselineAllocationCalls,
+    filteredExactAllocationCalls: filteredAllocationCalls,
     callsSaved,
     callReduction: +callReduction.toFixed(4),
     minimumCallReduction,
+    observedScheduleUpperBound,
+    observedScheduleCallsSaved,
+    observedScheduleCallReduction: observedScheduleUpperBound
+      ? +(observedScheduleCallsSaved / observedScheduleUpperBound).toFixed(4)
+      : 0,
     baselineElapsedMs: baselineMs,
     filteredElapsedMs: filteredMs,
     runtimeRatio: +runtimeRatio.toFixed(4),
