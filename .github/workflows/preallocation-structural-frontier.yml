@@ -117,10 +117,90 @@ jobs:
             research-output/preallocation-structural-frontier/filter-development-20.jsonl \
             | tee research-output/preallocation-structural-frontier/filter-development-console.jsonl
 
-      - name: Publish filter evidence
+      - name: Publish development filter evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: preallocation-structural-frontier-filter-${{ env.SOURCE_SHA }}
+          name: preallocation-structural-frontier-development-${{ env.SOURCE_SHA }}
+          path: research-output/preallocation-structural-frontier/
+          if-no-files-found: error
+
+  promotion-filter:
+    needs: development-filter
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_PREALLOCATION_CONCURRENCY: 4
+      SCANWORD_PREALLOCATION_FILTER_RUNTIME_RATIO: 1.05
+      SCANWORD_PREALLOCATION_SEED_TIMEOUT_MS: 1200000
+      SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER_WIDTH: 96
+      SCANWORD_PREALLOCATION_MIN_CALL_REDUCTION: 0.40
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run locked promotion-50 filter checkpoint
+        run: |
+          set -o pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          mkdir -p research-output/preallocation-structural-frontier
+          node tools/preallocation-filter-checkpoint-v1.cjs \
+            research/baselines/seed-sets/promotion-50.json \
+            research-output/preallocation-structural-frontier/filter-promotion-50.jsonl \
+            | tee research-output/preallocation-structural-frontier/filter-promotion-console.jsonl
+
+      - name: Publish promotion filter evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preallocation-structural-frontier-promotion-${{ env.SOURCE_SHA }}
+          path: research-output/preallocation-structural-frontier/
+          if-no-files-found: error
+
+  stability-filter:
+    needs: promotion-filter
+    runs-on: ubuntu-latest
+    timeout-minutes: 480
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_PREALLOCATION_CONCURRENCY: 4
+      SCANWORD_PREALLOCATION_FILTER_RUNTIME_RATIO: 1.05
+      SCANWORD_PREALLOCATION_SEED_TIMEOUT_MS: 1200000
+      SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER_WIDTH: 96
+      SCANWORD_PREALLOCATION_MIN_CALL_REDUCTION: 0.40
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run locked stability-100 filter checkpoint
+        run: |
+          set -o pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          mkdir -p research-output/preallocation-structural-frontier
+          node tools/preallocation-filter-checkpoint-v1.cjs \
+            research/baselines/seed-sets/stability-100.json \
+            research-output/preallocation-structural-frontier/filter-stability-100.jsonl \
+            | tee research-output/preallocation-structural-frontier/filter-stability-console.jsonl
+
+      - name: Publish stability filter evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preallocation-structural-frontier-stability-${{ env.SOURCE_SHA }}
           path: research-output/preallocation-structural-frontier/
           if-no-files-found: error
