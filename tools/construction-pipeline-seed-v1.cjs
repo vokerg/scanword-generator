@@ -9,6 +9,12 @@ function digest(value) {
   return crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
 
+function now() {
+  return typeof performance !== "undefined" && typeof performance.now === "function"
+    ? performance.now()
+    : Date.now();
+}
+
 function normalizedGrid(result) {
   return result.grid.map((row) => row.map((cell) => ({
     type: cell.type,
@@ -55,19 +61,101 @@ function selectedGridClueDebt(result) {
   );
 }
 
+function compactFilterTelemetry(telemetry) {
+  if (!telemetry || typeof telemetry !== "object") return null;
+  return {
+    activePoolLimit: String(process.env.SCANWORD_ACTIVE_POOL_LIMIT || "default"),
+    schemaVersion: telemetry.schemaVersion || null,
+    mode: telemetry.mode || null,
+    authoritative: Boolean(telemetry.authoritative),
+    width: Number(telemetry.width || 0),
+    exactAllocationCalls: Number(telemetry.exactAllocationCalls || 0),
+    unrestrictedAllocationUpperBound: Number(telemetry.unrestrictedAllocationUpperBound || 0),
+    callsSavedAgainstObservedSchedule: Number(telemetry.callsSavedAgainstObservedSchedule || 0),
+    callReductionAgainstObservedSchedule: Number(telemetry.callReductionAgainstObservedSchedule || 0),
+    fallbackUsed: Boolean(telemetry.fallbackUsed),
+    fallbackReason: telemetry.fallbackReason || null,
+    error: telemetry.error || null,
+  };
+}
+
+const solver = global.ScanwordSolver;
+const originalAssignClueTextCellsV2 = solver.assignClueTextCellsV2;
+const originalExplicitCandidate = solver.generateExplicitSingleCandidateV2;
+const originalGeneratePortfolio = solver.generatePortfolio;
+let exactAllocationCalls = 0;
+let exactAllocationElapsedMs = 0;
+const preallocationFilterRuns = [];
+const capturedFilterTelemetry = new Set();
+
+function captureFilterRun(result) {
+  const telemetry = result?.constructionV2?.preallocationFilter;
+  if (!telemetry || capturedFilterTelemetry.has(telemetry)) return result;
+  capturedFilterTelemetry.add(telemetry);
+  preallocationFilterRuns.push(compactFilterTelemetry(telemetry));
+  return result;
+}
+
+if (typeof originalAssignClueTextCellsV2 === "function") {
+  solver.assignClueTextCellsV2 = function measuredAssignClueTextCellsV2(...args) {
+    const started = now();
+    try {
+      return originalAssignClueTextCellsV2.apply(solver, args);
+    } finally {
+      exactAllocationCalls += 1;
+      exactAllocationElapsedMs += now() - started;
+    }
+  };
+}
+
+if (typeof originalExplicitCandidate === "function") {
+  solver.generateExplicitSingleCandidateV2 = function measuredExplicitCandidate(...args) {
+    return captureFilterRun(originalExplicitCandidate.apply(solver, args));
+  };
+} else if (typeof originalGeneratePortfolio === "function") {
+  solver.generatePortfolio = function measuredGeneratePortfolio(...args) {
+    return captureFilterRun(originalGeneratePortfolio.apply(solver, args));
+  };
+}
+
 const started = Date.now();
-const result = global.ScanwordSolver.generateBest(seed, global.RUSSIAN_WORDS.length, 17, 13, 30, 27);
+let result;
+try {
+  result = solver.generateBest(seed, global.RUSSIAN_WORDS.length, 17, 13, 30, 27);
+} finally {
+  if (typeof originalAssignClueTextCellsV2 === "function") solver.assignClueTextCellsV2 = originalAssignClueTextCellsV2;
+  if (typeof originalExplicitCandidate === "function") solver.generateExplicitSingleCandidateV2 = originalExplicitCandidate;
+  else if (typeof originalGeneratePortfolio === "function") solver.generatePortfolio = originalGeneratePortfolio;
+}
+
 const grid = normalizedGrid(result);
 const placed = normalizedPlaced(result);
 const cluePayload = placed.map(({ answer, clue, hasExactClue }) => ({ answer, clue, hasExactClue }));
 const editorial = global.ScanwordEditorialLexicalPolicyV3?.summarize?.(result.placed || []) || {};
 const constructionV2 = result.constructionV2 || {};
+const filterPortfolio = preallocationFilterRuns.length ? {
+  schemaVersion: 1,
+  runCount: preallocationFilterRuns.length,
+  fallbackRuns: preallocationFilterRuns.filter((entry) => entry.fallbackUsed).length,
+  exactAllocationCalls: preallocationFilterRuns.reduce((sum, entry) => sum + entry.exactAllocationCalls, 0),
+  unrestrictedAllocationUpperBound: preallocationFilterRuns.reduce(
+    (sum, entry) => sum + entry.unrestrictedAllocationUpperBound,
+    0,
+  ),
+  callsSavedAgainstObservedSchedule: preallocationFilterRuns.reduce(
+    (sum, entry) => sum + entry.callsSavedAgainstObservedSchedule,
+    0,
+  ),
+  runs: preallocationFilterRuns,
+} : null;
 const summary = {
   seed,
   mode: String(process.env.SCANWORD_EXPLICIT_PIPELINE || "off").toLowerCase(),
   frontierMode: String(process.env.SCANWORD_COMPLETE_PIPELINE_FRONTIER || "off").toLowerCase(),
   preallocationMode: String(process.env.SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER || "off").toLowerCase(),
   elapsedMs: Date.now() - started,
+  exactAllocationCalls,
+  exactAllocationElapsedMs: +exactAllocationElapsedMs.toFixed(3),
   valid: Boolean(result.validation?.valid),
   components: Number(result.components || 0),
   panels: Number(result.panelCells || 0),
@@ -112,6 +200,7 @@ const summary = {
     || constructionV2.preallocationRankedFrontierPortfolio
     || null,
   preallocationFilter: constructionV2.preallocationFilter || null,
+  preallocationFilterPortfolio: filterPortfolio,
   preallocationInstallation: {
     structural: Boolean(global.ScanwordSolver.__preallocationStructuralFrontierV1Installed),
     repairPotential: Boolean(global.ScanwordSolver.__preallocationRepairPotentialV1Installed),
