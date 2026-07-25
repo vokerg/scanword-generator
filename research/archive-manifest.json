@@ -3,7 +3,8 @@
   "status": "active",
   "auditedDate": "2026-07-25",
   "mainRef": "refs/remotes/origin/main",
-  "auditedMainCommit": "2790ed77edee0ab60bd9862dca0a276b92d1f2bb",
+  "auditedMainCommit": "9e79abb50f3b360e8a7a07292557cecb7f516174",
+  "auditNote": "Archive refs and documented commits were audited through the Phase 11 integration squash. Later documentation-only descendants do not change the preserved implementation evidence.",
   "policy": {
     "historicalBranchNamesAreLabelsUnlessListed": true,
     "requiredRefsMustResolveExactly": true,
@@ -145,6 +146,18 @@
       "ref": "refs/heads/research/archive-phase-11-preallocation-structural-filter-closure-2026-07-25",
       "commit": "7670d088d01db2b2a8b4a0f26c0b635e5c7a8239",
       "contains": ["7670d088d01db2b2a8b4a0f26c0b635e5c7a8239"]
+    },
+    {
+      "name": "phase-11-preallocation-filter-final-head",
+      "ref": "refs/heads/research/archive-phase-11-preallocation-structural-filter-final-2026-07-25",
+      "commit": "838f5172d1c3833b156f229d03c8e3195575c2cc",
+      "contains": ["838f5172d1c3833b156f229d03c8e3195575c2cc"]
+    },
+    {
+      "name": "phase-11-integration-main",
+      "ref": "refs/heads/research/archive-phase-11-integration-main-2026-07-25",
+      "commit": "9e79abb50f3b360e8a7a07292557cecb7f516174",
+      "contains": ["9e79abb50f3b360e8a7a07292557cecb7f516174"]
     },
     {
       "name": "superseded-explicit-pipeline-roadmap",
