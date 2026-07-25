@@ -131,6 +131,13 @@ async function worker() {
       const actualCallReduction = baselineAllocationCalls
         ? +(actualCallsSaved / baselineAllocationCalls).toFixed(4)
         : null;
+      const unrestrictedBoundaryCalls = Number(portfolio?.unrestrictedAllocationUpperBound || 0);
+      const filteredBoundaryCalls = Number(portfolio?.exactAllocationCalls || 0);
+      const baselineOutsideBoundaryCalls = baselineAllocationCalls - unrestrictedBoundaryCalls;
+      const filteredOutsideBoundaryCalls = filteredAllocationCalls - filteredBoundaryCalls;
+      const outsideBoundaryParity = baselineOutsideBoundaryCalls >= 0
+        && filteredOutsideBoundaryCalls >= 0
+        && baselineOutsideBoundaryCalls === filteredOutsideBoundaryCalls;
       const runTelemetryValid = Array.isArray(portfolio?.runs)
         && portfolio.runs.length === expectedFilterRuns
         && portfolio.runs.every((entry) => entry
@@ -148,7 +155,10 @@ async function worker() {
         && portfolio.runCount === expectedFilterRuns
         && portfolio.fallbackRuns === 0
         && runTelemetryValid
-        && portfolio.exactAllocationCalls === filteredAllocationCalls
+        && unrestrictedBoundaryCalls > 0
+        && filteredBoundaryCalls > 0
+        && filteredBoundaryCalls <= unrestrictedBoundaryCalls
+        && outsideBoundaryParity
         && baselineAllocationCalls > 0
         && filteredAllocationCalls > 0
         && filteredAllocationCalls <= baselineAllocationCalls
@@ -165,6 +175,11 @@ async function worker() {
         filteredAllocationCalls,
         actualCallsSaved,
         actualCallReduction,
+        unrestrictedBoundaryCalls,
+        filteredBoundaryCalls,
+        baselineOutsideBoundaryCalls,
+        filteredOutsideBoundaryCalls,
+        outsideBoundaryParity,
         differences,
         outputValid,
         exactParity,
@@ -200,14 +215,11 @@ async function worker() {
   const callReduction = baselineAllocationCalls ? callsSaved / baselineAllocationCalls : 0;
   const fallbackRuns = executed.reduce((sum, record) => sum + Number(record.filterPortfolio?.fallbackRuns || 0), 0);
   const fallbackSeeds = executed.filter((record) => Number(record.filterPortfolio?.fallbackRuns || 0) > 0).length;
-  const observedScheduleUpperBound = executed.reduce(
-    (sum, record) => sum + Number(record.filterPortfolio?.unrestrictedAllocationUpperBound || 0),
-    0,
-  );
-  const observedScheduleCallsSaved = executed.reduce(
-    (sum, record) => sum + Number(record.filterPortfolio?.callsSavedAgainstObservedSchedule || 0),
-    0,
-  );
+  const unrestrictedBoundaryCalls = executed.reduce((sum, record) => sum + record.unrestrictedBoundaryCalls, 0);
+  const filteredBoundaryCalls = executed.reduce((sum, record) => sum + record.filteredBoundaryCalls, 0);
+  const boundaryCallsSaved = Math.max(0, unrestrictedBoundaryCalls - filteredBoundaryCalls);
+  const boundaryCallReduction = unrestrictedBoundaryCalls ? boundaryCallsSaved / unrestrictedBoundaryCalls : 0;
+  const outsideBoundaryCalls = executed.reduce((sum, record) => sum + record.baselineOutsideBoundaryCalls, 0);
   const passed = failures.length === 0
     && runtimeRatio <= runtimeCap
     && callReduction >= minimumCallReduction
@@ -235,11 +247,11 @@ async function worker() {
     callsSaved,
     callReduction: +callReduction.toFixed(4),
     minimumCallReduction,
-    observedScheduleUpperBound,
-    observedScheduleCallsSaved,
-    observedScheduleCallReduction: observedScheduleUpperBound
-      ? +(observedScheduleCallsSaved / observedScheduleUpperBound).toFixed(4)
-      : 0,
+    unrestrictedBoundaryCalls,
+    filteredBoundaryCalls,
+    boundaryCallsSaved,
+    boundaryCallReduction: +boundaryCallReduction.toFixed(4),
+    unchangedOutsideBoundaryCalls: outsideBoundaryCalls,
     baselineElapsedMs: baselineMs,
     filteredElapsedMs: filteredMs,
     runtimeRatio: +runtimeRatio.toFixed(4),
