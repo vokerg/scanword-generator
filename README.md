@@ -2,50 +2,33 @@
 
 A browser-based generator for Russian Swedish-style crosswords (arrowwords / scanwords) on an exact A5 page.
 
-## Current project baseline: complete frontier 1.3
+## Start here
 
-The project is an actively developed draft. Its canonical browser path is:
+New contributors and continuation chats should read:
+
+- [`CONTINUATION.md`](CONTINUATION.md) — current production state, Phase 11 closure and exact next steps;
+- [`AGENTS.md`](AGENTS.md) — repository operating rules;
+- [`docs/milestones/v1.3-complete-pipeline-frontier.md`](docs/milestones/v1.3-complete-pipeline-frontier.md) — accepted production baseline;
+- [`research/preallocation-structural-frontier/README.md`](research/preallocation-structural-frontier/README.md) — complete Phase 11 evidence and negative result.
+
+## Current production baseline: complete frontier 1.3
+
+The canonical browser path is:
 
 ```text
 40,966-entry attributed corpus v8
 -> deterministic 2,500/3,500 seed-specific working sets
 -> indexed construction and exact clue allocation
--> width-four repair-potential frontier
+-> width-four repair-potential complete-pipeline frontier
 -> complete clue and repair chain per finalist
 -> same-geometry editorial repair
 -> complete structural validation
 -> canonical panel-first final comparison
 ```
 
-The explicit orchestrator remains the sole production `generateBest` owner. Phase 10 changes candidate retention and selected outputs, not global ownership.
+The explicit orchestrator remains the sole production `generateBest` owner.
 
-Decision records:
-
-- [Milestone 1.3 — bounded complete-pipeline frontier](docs/milestones/v1.3-complete-pipeline-frontier.md)
-- [Phase 10 evidence ledger](research/complete-pipeline-frontier/README.md)
-- [Milestone 1.2 — explicit production pipeline](docs/milestones/v1.2-explicit-pipeline-default.md)
-- [Architecture and contribution rules](AGENTS.md)
-
-## Accepted Phase 10 evidence
-
-All locked development, promotion and stability A/B pairs were valid, connected and exact-clue-only. The accepted frontier had zero canonical regressions.
-
-| seed set | wins | ties | regressions | residual panels | runtime ratio |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| development-20 | 16 | 4 | 0 | 5.30 → **4.65** | 1.1676 |
-| promotion-50 | 41 | 9 | 0 | 5.10 → **4.60** | 1.1815 |
-| stability-100 | 63 | 37 | 0 | 4.84 → **4.37** | 1.1850 |
-
-The exact Phase 9 result is immutable frontier member zero and wins complete ties. The runtime cap was 1.35.
-
-Frozen implementation:
-
-```text
-df537dd5f47712062fb6224d4e42cb67e41876b3
-refs/heads/research/archive-phase-10-complete-pipeline-frontier-evidence-2026-07-23
-```
-
-## Browser defaults
+### Browser defaults
 
 ```text
 SCANWORD_CONSTRUCTION_MODE=portfolio
@@ -59,6 +42,7 @@ SCANWORD_PIPELINE_STAGE_RUNTIME=explicit
 SCANWORD_WRAPPER_INSTALLATION_LOCK=explicit-pipeline-v1
 SCANWORD_COMPLETE_PIPELINE_FRONTIER=on
 SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH=4
+SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER=off
 SCANWORD_FULL_CORPUS_RETRIEVAL=off
 SCANWORD_CLUE_FEASIBILITY=off
 SCANWORD_PARTIAL_SEARCH=off
@@ -76,7 +60,66 @@ Historical wrapper-chain rollback:
 SCANWORD_EXPLICIT_PIPELINE=off
 ```
 
-Node benchmarks set frontier mode explicitly. Historical baseline configurations remain reproducible rather than silently inheriting a new flag.
+## Accepted Phase 10 evidence
+
+All 170 locked A/B pairs were valid, connected and exact-clue-only. The width-four complete frontier had zero canonical regressions.
+
+| seed set | wins | ties | regressions | panels baseline → frontier | runtime ratio |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| development-20 | 16 | 4 | 0 | 5.30 → 4.65 | 1.1676 |
+| promotion-50 | 41 | 9 | 0 | 5.10 → 4.60 | 1.1815 |
+| stability-100 | 63 | 37 | 0 | 4.84 → 4.37 | 1.1850 |
+
+Frozen Phase 10 implementation:
+
+```text
+df537dd5f47712062fb6224d4e42cb67e41876b3
+refs/heads/research/archive-phase-10-complete-pipeline-frontier-evidence-2026-07-23
+```
+
+## Phase 11 research closure
+
+Phase 11 moved a deterministic frontier before exact clue allocation and measured real allocator work.
+
+The width-96 rank-only filter achieved:
+
+| seed set | exact parity | total allocation reduction | runtime ratio |
+| --- | ---: | ---: | ---: |
+| development-20 | 20/20 | 48.46% | 0.9146 |
+| promotion-50 | 50/50 | 48.79% | 0.9306 |
+| stability-100 | 99/100 | 48.98% | 0.9442 |
+
+Production promotion is rejected because `v8-stability-058` changed from 4 residual panels to 7. The result remained valid and exact-clue-only, but violated the primary canonical objective.
+
+The Phase 11 code, telemetry, deterministic tests, rejected variants and benchmark harness remain on `main` as default-off research:
+
+```text
+SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER=off
+```
+
+Frozen implementation:
+
+```text
+5f8fb8dcb446d1dcf13e1ef5fc1cee0c151906e4
+refs/heads/research/archive-phase-11-preallocation-structural-filter-evidence-2026-07-25
+```
+
+See [`docs/milestones/phase-11-preallocation-research-closure.md`](docs/milestones/phase-11-preallocation-research-closure.md).
+
+## Next investigation
+
+Phase 12 should accelerate exact clue allocation internally instead of skipping candidates:
+
+```text
+profile assignClueTextCellsV2
+-> cache immutable geometry/domain work
+-> reuse safe work across deterministic restarts
+-> add admissible branch-and-bound pruning
+-> preserve exact selected layouts and digests
+-> validate on fresh seed sets
+```
+
+Do not tune against Phase 11 promotion or stability seeds. The detailed execution boundary is in [`CONTINUATION.md`](CONTINUATION.md).
 
 ## Production ownership
 
@@ -87,7 +130,7 @@ rollback owner:             legacy-wrapper-chain
 installation lock:          explicit-pipeline-v1
 ```
 
-The accepted direct source now executes:
+The direct source executes:
 
 ```text
 construction portfolio and repair-potential frontier
@@ -102,47 +145,6 @@ construction portfolio and repair-potential frontier
 -> editorial repair
 -> complete final comparison
 ```
-
-The legacy guard is generated once and cloned per finalist. Frontier width does not multiply unrestricted construction attempts.
-
-## Repair-potential frontier
-
-The frontier preserves the exact local construction winner and retains at most four non-dominated candidates. Its deterministic vector includes:
-
-```text
-residual panels, panel regions and isolated panels
-residual concentration
-letter cells, crossings and answers
-weak fill, clue-text cells and external clue capacity
-```
-
-Residual topology allows a candidate with a small current panel disadvantage to survive when its remaining cells are more concentrated and repairable. Only complete valid connected exact-clue results can win the final comparison.
-
-Final priority is lexicographic:
-
-1. fewer residual panels;
-2. more answers;
-3. more crossings;
-4. greater raw-letter coverage;
-5. fewer formulaic short answers;
-6. lower editorial penalty;
-7. lower selected-grid clue debt;
-8. higher solver score;
-9. exact member-zero preference on complete ties.
-
-## Retained research features
-
-### Bounded full-corpus retrieval
-
-`SCANWORD_FULL_CORPUS_RETRIEVAL=on` permits bounded fixed-letter pattern retrieval from the complete admitted corpus during same-geometry repair. It remains off by default. See [the retrieval ledger](research/full-corpus-retrieval/README.md).
-
-### Incremental clue-feasibility diagnostics
-
-`SCANWORD_CLUE_FEASIBILITY=shadow` observes regional clue capacity without changing output. Direct local ranking was rejected because its modest density improvement caused complete-objective regressions. See [the feasibility ledger](research/clue-feasibility/README.md).
-
-### Bounded partial-state search
-
-`SCANWORD_PARTIAL_SEARCH=beam` adds a deterministic late-placement beam while preserving exact greedy replay. Its density gain remains too expensive for the default. See [bounded search](research/bounded-partial-search/README.md) and [adaptive search](research/adaptive-partial-search/README.md).
 
 ## Structural guarantees
 
@@ -161,89 +163,52 @@ The complete validator remains the acceptance authority.
 
 ## Corpus
 
-The generated v8 corpus contains 40,966 unique clue-bearing entries:
-
-| category group | entries |
-| --- | ---: |
-| common nouns | 4,358 |
-| specialist nouns | 20,099 |
-| given names | 2,798 |
-| surnames | 2,087 |
-| patronymics | 115 |
-| cities | 9,752 |
-| capitals | 163 |
-| countries | 125 |
-| regions | 397 |
-| rivers | 328 |
-| mountains, ranges, peaks and hills | 429 |
-| lakes, seas and bays | 118 |
-| islands and island groups | 109 |
-| valleys, plateaus and volcanoes | 88 |
-
-Generated chunks are build artifacts. Change `tools/build-bulk-lexicon-v8.py` or its documented source policy and regenerate the manifest, loader and every chunk together.
+The generated v8 corpus contains 40,966 unique clue-bearing entries. Generated chunks are build artifacts; change `tools/build-bulk-lexicon-v8.py` or its documented source policy and regenerate the manifest, loader and every chunk together.
 
 ## Running locally
-
-Open `index.html`, or serve the repository:
 
 ```bash
 python3 -m http.server 8080
 ```
 
-Then open `http://localhost:8080`.
+Open `http://localhost:8080`.
 
 ## Core quality gates
 
 ```bash
 node tools/bulk-lexicon-audit.cjs
 node tools/dictionary-count-v3.cjs
-node tools/wrapper-retirement-test-v1.cjs
-SCANWORD_COMPLETE_PIPELINE_FRONTIER=off \
-  node tools/construction-stage-runtime-test-v2.cjs
 node tools/complete-pipeline-frontier-test-v1.cjs
-
-SCANWORD_FRONTIER_CONCURRENCY=4 \
-SCANWORD_FRONTIER_RUNTIME_RATIO=1.35 \
-SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH=4 \
-SCANWORD_FRONTIER_REQUIRE_WIN=1 \
-  node tools/complete-pipeline-frontier-checkpoint-v1.cjs \
-  research/baselines/seed-sets/development-20.json \
-  research-output/complete-pipeline-frontier/development-20.jsonl
+node tools/construction-stage-runtime-test-v2.cjs
+NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
+  node tools/wrapper-retirement-test-v1.cjs
+node tools/preallocation-structural-frontier-test-v1.cjs
+node tools/preallocation-repair-potential-test-v1.cjs
+node tools/preallocation-ranked-frontier-test-v1.cjs
+node tools/preallocation-filter-test-v1.cjs
 ```
 
-Use the dedicated workflow for the sequential locked development-20, promotion-50 and stability-100 boundary.
-
-## Rollback and A/B controls
-
-```text
-SCANWORD_COMPLETE_PIPELINE_FRONTIER=off         exact Phase 9 single-candidate path
-SCANWORD_EXPLICIT_PIPELINE=off                  historical complete wrapper chain
-SCANWORD_VOCABULARY_PORTFOLIO_MODE=adaptive    conservative active-set early acceptance
-SCANWORD_FULL_CORPUS_RETRIEVAL=on               bounded constrained-pattern retrieval
-SCANWORD_CLUE_FEASIBILITY=shadow                exact-parity feasibility telemetry
-SCANWORD_PARTIAL_SEARCH=beam                    bounded complete-pipeline beam probe
-```
+Historical locked configurations set feature modes explicitly and must remain reproducible.
 
 ## Repository map
 
 ```text
-index.html                                      browser defaults and script order
-bulk-lexicon/                                   generated corpus, loader and manifest
-solver.js                                       base placement, metrics and validation
-construction-portfolio.js                       construction ranking and retained frontier
-construction-stage-runtime-v2.js                complete finalist processing and comparison
-construction-stage-source-anchor-v2.js          pre-wrapper production source
-construction-candidate-state-v1.js              explicit state, cloning and signatures
-construction-pipeline-v1.js                     sole production orchestrator
-construction-wrapper-retirement-audit-v1.js     ownership/default audit
-construction-*.js                               construction and repair algorithms
-editorial-*.js                                  lexical policy and repair vocabulary
-renderer.js, ui.js                              A5 rendering, controls and exports
-research/                                       evidence ledgers and negative results
-docs/milestones/                                accepted project boundaries
-tools/                                          builders, tests and benchmarks
+index.html                                  browser defaults and script order
+solver.js                                   base placement, metrics and validation
+construction-portfolio.js                   construction ranking and Phase 10 frontier
+construction-preallocation-*.js             default-off Phase 11 research
+construction-stage-runtime-v2.js            complete finalist processing and comparison
+construction-pipeline-v1.js                 sole production orchestrator
+research/                                   evidence ledgers and negative results
+docs/milestones/                            accepted and closed phase decisions
+tools/                                      builders, tests and benchmarks
+CONTINUATION.md                              canonical handoff and next plan
 ```
 
-## Known debt and next investigation
+## Merge and archive policy
 
-The project does not claim zero-panel generation or publication-ready clue prose. Phase 10 retains candidates only after exact clue allocation. The next bounded optimization should move a cheap structural frontier before exact allocation, allocate clues only for finalists, and prove either complete output parity or a separately accepted quality improvement with measured allocation savings.
+- `main` is the only long-lived development branch.
+- Every logical phase or documentation block is squash-merged.
+- Exact implementation heads are preserved under immutable `research/archive-*` refs before documentation-only commits.
+- Negative experiments and harness defects remain documented and reproducible.
+- Promotion and stability seeds are never tuning data.

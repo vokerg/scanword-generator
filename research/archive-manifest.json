@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "status": "active",
-  "auditedDate": "2026-07-24",
+  "auditedDate": "2026-07-25",
   "mainRef": "refs/remotes/origin/main",
-  "auditedMainCommit": "c09c1694c9656f5003a823085d57663a641f57ed",
+  "auditedMainCommit": "2790ed77edee0ab60bd9862dca0a276b92d1f2bb",
   "policy": {
     "historicalBranchNamesAreLabelsUnlessListed": true,
     "requiredRefsMustResolveExactly": true,
@@ -133,6 +133,42 @@
       "ref": "refs/heads/research/archive-phase-10-complete-pipeline-frontier-acceptance-2026-07-24",
       "commit": "499a242bf5e4b84aa01148a6e1db042fc50ea44a",
       "contains": ["499a242bf5e4b84aa01148a6e1db042fc50ea44a"]
+    },
+    {
+      "name": "phase-11-preallocation-filter-implementation",
+      "ref": "refs/heads/research/archive-phase-11-preallocation-structural-filter-evidence-2026-07-25",
+      "commit": "5f8fb8dcb446d1dcf13e1ef5fc1cee0c151906e4",
+      "contains": ["5f8fb8dcb446d1dcf13e1ef5fc1cee0c151906e4"]
+    },
+    {
+      "name": "phase-11-preallocation-filter-closure",
+      "ref": "refs/heads/research/archive-phase-11-preallocation-structural-filter-closure-2026-07-25",
+      "commit": "7670d088d01db2b2a8b4a0f26c0b635e5c7a8239",
+      "contains": ["7670d088d01db2b2a8b4a0f26c0b635e5c7a8239"]
+    },
+    {
+      "name": "superseded-explicit-pipeline-roadmap",
+      "ref": "refs/heads/research/archive-superseded-explicit-pipeline-roadmap-2026-07-25",
+      "commit": "843a30066357d4766d9f5f33489a11fa65236a4b",
+      "contains": ["843a30066357d4766d9f5f33489a11fa65236a4b"]
+    },
+    {
+      "name": "superseded-phase-8-explicit-stage-migration",
+      "ref": "refs/heads/research/archive-superseded-phase-8-explicit-stage-migration-2026-07-25",
+      "commit": "e9f5eb36996e5221eec8ba6ea18c9c3ad2d5aff2",
+      "contains": ["e9f5eb36996e5221eec8ba6ea18c9c3ad2d5aff2"]
+    },
+    {
+      "name": "superseded-selected-grid-editorial-quality-1.2",
+      "ref": "refs/heads/research/archive-superseded-selected-grid-editorial-quality-1.2-2026-07-25",
+      "commit": "8203dc044969afc59d00d7cb5a207d219cb71957",
+      "contains": ["8203dc044969afc59d00d7cb5a207d219cb71957"]
+    },
+    {
+      "name": "superseded-vocabulary-greatness-1.1",
+      "ref": "refs/heads/research/archive-superseded-vocabulary-greatness-1.1-2026-07-25",
+      "commit": "89a8411141423294e3430373036bb278e420d758",
+      "contains": ["89a8411141423294e3430373036bb278e420d758"]
     }
   ]
 }
