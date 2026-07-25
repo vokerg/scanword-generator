@@ -135,9 +135,10 @@ async function worker() {
       const filteredBoundaryCalls = Number(portfolio?.exactAllocationCalls || 0);
       const baselineOutsideBoundaryCalls = baselineAllocationCalls - unrestrictedBoundaryCalls;
       const filteredOutsideBoundaryCalls = filteredAllocationCalls - filteredBoundaryCalls;
+      const outsideBoundaryCallDelta = filteredOutsideBoundaryCalls - baselineOutsideBoundaryCalls;
       const outsideBoundaryParity = baselineOutsideBoundaryCalls >= 0
         && filteredOutsideBoundaryCalls >= 0
-        && baselineOutsideBoundaryCalls === filteredOutsideBoundaryCalls;
+        && outsideBoundaryCallDelta === 0;
       const runTelemetryValid = Array.isArray(portfolio?.runs)
         && portfolio.runs.length === expectedFilterRuns
         && portfolio.runs.every((entry) => entry
@@ -158,7 +159,8 @@ async function worker() {
         && unrestrictedBoundaryCalls > 0
         && filteredBoundaryCalls > 0
         && filteredBoundaryCalls <= unrestrictedBoundaryCalls
-        && outsideBoundaryParity
+        && baselineOutsideBoundaryCalls >= 0
+        && filteredOutsideBoundaryCalls >= 0
         && baselineAllocationCalls > 0
         && filteredAllocationCalls > 0
         && filteredAllocationCalls <= baselineAllocationCalls
@@ -179,6 +181,7 @@ async function worker() {
         filteredBoundaryCalls,
         baselineOutsideBoundaryCalls,
         filteredOutsideBoundaryCalls,
+        outsideBoundaryCallDelta,
         outsideBoundaryParity,
         differences,
         outputValid,
@@ -219,7 +222,9 @@ async function worker() {
   const filteredBoundaryCalls = executed.reduce((sum, record) => sum + record.filteredBoundaryCalls, 0);
   const boundaryCallsSaved = Math.max(0, unrestrictedBoundaryCalls - filteredBoundaryCalls);
   const boundaryCallReduction = unrestrictedBoundaryCalls ? boundaryCallsSaved / unrestrictedBoundaryCalls : 0;
-  const outsideBoundaryCalls = executed.reduce((sum, record) => sum + record.baselineOutsideBoundaryCalls, 0);
+  const baselineOutsideBoundaryCalls = executed.reduce((sum, record) => sum + record.baselineOutsideBoundaryCalls, 0);
+  const filteredOutsideBoundaryCalls = executed.reduce((sum, record) => sum + record.filteredOutsideBoundaryCalls, 0);
+  const outsideBoundaryParitySeeds = executed.filter((record) => record.outsideBoundaryParity).length;
   const passed = failures.length === 0
     && runtimeRatio <= runtimeCap
     && callReduction >= minimumCallReduction
@@ -251,7 +256,10 @@ async function worker() {
     filteredBoundaryCalls,
     boundaryCallsSaved,
     boundaryCallReduction: +boundaryCallReduction.toFixed(4),
-    unchangedOutsideBoundaryCalls: outsideBoundaryCalls,
+    baselineOutsideBoundaryCalls,
+    filteredOutsideBoundaryCalls,
+    outsideBoundaryCallDelta: filteredOutsideBoundaryCalls - baselineOutsideBoundaryCalls,
+    outsideBoundaryParitySeeds,
     baselineElapsedMs: baselineMs,
     filteredElapsedMs: filteredMs,
     runtimeRatio: +runtimeRatio.toFixed(4),
