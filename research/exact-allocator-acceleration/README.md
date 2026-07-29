@@ -81,26 +81,86 @@ Heavy observations are attached non-enumerably to the allocated grid. Compact pr
 
 No optimization has been implemented or promoted. Browser and Node defaults remain `off`.
 
+## Frozen Phase 12 seed boundary
+
+Fresh seed sets were derived and committed before optimization work:
+
+```text
+development: 20
+promotion:   50
+stability:  100
+```
+
+Manifest:
+
+```text
+research/exact-allocator-acceleration/seed-manifest-v1.json
+```
+
+Canonical manifest digest:
+
+```text
+389647aadef2a55df6f8f7ba3e5dd6c3f26ad86cd9b53030a22f58a9e754d2e9
+```
+
+The deterministic materializer and verifier is `tools/phase-12-seed-manifest-v1.cjs`. The seed namespace, split counts, derivation and digest are frozen before any cache or pruning candidate is introduced.
+
+## Frozen-seed profiling checkpoint
+
+`tools/exact-allocator-profile-checkpoint-v1.cjs` runs each selected seed twice:
+
+```text
+canonical profile-off baseline
+-> profile-shadow authoritative run plus exact replay
+-> exact final-output digest comparison
+-> per-call replay and RNG parity validation
+-> aggregate immutable setup, restart search and application work
+```
+
+The checkpoint does not treat shadow overhead as an optimization result. Its purpose is to establish where authoritative allocator work is spent and to reject any profiler or wrapper behavior that changes selected output.
+
+Reproduce the frozen development split:
+
+```bash
+node tools/exact-allocator-profile-checkpoint-v1.cjs \
+  development \
+  research-output/exact-allocator-acceleration/development-profile-v1.jsonl
+```
+
+The Phase 12 workflow exposes this as a manual `development-profile` job and uploads the JSONL evidence artifact.
+
 ## Planned investigation
 
 1. **Completed:** locate the complete `assignClueTextCellsV2` call graph and restart boundary.
-2. **Implemented, validation pending:** add default-off allocation telemetry with deterministic counters and timing summaries.
-3. Create fresh Phase 12 development, promotion and stability seed manifests before tuning.
-4. Measure repeated immutable work across restarts and candidates.
+2. **Completed:** add default-off allocation telemetry with deterministic counters and timing summaries.
+3. **Completed:** freeze fresh Phase 12 development, promotion and stability seed manifests before tuning.
+4. **Ready to execute:** measure repeated immutable work across restarts and candidates on development-20.
 5. Introduce one bounded optimization at a time behind an explicit default-off flag.
 6. Require exact digest parity before considering runtime evidence.
 7. Preserve the exact implementation head under an immutable `research/archive-*` ref before documentation-only closure commits.
 
 ## Profiler validation
 
+Primitive validation passed in workflow run:
+
+```text
+30421463278
+```
+
+The job proved exact replayed layout/grid parity, exact random-draw consumption, full restart summaries in diagnostic mode, frozen seed-manifest integrity and zero observations when the feature is off.
+
+Local commands:
+
 ```bash
 node --check construction-exact-allocator-profile-v1.js
+node --check tools/construction-pipeline-seed-v1.cjs
 node --check tools/exact-allocator-profile-test-v1.cjs
+node --check tools/exact-allocator-profile-checkpoint-v1.cjs
+node --check tools/phase-12-seed-manifest-v1.cjs
+node tools/phase-12-seed-manifest-v1.cjs
 NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
   node tools/exact-allocator-profile-test-v1.cjs
 ```
-
-The primitive test requires exact replayed layout/grid parity, exact random-draw consumption, full restart summaries in diagnostic mode and zero observations when the feature is off.
 
 ## Required baseline gates
 
