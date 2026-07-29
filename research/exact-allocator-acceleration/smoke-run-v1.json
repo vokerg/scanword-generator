@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "phase": "Phase 12 — exact allocator acceleration",
+  "status": "requested",
+  "requested": "2026-07-29",
+  "sourceHeadBeforeRequest": "e584bcb7deb598f7bc24a30a5861868eeb2e57a3",
+  "split": "development",
+  "seedLimit": 1,
+  "purpose": "Validate the production-path checkpoint and identify the preliminary dominant allocator work bucket before optimization."
+}
