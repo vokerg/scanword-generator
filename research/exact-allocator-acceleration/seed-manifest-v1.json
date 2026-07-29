@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "phase": "Phase 12 — exact allocator acceleration",
+  "status": "frozen-before-optimization",
+  "created": "2026-07-29",
+  "sourceBaseline": "ab9f43f525280a674c49ecd7304f62cc4eb0c15c",
+  "namespace": "phase-12-exact-allocator-acceleration-v1",
+  "derivation": "sha256(namespace + ':' + split + ':' + oneBasedIndex), first 16 hex characters",
+  "canonicalOrder": [
+    "development",
+    "promotion",
+    "stability"
+  ],
+  "splits": {
+    "development": 20,
+    "promotion": 50,
+    "stability": 100
+  },
+  "manifestDigestInput": "one line per seed as split:derivedSeed with a final newline",
+  "manifestDigestSha256": "389647aadef2a55df6f8f7ba3e5dd6c3f26ad86cd9b53030a22f58a9e754d2e9"
+}

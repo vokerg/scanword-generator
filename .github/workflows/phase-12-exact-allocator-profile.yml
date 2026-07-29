@@ -1,0 +1,153 @@
+name: Phase 12 exact allocator profile
+
+on:
+  push:
+    branches:
+      - "agent/phase-12-exact-allocator-acceleration"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "construction-exact-allocator-profile-v1.js"
+      - "index.html"
+      - "tools/construction-pipeline-seed-v1.cjs"
+      - "tools/exact-allocator-profile-test-v1.cjs"
+      - "tools/exact-allocator-profile-checkpoint-v1.cjs"
+      - "tools/node-benchmark-bootstrap-v1.cjs"
+      - "tools/phase-12-seed-manifest-v1.cjs"
+      - "research/exact-allocator-acceleration/**"
+      - ".github/workflows/phase-12-exact-allocator-profile.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: phase-12-exact-allocator-profile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  exact-replay-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check Phase 12 syntax and default-off boundary
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          node --check construction-exact-allocator-profile-v1.js
+          node --check tools/construction-pipeline-seed-v1.cjs
+          node --check tools/exact-allocator-profile-test-v1.cjs
+          node --check tools/exact-allocator-profile-checkpoint-v1.cjs
+          node --check tools/phase-12-seed-manifest-v1.cjs
+          node --check tools/node-benchmark-bootstrap-v1.cjs
+          grep -q 'SCANWORD_EXACT_ALLOCATOR_PROFILE = "off"' index.html
+          grep -q 'construction-exact-allocator-profile-v1.js' index.html
+          grep -q 'construction-exact-allocator-profile-v1.js' tools/node-benchmark-bootstrap-v1.cjs
+
+      - name: Verify frozen Phase 12 seed sets
+        run: node tools/phase-12-seed-manifest-v1.cjs
+
+      - name: Prove shadow replay parity
+        env:
+          SCANWORD_BULK_LEXICON: "off"
+        run: >-
+          NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs
+          node tools/exact-allocator-profile-test-v1.cjs
+
+      - name: Preserve accepted Phase 10 and Phase 11 contracts
+        run: |
+          node tools/preallocation-structural-frontier-test-v1.cjs
+          node tools/preallocation-repair-potential-test-v1.cjs
+          node tools/preallocation-ranked-frontier-test-v1.cjs
+          node tools/preallocation-filter-test-v1.cjs
+          node tools/complete-pipeline-frontier-test-v1.cjs
+          node tools/construction-stage-runtime-test-v2.cjs
+          NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
+            node tools/wrapper-retirement-test-v1.cjs
+
+  production-path-profile-smoke:
+    if: >-
+      github.event_name == 'push'
+      && github.event.head_commit.message == 'Research: run Phase 12 allocator profile smoke'
+    needs: exact-replay-parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      SOURCE_SHA: ${{ github.sha }}
+      SCANWORD_EXACT_ALLOCATOR_PROFILE_CONCURRENCY: 1
+      SCANWORD_EXACT_ALLOCATOR_PROFILE_SEED_LIMIT: 1
+      SCANWORD_EXACT_ALLOCATOR_PROFILE_SEED_TIMEOUT_MS: 7200000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Profile first frozen development seed
+        run: |
+          set -o pipefail
+          mkdir -p research-output/exact-allocator-acceleration
+          node tools/exact-allocator-profile-checkpoint-v1.cjs \
+            development \
+            research-output/exact-allocator-acceleration/development-smoke-v1.jsonl \
+            | tee research-output/exact-allocator-acceleration/development-smoke-console-v1.jsonl
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-12-exact-allocator-smoke-${{ env.SOURCE_SHA }}
+          path: research-output/exact-allocator-acceleration/
+          if-no-files-found: error
+
+  development-profile:
+    if: github.event_name == 'workflow_dispatch'
+    needs: exact-replay-parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      SOURCE_SHA: ${{ github.sha }}
+      SCANWORD_EXACT_ALLOCATOR_PROFILE_CONCURRENCY: 4
+      SCANWORD_EXACT_ALLOCATOR_PROFILE_SEED_TIMEOUT_MS: 1800000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Profile frozen development-20
+        run: |
+          set -o pipefail
+          mkdir -p research-output/exact-allocator-acceleration
+          node tools/exact-allocator-profile-checkpoint-v1.cjs \
+            development \
+            research-output/exact-allocator-acceleration/development-profile-v1.jsonl \
+            | tee research-output/exact-allocator-acceleration/development-profile-console-v1.jsonl
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-12-exact-allocator-development-${{ env.SOURCE_SHA }}
+          path: research-output/exact-allocator-acceleration/
+          if-no-files-found: error
