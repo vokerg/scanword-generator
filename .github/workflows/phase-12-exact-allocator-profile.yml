@@ -1,0 +1,41 @@
+name: Phase 12 exact allocator profile
+
+on:
+  pull_request:
+    paths:
+      - "construction-exact-allocator-profile-v1.js"
+      - "index.html"
+      - "tools/exact-allocator-profile-test-v1.cjs"
+      - "tools/node-benchmark-bootstrap-v1.cjs"
+      - "research/exact-allocator-acceleration/**"
+      - ".github/workflows/phase-12-exact-allocator-profile.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-replay-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check profiler syntax
+        run: node --check construction-exact-allocator-profile-v1.js
+
+      - name: Check primitive test syntax
+        run: node --check tools/exact-allocator-profile-test-v1.cjs
+
+      - name: Prove shadow replay parity
+        env:
+          SCANWORD_BULK_LEXICON: "off"
+        run: >-
+          NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs
+          node tools/exact-allocator-profile-test-v1.cjs
