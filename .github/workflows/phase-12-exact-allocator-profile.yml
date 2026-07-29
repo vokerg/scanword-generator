@@ -1,12 +1,16 @@
 name: Phase 12 exact allocator profile
 
 on:
+  push:
+    branches:
+      - "agent/phase-12-exact-allocator-acceleration"
   pull_request:
     paths:
       - "construction-exact-allocator-profile-v1.js"
       - "index.html"
       - "tools/exact-allocator-profile-test-v1.cjs"
       - "tools/node-benchmark-bootstrap-v1.cjs"
+      - "tools/phase-12-seed-manifest-v1.cjs"
       - "research/exact-allocator-acceleration/**"
       - ".github/workflows/phase-12-exact-allocator-profile.yml"
   workflow_dispatch:
@@ -32,6 +36,12 @@ jobs:
 
       - name: Check primitive test syntax
         run: node --check tools/exact-allocator-profile-test-v1.cjs
+
+      - name: Check seed-manifest tool syntax
+        run: node --check tools/phase-12-seed-manifest-v1.cjs
+
+      - name: Verify frozen Phase 12 seed sets
+        run: node tools/phase-12-seed-manifest-v1.cjs
 
       - name: Prove shadow replay parity
         env:
