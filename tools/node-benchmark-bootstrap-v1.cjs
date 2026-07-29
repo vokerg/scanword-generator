@@ -13,6 +13,7 @@ const supportedEntries = new Set([
   "adaptive-partial-search-test.cjs",
   "construction-stage-runtime-test-v2.cjs",
   "wrapper-retirement-test-v1.cjs",
+  "exact-allocator-profile-test-v1.cjs",
 ]);
 if (!supportedEntries.has(entry)) return;
 
@@ -46,6 +47,7 @@ const scripts = [
   "construction-victim.js",
   "construction-victim-depth2.js",
   "construction-stage-source-anchor-v2.js",
+  "construction-exact-allocator-profile-v1.js",
   "construction-portfolio.js",
   "construction-preallocation-frontier-v1.js",
   "construction-preallocation-repair-potential-v1.js",
@@ -102,6 +104,7 @@ const benchmarkEntrypoints = new Set([
   path.join(__dirname, "adaptive-partial-search-test.cjs"),
   path.join(__dirname, "construction-stage-runtime-test-v2.cjs"),
   path.join(__dirname, "wrapper-retirement-test-v1.cjs"),
+  path.join(__dirname, "exact-allocator-profile-test-v1.cjs"),
 ]);
 const originalLoad = Module._load;
 Module._load = function loadCanonicalBenchmarkDependency(request, parent, isMain) {
@@ -110,7 +113,7 @@ Module._load = function loadCanonicalBenchmarkDependency(request, parent, isMain
 };
 
 window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
-  version: 7,
+  version: 8,
   bulkEnabled,
   entry,
   scripts,
@@ -122,6 +125,7 @@ window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
   boundedPartialSearchFallback: "construction-bounded-partial-search-fallback-v1",
   adaptivePartialSearch: "construction-vocabulary-portfolio-v1",
   stageSourceAnchor: "construction-stage-source-anchor-v2",
+  exactAllocatorProfile: "construction-exact-allocator-profile-v1",
   preallocationStructuralFrontier: "construction-preallocation-frontier-v1",
   preallocationRepairPotential: "construction-preallocation-repair-potential-v1",
   preallocationRankedFrontier: "construction-preallocation-ranked-frontier-v1",
