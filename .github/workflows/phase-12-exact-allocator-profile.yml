@@ -77,6 +77,45 @@ jobs:
           NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
             node tools/wrapper-retirement-test-v1.cjs
 
+  production-path-profile-smoke:
+    if: >-
+      github.event_name == 'push'
+      && github.event.head_commit.message == 'Research: run Phase 12 allocator profile smoke'
+    needs: exact-replay-parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      SOURCE_SHA: ${{ github.sha }}
+      SCANWORD_EXACT_ALLOCATOR_PROFILE_CONCURRENCY: 1
+      SCANWORD_EXACT_ALLOCATOR_PROFILE_SEED_LIMIT: 1
+      SCANWORD_EXACT_ALLOCATOR_PROFILE_SEED_TIMEOUT_MS: 7200000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Profile first frozen development seed
+        run: |
+          set -o pipefail
+          mkdir -p research-output/exact-allocator-acceleration
+          node tools/exact-allocator-profile-checkpoint-v1.cjs \
+            development \
+            research-output/exact-allocator-acceleration/development-smoke-v1.jsonl \
+            | tee research-output/exact-allocator-acceleration/development-smoke-console-v1.jsonl
+
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-12-exact-allocator-smoke-${{ env.SOURCE_SHA }}
+          path: research-output/exact-allocator-acceleration/
+          if-no-files-found: error
+
   development-profile:
     if: github.event_name == 'workflow_dispatch'
     needs: exact-replay-parity
