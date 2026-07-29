@@ -79,13 +79,15 @@ jobs:
 
   production-path-profile-smoke:
     if: >-
-      github.event_name == 'push'
-      && github.event.head_commit.message == 'Research: run Phase 12 allocator profile smoke'
+      (github.event_name == 'push'
+      && github.event.head_commit.message == 'Research: run Phase 12 allocator profile smoke')
+      || (github.event_name == 'pull_request'
+      && github.head_ref == 'agent/phase-12-development-profile-evidence')
     needs: exact-replay-parity
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
-      SOURCE_SHA: ${{ github.sha }}
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       SCANWORD_EXACT_ALLOCATOR_PROFILE_CONCURRENCY: 1
       SCANWORD_EXACT_ALLOCATOR_PROFILE_SEED_LIMIT: 1
       SCANWORD_EXACT_ALLOCATOR_PROFILE_SEED_TIMEOUT_MS: 7200000
