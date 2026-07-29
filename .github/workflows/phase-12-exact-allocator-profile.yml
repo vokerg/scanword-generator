@@ -3,7 +3,7 @@ name: Phase 12 exact allocator profile
 on:
   push:
     branches:
-      - "agent/phase-12-exact-allocator-acceleration"
+      - "agent/phase-12-*"
   pull_request:
     branches:
       - main
