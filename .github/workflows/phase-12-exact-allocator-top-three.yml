@@ -61,11 +61,11 @@ jobs:
           NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs
           node tools/exact-allocator-top-three-test-v1.cjs
 
-  promotion-selector-profile:
+  stability-selector-profile:
     if: github.event_name == 'pull_request'
     needs: exact-selector-parity
     runs-on: ubuntu-latest
-    timeout-minutes: 480
+    timeout-minutes: 360
     env:
       SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
       SCANWORD_EXACT_ALLOCATOR_SELECTOR_CONCURRENCY: 4
@@ -81,18 +81,18 @@ jobs:
         with:
           node-version: 22
 
-      - name: Compare frozen promotion-50
+      - name: Compare frozen stability-100
         run: |
           set -o pipefail
           mkdir -p research-output/exact-allocator-acceleration
           node tools/exact-allocator-top-three-checkpoint-v1.cjs \
-            promotion \
-            research-output/exact-allocator-acceleration/promotion-top-three-v1.jsonl \
-            | tee research-output/exact-allocator-acceleration/promotion-top-three-console-v1.jsonl
+            stability \
+            research-output/exact-allocator-acceleration/stability-top-three-v1.jsonl \
+            | tee research-output/exact-allocator-acceleration/stability-top-three-console-v1.jsonl
 
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase-12-exact-allocator-top-three-promotion-${{ env.SOURCE_SHA }}
+          name: phase-12-exact-allocator-top-three-stability-${{ env.SOURCE_SHA }}
           path: research-output/exact-allocator-acceleration/
           if-no-files-found: error
