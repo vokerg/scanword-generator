@@ -25,7 +25,8 @@ if (process.env.SCANWORD_WRAPPER_INSTALLATION_LOCK) {
   window.SCANWORD_WRAPPER_INSTALLATION_LOCK = process.env.SCANWORD_WRAPPER_INSTALLATION_LOCK;
 }
 const selectorSetting = String(process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR || "linear-top-three").toLowerCase();
-window.SCANWORD_EXACT_ALLOCATOR_SELECTOR = selectorSetting === "off" ? "off" : "linear-top-three";
+process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR = selectorSetting === "off" ? "off" : "linear-top-three";
+window.SCANWORD_EXACT_ALLOCATOR_SELECTOR = process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR;
 
 const bulkEnabled = String(process.env.SCANWORD_BULK_LEXICON || "on").toLowerCase() !== "off";
 const scripts = [
@@ -133,7 +134,7 @@ window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
   adaptivePartialSearch: "construction-vocabulary-portfolio-v1",
   stageSourceAnchor: "construction-stage-source-anchor-v2",
   exactAllocatorSelector: "construction-exact-allocator-top-three-v1",
-  exactAllocatorSelectorDefault: window.SCANWORD_EXACT_ALLOCATOR_SELECTOR,
+  exactAllocatorSelectorDefault: process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR,
   exactAllocatorProfile: "construction-exact-allocator-profile-v1",
   preallocationStructuralFrontier: "construction-preallocation-frontier-v1",
   preallocationRepairPotential: "construction-preallocation-repair-potential-v1",
