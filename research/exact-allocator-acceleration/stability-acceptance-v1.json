@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "phase": "phase-12-exact-allocator-linear-top-three",
+  "status": "accepted-research-candidate",
+  "sourceBaseline": "e270e07e4747c18d3d59a5a9c26a6d68b43e8a5e",
+  "implementationHead": "5db8d25de2422ce1f62d21d4ffa2da7bb3cafb3e",
+  "seedManifestSha256": "389647aadef2a55df6f8f7ba3e5dd6c3f26ad86cd9b53030a22f58a9e754d2e9",
+  "controls": {
+    "default": "off",
+    "candidate": "linear-top-three",
+    "fallback": "canonical-stable-full-sort"
+  },
+  "development": {
+    "seeds": 20,
+    "exactOutputParity": 20,
+    "auditOutputParity": 20,
+    "fallbacks": 0,
+    "errors": 0,
+    "allocatorRuntimeRatio": 0.959,
+    "totalRuntimeRatio": 0.994,
+    "workflowRun": 30517578909,
+    "artifact": 8749748555,
+    "artifactSha256": "ccb42dd41e5a26bf28f7743cb3712da4e4bd5c322b79b01eb3bd8cfb3a3c21c5"
+  },
+  "promotion": {
+    "seeds": 50,
+    "exactOutputParity": 50,
+    "auditOutputParity": 50,
+    "fallbacks": 0,
+    "errors": 0,
+    "allocatorRuntimeRatio": 0.95,
+    "totalRuntimeRatio": 0.99,
+    "workflowRun": 30518444936,
+    "artifact": 8750320665,
+    "artifactSha256": "2d7008cff5455d8321b4babde8b36ff1580ea3db8e6815c3fe166040c40cf74e"
+  },
+  "stability": {
+    "seeds": 100,
+    "exactOutputParity": 100,
+    "auditOutputParity": 100,
+    "fallbacks": 0,
+    "errors": 0,
+    "exactAllocationCalls": 53622,
+    "allocatorRuntimeRatio": 0.9562,
+    "medianAllocatorRuntimeRatio": 0.9606,
+    "totalRuntimeRatio": 0.9891,
+    "medianTotalRuntimeRatio": 0.9941,
+    "auditShadowReplayRatio": 0.7327,
+    "workflowRun": 30520073731,
+    "artifact": 8752036962,
+    "artifactSha256": "f54cad7882f25cf63a0412febf75a501e0620b195f44ce1a16bf7dce09a4d6d4"
+  },
+  "decision": "land default-off implementation and evidence",
+  "next": "separate controlled production default-promotion branch"
+}
