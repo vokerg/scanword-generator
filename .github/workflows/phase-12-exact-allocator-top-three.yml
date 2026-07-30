@@ -61,15 +61,14 @@ jobs:
           NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs
           node tools/exact-allocator-top-three-test-v1.cjs
 
-  production-path-selector-smoke:
+  development-selector-profile:
     if: github.event_name == 'pull_request'
     needs: exact-selector-parity
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 360
     env:
       SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
-      SCANWORD_EXACT_ALLOCATOR_SELECTOR_CONCURRENCY: 1
-      SCANWORD_EXACT_ALLOCATOR_SELECTOR_SEED_LIMIT: 1
+      SCANWORD_EXACT_ALLOCATOR_SELECTOR_CONCURRENCY: 4
       SCANWORD_EXACT_ALLOCATOR_SELECTOR_SEED_TIMEOUT_MS: 7200000
     steps:
       - name: Check out exact candidate head
@@ -82,18 +81,18 @@ jobs:
         with:
           node-version: 22
 
-      - name: Compare first frozen development seed
+      - name: Compare frozen development-20
         run: |
           set -o pipefail
           mkdir -p research-output/exact-allocator-acceleration
           node tools/exact-allocator-top-three-checkpoint-v1.cjs \
             development \
-            research-output/exact-allocator-acceleration/development-top-three-smoke-v1.jsonl \
-            | tee research-output/exact-allocator-acceleration/development-top-three-smoke-console-v1.jsonl
+            research-output/exact-allocator-acceleration/development-top-three-v1.jsonl \
+            | tee research-output/exact-allocator-acceleration/development-top-three-console-v1.jsonl
 
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase-12-exact-allocator-top-three-smoke-${{ env.SOURCE_SHA }}
+          name: phase-12-exact-allocator-top-three-development-${{ env.SOURCE_SHA }}
           path: research-output/exact-allocator-acceleration/
           if-no-files-found: error
