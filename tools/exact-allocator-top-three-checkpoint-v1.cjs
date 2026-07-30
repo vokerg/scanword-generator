@@ -47,6 +47,7 @@ function runSeed(seed, selectorMode, profileMode) {
         SCANWORD_COMPLETE_PIPELINE_FRONTIER_WIDTH: "4",
         SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER: "off",
         SCANWORD_EXACT_ALLOCATOR_SELECTOR: selectorMode,
+        SCANWORD_EXACT_ALLOCATOR_SELECTOR_DETAIL: "summary",
         SCANWORD_EXACT_ALLOCATOR_PROFILE: profileMode,
         SCANWORD_EXACT_ALLOCATOR_PROFILE_DETAIL: "summary",
       },
@@ -119,6 +120,7 @@ function compactSelector(selector) {
   return {
     schemaVersion: Number(selector.schemaVersion || 0),
     mode: selector.mode || null,
+    detail: selector.detail || null,
     calls: Number(selector.calls || 0),
     fallbacks: Number(selector.fallbacks || 0),
     errors: Number(selector.errors || 0),
@@ -179,11 +181,10 @@ async function worker() {
         selector
         && selector.schemaVersion === 1
         && selector.mode === "linear-top-three"
+        && selector.detail === "summary"
         && selector.calls === candidate.exactAllocationCalls
         && selector.fallbacks === 0
         && selector.errors === 0
-        && selector.rankedCandidates > 0
-        && selector.comparatorCalls > 0
       );
       const profileValid = Boolean(
         profile
