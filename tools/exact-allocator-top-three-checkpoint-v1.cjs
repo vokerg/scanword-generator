@@ -104,15 +104,16 @@ function compact(summary) {
   };
 }
 
-function exactDifferences(baseline, candidate) {
-  const fields = [
-    "valid", "components", "exactCluesOnly", "panels", "answers", "crossings",
-    "rawLetterCoverage", "formulaicShortCount", "editorialPenalty", "clueDebt", "score",
-    "gridDigest", "placedDigest", "clueDigest", "geometryDigest",
-  ];
-  return fields
-    .filter((field) => baseline[field] !== candidate[field])
-    .map((field) => ({ field, baseline: baseline[field], candidate: candidate[field] }));
+const parityFields = [
+  "valid", "components", "exactCluesOnly", "panels", "answers", "crossings",
+  "rawLetterCoverage", "formulaicShortCount", "editorialPenalty", "clueDebt", "score",
+  "gridDigest", "placedDigest", "clueDigest", "geometryDigest",
+];
+
+function exactDifferences(first, second, firstLabel = "first", secondLabel = "second") {
+  return parityFields
+    .filter((field) => first[field] !== second[field])
+    .map((field) => ({ field, [firstLabel]: first[field], [secondLabel]: second[field] }));
 }
 
 function compactSelector(selector) {
@@ -151,6 +152,18 @@ function compactProfile(profile) {
   };
 }
 
+function validSelector(selector, allocationCalls) {
+  return Boolean(
+    selector
+    && selector.schemaVersion === 1
+    && selector.mode === "linear-top-three"
+    && selector.detail === "summary"
+    && selector.calls === allocationCalls
+    && selector.fallbacks === 0
+    && selector.errors === 0
+  );
+}
+
 function roundedRatio(numerator, denominator) {
   return denominator ? +(numerator / denominator).toFixed(4) : null;
 }
@@ -165,32 +178,30 @@ async function worker() {
     const seed = seeds[index];
     try {
       const baselineSummary = await runSeed(seed, "off", "off");
-      const candidateSummary = await runSeed(seed, "linear-top-three", "shadow");
+      const candidateSummary = await runSeed(seed, "linear-top-three", "off");
+      const auditSummary = await runSeed(seed, "linear-top-three", "shadow");
       const baseline = compact(baselineSummary);
       const candidate = compact(candidateSummary);
+      const audit = compact(auditSummary);
       const selector = compactSelector(candidateSummary.exactAllocatorSelector);
-      const profile = compactProfile(candidateSummary.exactAllocatorProfile);
-      const differences = exactDifferences(baseline, candidate);
+      const auditSelector = compactSelector(auditSummary.exactAllocatorSelector);
+      const profile = compactProfile(auditSummary.exactAllocatorProfile);
+      const differences = exactDifferences(baseline, candidate, "baseline", "candidate");
+      const auditDifferences = exactDifferences(candidate, audit, "candidate", "audit");
       const exactOutputParity = Boolean(
         candidate.valid
         && candidate.components === 1
         && candidate.exactCluesOnly
         && differences.length === 0
       );
-      const selectorValid = Boolean(
-        selector
-        && selector.schemaVersion === 1
-        && selector.mode === "linear-top-three"
-        && selector.detail === "summary"
-        && selector.calls === candidate.exactAllocationCalls
-        && selector.fallbacks === 0
-        && selector.errors === 0
-      );
+      const auditOutputParity = auditDifferences.length === 0;
+      const selectorValid = validSelector(selector, candidate.exactAllocationCalls)
+        && validSelector(auditSelector, audit.exactAllocationCalls);
       const profileValid = Boolean(
         profile
         && profile.schemaVersion === 1
         && profile.mode === "shadow"
-        && profile.calls === candidate.exactAllocationCalls
+        && profile.calls === audit.exactAllocationCalls
         && profile.parityFailures === 0
         && profile.randomDrawMismatches === 0
         && profile.errors === 0
@@ -198,23 +209,28 @@ async function worker() {
         && profile.replayElapsedMs > 0
       );
       results[index] = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         seed,
-        status: exactOutputParity && selectorValid && profileValid ? "ok" : "failed",
+        status: exactOutputParity && auditOutputParity && selectorValid && profileValid ? "ok" : "failed",
         baseline,
         candidate,
+        audit,
         differences,
+        auditDifferences,
         exactOutputParity,
+        auditOutputParity,
         selectorValid,
         profileValid,
         selector,
+        auditSelector,
         profile,
-        authoritativeAllocatorRatio: roundedRatio(profile?.originalElapsedMs, baseline.exactAllocationElapsedMs),
-        shadowReplayRatio: roundedRatio(profile?.originalElapsedMs, profile?.replayElapsedMs),
+        allocatorRuntimeRatio: roundedRatio(candidate.exactAllocationElapsedMs, baseline.exactAllocationElapsedMs),
+        totalRuntimeRatio: roundedRatio(candidate.elapsedMs, baseline.elapsedMs),
+        auditShadowReplayRatio: roundedRatio(profile?.originalElapsedMs, profile?.replayElapsedMs),
       };
     } catch (error) {
       results[index] = {
-        schemaVersion: 1,
+        schemaVersion: 2,
         seed,
         status: "error",
         error: String(error?.stack || error),
@@ -237,16 +253,26 @@ function median(values) {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
+function roundedMedian(values) {
+  const value = median(values);
+  return value == null ? null : +value.toFixed(4);
+}
+
 (async () => {
   await Promise.all(Array.from({ length: Math.min(concurrency, seeds.length) }, () => worker()));
   const failures = results.filter((record) => record?.status !== "ok");
-  const executed = results.filter((record) => record?.baseline && record?.candidate && record?.selector && record?.profile);
+  const executed = results.filter((record) => (
+    record?.baseline && record?.candidate && record?.audit && record?.selector && record?.auditSelector && record?.profile
+  ));
   const baselineAllocatorElapsedMs = sum(executed, (record) => record.baseline.exactAllocationElapsedMs);
-  const candidateAllocatorElapsedMs = sum(executed, (record) => record.profile.originalElapsedMs);
+  const candidateAllocatorElapsedMs = sum(executed, (record) => record.candidate.exactAllocationElapsedMs);
+  const baselineElapsedMs = sum(executed, (record) => record.baseline.elapsedMs);
+  const candidateElapsedMs = sum(executed, (record) => record.candidate.elapsedMs);
+  const auditAuthoritativeElapsedMs = sum(executed, (record) => record.profile.originalElapsedMs);
   const canonicalReplayElapsedMs = sum(executed, (record) => record.profile.replayElapsedMs);
   const summary = {
     type: "summary",
-    schemaVersion: 1,
+    schemaVersion: 2,
     phase: "exact-allocator-linear-top-three-v1",
     baselineId: baselineConfig.baselineId,
     sourceBaseline: seedManifest.manifest.sourceBaseline,
@@ -259,26 +285,22 @@ function median(values) {
     passedSeeds: results.length - failures.length,
     failures: failures.length,
     exactOutputParitySeeds: executed.filter((record) => record.exactOutputParity).length,
+    auditOutputParitySeeds: executed.filter((record) => record.auditOutputParity).length,
     selectorValidSeeds: executed.filter((record) => record.selectorValid).length,
     profileValidSeeds: executed.filter((record) => record.profileValid).length,
     exactAllocationCalls: sum(executed, (record) => record.candidate.exactAllocationCalls),
-    rankedDomains: sum(executed, (record) => record.selector.rankedDomains),
-    rankedCandidates: sum(executed, (record) => record.selector.rankedCandidates),
-    comparatorCalls: sum(executed, (record) => record.selector.comparatorCalls),
-    maximumDomainSize: Math.max(0, ...executed.map((record) => record.selector.maximumDomainSize)),
     baselineAllocatorElapsedMs: +baselineAllocatorElapsedMs.toFixed(3),
     candidateAllocatorElapsedMs: +candidateAllocatorElapsedMs.toFixed(3),
+    aggregateAllocatorRuntimeRatio: roundedRatio(candidateAllocatorElapsedMs, baselineAllocatorElapsedMs),
+    medianAllocatorRuntimeRatio: roundedMedian(executed.map((record) => record.allocatorRuntimeRatio)),
+    baselineElapsedMs,
+    candidateElapsedMs,
+    aggregateTotalRuntimeRatio: roundedRatio(candidateElapsedMs, baselineElapsedMs),
+    medianTotalRuntimeRatio: roundedMedian(executed.map((record) => record.totalRuntimeRatio)),
+    auditAuthoritativeElapsedMs: +auditAuthoritativeElapsedMs.toFixed(3),
     canonicalReplayElapsedMs: +canonicalReplayElapsedMs.toFixed(3),
-    aggregateAuthoritativeAllocatorRatio: roundedRatio(candidateAllocatorElapsedMs, baselineAllocatorElapsedMs),
-    aggregateShadowReplayRatio: roundedRatio(candidateAllocatorElapsedMs, canonicalReplayElapsedMs),
-    medianAuthoritativeAllocatorRatio: (() => {
-      const value = median(executed.map((record) => record.authoritativeAllocatorRatio));
-      return value == null ? null : +value.toFixed(4);
-    })(),
-    medianShadowReplayRatio: (() => {
-      const value = median(executed.map((record) => record.shadowReplayRatio));
-      return value == null ? null : +value.toFixed(4);
-    })(),
+    aggregateAuditShadowReplayRatio: roundedRatio(auditAuthoritativeElapsedMs, canonicalReplayElapsedMs),
+    medianAuditShadowReplayRatio: roundedMedian(executed.map((record) => record.auditShadowReplayRatio)),
     passed: failures.length === 0 && executed.length === results.length,
   };
   fs.appendFileSync(outputFile, `${JSON.stringify(summary)}\n`);
