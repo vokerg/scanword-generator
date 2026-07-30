@@ -1,6 +1,6 @@
 # Phase 12 experiment — exact linear top-three selection
 
-Status: active research; development and promotion checkpoints passed
+Status: accepted research candidate; development, promotion and stability checkpoints passed
 
 Source baseline:
 
@@ -139,7 +139,36 @@ artifact sha256: 2d7008cff5455d8321b4babde8b36ff1580ea3db8e6815c3fe166040c40cf74
 
 Decision: **promotion checkpoint passed**. Exact-allocation time fell 5.00% aggregate and total runtime fell 1.00% aggregate. Every final and audited allocator result remained identical.
 
-No selector tuning occurred after development. The frozen stability-100 corpus is therefore opened against the same implementation.
+## Accepted stability-100 checkpoint
+
+Evidence:
+
+```text
+workflow run:    30520073731
+artifact:        8752036962
+artifact sha256: f54cad7882f25cf63a0412febf75a501e0620b195f44ce1a16bf7dce09a4d6d4
+```
+
+| metric | result |
+| --- | ---: |
+| exact final-output parity | 100 / 100 |
+| independent shadow-audit output parity | 100 / 100 |
+| selector-valid seeds | 100 / 100 |
+| profiler-valid seeds | 100 / 100 |
+| selector fallbacks | 0 |
+| selector errors | 0 |
+| exact allocator calls | 53,622 |
+| aggregate allocator runtime ratio | 0.9562 |
+| median allocator runtime ratio | 0.9606 |
+| aggregate total runtime ratio | 0.9891 |
+| median total runtime ratio | 0.9941 |
+| audit selector / canonical replay ratio | 0.7327 |
+
+Decision: **stability checkpoint passed**. Exact-allocation time fell 4.38% aggregate and total runtime fell 1.09% aggregate over the locked 100-seed holdout. Every final digest and every independent allocator audit remained identical.
+
+## Conclusion
+
+The exact linear top-three selector passed the complete 20/50/100 corpus sequence without tuning, output drift, RNG drift, fallback or error. This PR should land the default-off implementation and evidence. Production activation belongs in a separate branch with an explicit default-promotion gate and rollback contract.
 
 ## Evidence sequence
 
@@ -147,5 +176,6 @@ No selector tuning occurred after development. The frozen stability-100 corpus i
 2. **passed:** exact replay parity and inherited contracts;
 3. **passed:** frozen one-seed production smoke after measurement correction;
 4. **passed:** frozen development-20 runtime and digest comparison;
-5. **passed:** frozen promotion-50;
-6. **next:** frozen stability-100 without tuning.
+5. **passed:** frozen promotion-50 without tuning;
+6. **passed:** frozen stability-100 without tuning;
+7. **next branch:** controlled production default promotion with unchanged selector implementation.
