@@ -23,7 +23,9 @@ function genericCompare(first, second) {
 }
 
 const stableTies = Array.from({ length: 8 }, (_, id) => ({ id, rank: 7, signature: "same" }));
-assert.deepEqual(ids(selectStablePrefix(stableTies, 3, genericCompare)), [0, 1, 2]);
+const primitiveTelemetry = { comparatorCalls: 0 };
+assert.deepEqual(ids(selectStablePrefix(stableTies, 3, genericCompare, primitiveTelemetry)), [0, 1, 2]);
+assert(primitiveTelemetry.comparatorCalls > 0);
 assert.deepEqual(ids(stableTies), [0, 1, 2, 3, 4, 5, 6, 7], "selector must not mutate the input array");
 
 for (let length = 0; length <= 96; length += 1) {
@@ -119,6 +121,7 @@ function normalizedLayout(layout) {
 function runAllocator(mode, seed, restarts) {
   process.env.SCANWORD_EXACT_ALLOCATOR_PROFILE = "off";
   process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR = mode;
+  process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR_DETAIL = "full";
   solver.resetExactAllocatorSelectorV1();
   const sourceRandom = core.makeRandom(seed);
   let randomDraws = 0;
@@ -148,6 +151,7 @@ for (const restarts of [1, 2, 7, 12]) {
     assert.equal(candidate.telemetry.calls, 1);
     assert.equal(candidate.telemetry.fallbacks, 0);
     assert.equal(candidate.telemetry.errors, 0);
+    assert.equal(candidate.telemetry.detail, "full");
     assert(candidate.telemetry.rankedCandidates > 0);
     assert(candidate.telemetry.comparatorCalls > 0);
     rankedCandidates += candidate.telemetry.rankedCandidates;
