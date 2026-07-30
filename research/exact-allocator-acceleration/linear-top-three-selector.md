@@ -1,6 +1,6 @@
 # Phase 12 experiment — exact linear top-three selection
 
-Status: active research
+Status: active research; development checkpoint passed
 
 Source baseline:
 
@@ -34,12 +34,83 @@ The experiment must preserve:
 
 ## Controls
 
-The candidate implementation must remain default-off and fail open to the canonical allocator on any internal error.
+The implementation is default-off:
+
+```text
+SCANWORD_EXACT_ALLOCATOR_SELECTOR=off
+SCANWORD_EXACT_ALLOCATOR_SELECTOR=linear-top-three
+SCANWORD_EXACT_ALLOCATOR_SELECTOR_DETAIL=summary|full
+```
+
+A selector failure falls back to the canonical stable full sort for that domain. Summary mode avoids hot-path diagnostic counters; full detail is reserved for deterministic primitive tests.
+
+## Primitive validation
+
+The deterministic primitive test covers:
+
+- 1,552 synthetic ranked domains from size 0 through 96;
+- exact comparator ties and duplicate signatures;
+- stable input-order preservation;
+- input-array non-mutation;
+- 48 complete allocator fixtures across restart counts 1, 2, 7 and 12;
+- exact layout, grid and RNG-draw parity.
+
+## Preserved measurement defects
+
+### Hot-path instrumentation defect
+
+The first production smoke recorded every selector RNG draw and comparison. Exact parity passed, and the selector was faster than the same-run canonical replay, but instrumentation made the independent runtime comparison invalid. Summary mode now removes those counters from the authoritative hot path.
+
+### Profile-boundary runtime defect
+
+The first development-20 harness timed the shadow-profiled selector against an unprofiled canonical baseline. The profiler's RNG recorder made the candidate appear 8.44% slower even though it was 24.11% faster than the canonical replay in the same process.
+
+The corrected harness uses three isolated runs per seed:
+
+```text
+canonical, profiler off       -> baseline runtime
+selector, profiler off        -> candidate runtime and final parity
+selector, shadow profiler on  -> independent per-call layout and RNG audit
+```
+
+## Accepted development-20 checkpoint
+
+Exact candidate head:
+
+```text
+5db8d25de2422ce1f62d21d4ffa2da7bb3cafb3e
+```
+
+Evidence:
+
+```text
+workflow run:    30517578909
+artifact:        8749748555
+artifact sha256: ccb42dd41e5a26bf28f7743cb3712da4e4bd5c322b79b01eb3bd8cfb3a3c21c5
+```
+
+| metric | result |
+| --- | ---: |
+| exact final-output parity | 20 / 20 |
+| independent shadow-audit output parity | 20 / 20 |
+| selector-valid seeds | 20 / 20 |
+| profiler-valid seeds | 20 / 20 |
+| selector fallbacks | 0 |
+| selector errors | 0 |
+| exact allocator calls | 10,648 |
+| aggregate allocator runtime ratio | 0.9590 |
+| median allocator runtime ratio | 0.9551 |
+| aggregate total runtime ratio | 0.9940 |
+| median total runtime ratio | 0.9935 |
+| audit selector / canonical replay ratio | 0.7297 |
+
+Decision: **development checkpoint passed**. The selector reduced measured exact-allocation time by 4.10% aggregate and total runtime by 0.60% while preserving every final digest and every audited allocator result.
 
 ## Evidence sequence
 
-1. deterministic primitive equivalence, including exact ties and duplicate signatures;
-2. exact replay parity and inherited Phase 10/11 contract gates;
-3. frozen one-seed production-path smoke;
-4. frozen development-20 runtime and digest comparison;
-5. promotion or rejection before any promotion/stability holdout is opened.
+1. **passed:** deterministic primitive equivalence;
+2. **passed:** exact replay parity and inherited contracts;
+3. **passed:** frozen one-seed production smoke after measurement correction;
+4. **passed:** frozen development-20 runtime and digest comparison;
+5. **next:** frozen promotion-50;
+6. stability-100 opens only if promotion passes without tuning.
