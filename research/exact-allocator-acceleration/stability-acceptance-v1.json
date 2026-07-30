@@ -50,5 +50,6 @@
     "artifact": 8752036962,
     "artifactSha256": "f54cad7882f25cf63a0412febf75a501e0620b195f44ce1a16bf7dce09a4d6d4"
   },
+  "decision": "land default-off implementation and evidence",
   "next": "separate controlled production default-promotion branch"
 }
