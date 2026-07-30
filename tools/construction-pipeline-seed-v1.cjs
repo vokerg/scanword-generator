@@ -151,9 +151,7 @@ const filterPortfolio = preallocationFilterRuns.length ? {
 const exactAllocatorProfileEnabled = String(
   process.env.SCANWORD_EXACT_ALLOCATOR_PROFILE || "off",
 ).toLowerCase() === "shadow";
-const exactAllocatorSelectorEnabled = String(
-  process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR || "off",
-).toLowerCase() === "linear-top-three";
+const exactAllocatorSelectorEnabled = solver.exactAllocatorSelectorModeV1?.() === "linear-top-three";
 const summary = {
   seed,
   mode: String(process.env.SCANWORD_EXPLICIT_PIPELINE || "off").toLowerCase(),
