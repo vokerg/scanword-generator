@@ -15,6 +15,7 @@ const supportedEntries = new Set([
   "wrapper-retirement-test-v1.cjs",
   "exact-allocator-profile-test-v1.cjs",
   "exact-allocator-top-three-test-v1.cjs",
+  "exact-allocator-selector-default-test-v1.cjs",
 ]);
 if (!supportedEntries.has(entry)) return;
 
@@ -23,6 +24,8 @@ global.window = global;
 if (process.env.SCANWORD_WRAPPER_INSTALLATION_LOCK) {
   window.SCANWORD_WRAPPER_INSTALLATION_LOCK = process.env.SCANWORD_WRAPPER_INSTALLATION_LOCK;
 }
+const selectorSetting = String(process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR || "linear-top-three").toLowerCase();
+window.SCANWORD_EXACT_ALLOCATOR_SELECTOR = selectorSetting === "off" ? "off" : "linear-top-three";
 
 const bulkEnabled = String(process.env.SCANWORD_BULK_LEXICON || "on").toLowerCase() !== "off";
 const scripts = [
@@ -108,6 +111,7 @@ const benchmarkEntrypoints = new Set([
   path.join(__dirname, "wrapper-retirement-test-v1.cjs"),
   path.join(__dirname, "exact-allocator-profile-test-v1.cjs"),
   path.join(__dirname, "exact-allocator-top-three-test-v1.cjs"),
+  path.join(__dirname, "exact-allocator-selector-default-test-v1.cjs"),
 ]);
 const originalLoad = Module._load;
 Module._load = function loadCanonicalBenchmarkDependency(request, parent, isMain) {
@@ -116,7 +120,7 @@ Module._load = function loadCanonicalBenchmarkDependency(request, parent, isMain
 };
 
 window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
-  version: 9,
+  version: 10,
   bulkEnabled,
   entry,
   scripts,
@@ -129,6 +133,7 @@ window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
   adaptivePartialSearch: "construction-vocabulary-portfolio-v1",
   stageSourceAnchor: "construction-stage-source-anchor-v2",
   exactAllocatorSelector: "construction-exact-allocator-top-three-v1",
+  exactAllocatorSelectorDefault: window.SCANWORD_EXACT_ALLOCATOR_SELECTOR,
   exactAllocatorProfile: "construction-exact-allocator-profile-v1",
   preallocationStructuralFrontier: "construction-preallocation-frontier-v1",
   preallocationRepairPotential: "construction-preallocation-repair-potential-v1",
