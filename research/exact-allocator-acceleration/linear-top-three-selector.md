@@ -1,6 +1,6 @@
 # Phase 12 experiment — exact linear top-three selection
 
-Status: active research; development checkpoint passed
+Status: active research; development and promotion checkpoints passed
 
 Source baseline:
 
@@ -73,13 +73,17 @@ selector, profiler off        -> candidate runtime and final parity
 selector, shadow profiler on  -> independent per-call layout and RNG audit
 ```
 
-## Accepted development-20 checkpoint
+## Exact implementation head
 
-Exact candidate head:
+The selector implementation was frozen before the accepted corpus sequence at:
 
 ```text
 5db8d25de2422ce1f62d21d4ffa2da7bb3cafb3e
 ```
+
+Later branch commits change only evidence documentation and workflow dispatch boundaries.
+
+## Accepted development-20 checkpoint
 
 Evidence:
 
@@ -106,11 +110,42 @@ artifact sha256: ccb42dd41e5a26bf28f7743cb3712da4e4bd5c322b79b01eb3bd8cfb3a3c21c
 
 Decision: **development checkpoint passed**. The selector reduced measured exact-allocation time by 4.10% aggregate and total runtime by 0.60% while preserving every final digest and every audited allocator result.
 
+## Accepted promotion-50 checkpoint
+
+Evidence:
+
+```text
+workflow run:    30518444936
+artifact:        8750320665
+artifact sha256: 2d7008cff5455d8321b4babde8b36ff1580ea3db8e6815c3fe166040c40cf74e
+```
+
+| metric | result |
+| --- | ---: |
+| exact final-output parity | 50 / 50 |
+| independent shadow-audit output parity | 50 / 50 |
+| selector-valid seeds | 50 / 50 |
+| profiler-valid seeds | 50 / 50 |
+| selector fallbacks | 0 |
+| selector errors | 0 |
+| exact allocator calls | 26,521 |
+| aggregate allocator runtime ratio | 0.9500 |
+| median allocator runtime ratio | 0.9487 |
+| allocator-faster seeds | 48 / 50 |
+| aggregate total runtime ratio | 0.9900 |
+| median total runtime ratio | 0.9945 |
+| total-runtime-faster seeds | 32 / 50 |
+| audit selector / canonical replay ratio | 0.7562 |
+
+Decision: **promotion checkpoint passed**. Exact-allocation time fell 5.00% aggregate and total runtime fell 1.00% aggregate. Every final and audited allocator result remained identical.
+
+No selector tuning occurred after development. The frozen stability-100 corpus is therefore opened against the same implementation.
+
 ## Evidence sequence
 
 1. **passed:** deterministic primitive equivalence;
 2. **passed:** exact replay parity and inherited contracts;
 3. **passed:** frozen one-seed production smoke after measurement correction;
 4. **passed:** frozen development-20 runtime and digest comparison;
-5. **next:** frozen promotion-50;
-6. stability-100 opens only if promotion passes without tuning.
+5. **passed:** frozen promotion-50;
+6. **next:** frozen stability-100 without tuning.
