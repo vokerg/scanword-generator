@@ -62,12 +62,12 @@ jobs:
           node tools/exact-allocator-top-three-test-v1.cjs
 
   stability-selector-profile:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'workflow_dispatch'
     needs: exact-selector-parity
     runs-on: ubuntu-latest
     timeout-minutes: 360
     env:
-      SOURCE_SHA: ${{ github.event.pull_request.head.sha }}
+      SOURCE_SHA: ${{ github.sha }}
       SCANWORD_EXACT_ALLOCATOR_SELECTOR_CONCURRENCY: 4
       SCANWORD_EXACT_ALLOCATOR_SELECTOR_SEED_TIMEOUT_MS: 7200000
     steps:
