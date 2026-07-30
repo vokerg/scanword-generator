@@ -151,6 +151,9 @@ const filterPortfolio = preallocationFilterRuns.length ? {
 const exactAllocatorProfileEnabled = String(
   process.env.SCANWORD_EXACT_ALLOCATOR_PROFILE || "off",
 ).toLowerCase() === "shadow";
+const exactAllocatorSelectorEnabled = String(
+  process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR || "off",
+).toLowerCase() === "linear-top-three";
 const summary = {
   seed,
   mode: String(process.env.SCANWORD_EXPLICIT_PIPELINE || "off").toLowerCase(),
@@ -204,6 +207,9 @@ const summary = {
     || null,
   preallocationFilter: constructionV2.preallocationFilter || null,
   preallocationFilterPortfolio: filterPortfolio,
+  ...(exactAllocatorSelectorEnabled ? {
+    exactAllocatorSelector: global.ScanwordExactAllocatorTopThreeV1?.current?.() || null,
+  } : {}),
   ...(exactAllocatorProfileEnabled ? {
     exactAllocatorProfile: global.ScanwordExactAllocatorProfileV1?.current?.() || null,
   } : {}),
