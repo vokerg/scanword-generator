@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "baselineId": "v8-production-1.1-explicit-browser-equivalent",
-  "description": "Locked browser-equivalent vocabulary-first 1.1 baseline using the direct explicit production orchestrator for the committed 40,966-entry v8 corpus.",
+  "description": "Locked browser-equivalent vocabulary-first 1.1 baseline using the direct explicit production orchestrator and exact linear top-three clue allocator selector for the committed 40,966-entry v8 corpus.",
   "corpus": {
     "manifest": "bulk-lexicon/manifest.json",
     "expectedVersion": 8,
@@ -40,6 +40,7 @@
     "SCANWORD_FULL_CORPUS_RETRIEVAL_MODE": "empty",
     "SCANWORD_CLUE_FEASIBILITY": "off",
     "SCANWORD_PARTIAL_SEARCH": "off",
+    "SCANWORD_EXACT_ALLOCATOR_SELECTOR": "linear-top-three",
     "SCANWORD_PORTFOLIO_ATTEMPTS": "240",
     "SCANWORD_PORTFOLIO_CLUE_RESTARTS": "160",
     "SCANWORD_VICTIM_BASES": "8",
