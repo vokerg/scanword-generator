@@ -19,6 +19,12 @@
       : "off";
   }
 
+  function detail() {
+    return String(environmentOption("SCANWORD_EXACT_ALLOCATOR_SELECTOR_DETAIL", "summary")).toLowerCase() === "full"
+      ? "full"
+      : "summary";
+  }
+
   function now() {
     return typeof performance !== "undefined" && typeof performance.now === "function"
       ? performance.now()
@@ -33,6 +39,7 @@
     return {
       schemaVersion: 1,
       mode: "linear-top-three",
+      detail: "summary",
       calls: 0,
       fallbacks: 0,
       errors: 0,
@@ -169,7 +176,7 @@
     return selected;
   }
 
-  function prepareSearch(state, random, restarts) {
+  function prepareSearch(state, random, restarts, collectDetail) {
     const regionSizes = panelRegionSizeMap(state);
     const items = [];
     for (let row = 0; row < state.rows; row += 1) {
@@ -190,6 +197,9 @@
       rankedCandidates: 0,
       comparatorCalls: 0,
       maximumDomainSize: 0,
+      fallbacks: 0,
+      errors: 0,
+      lastError: null,
     };
     let best = { score: -Infinity, covered: 0, assigned: new Map() };
     for (let restart = 0; restart < restarts; restart += 1) {
@@ -204,10 +214,25 @@
         const available = item.candidates.filter((candidate) => candidate.keys.every((key) => !occupied.has(key)));
         if (!available.length) continue;
         const ranked = available.map((candidate) => ({ candidate, rank: candidate.score + random() * 18 }));
-        telemetry.rankedDomains += 1;
-        telemetry.rankedCandidates += ranked.length;
-        telemetry.maximumDomainSize = Math.max(telemetry.maximumDomainSize, ranked.length);
-        const top = selectStablePrefix(ranked, 3, compareRankedCandidates, telemetry);
+        if (collectDetail) {
+          telemetry.rankedDomains += 1;
+          telemetry.rankedCandidates += ranked.length;
+          telemetry.maximumDomainSize = Math.max(telemetry.maximumDomainSize, ranked.length);
+        }
+        let top;
+        try {
+          top = selectStablePrefix(
+            ranked,
+            3,
+            compareRankedCandidates,
+            collectDetail ? telemetry : null,
+          );
+        } catch (error) {
+          telemetry.fallbacks += 1;
+          telemetry.errors += 1;
+          telemetry.lastError = String(error?.stack || error);
+          top = ranked.sort(compareRankedCandidates).slice(0, 3);
+        }
         const selected = top[Math.floor(random() * Math.min(3, ranked.length))].candidate;
         assigned.set(index, selected);
         for (const key of selected.keys) occupied.add(key);
@@ -255,63 +280,45 @@
     return { externalClueTexts, clueTextCells, footprints };
   }
 
-  function record(telemetry, elapsedMs, error = null, fallback = false) {
+  function record(telemetry, elapsedMs, currentDetail) {
+    aggregate.detail = currentDetail;
     aggregate.calls += 1;
-    aggregate.fallbacks += Number(fallback);
-    aggregate.errors += Number(Boolean(error));
+    aggregate.fallbacks += Number(telemetry?.fallbacks || 0);
+    aggregate.errors += Number(telemetry?.errors || 0);
     aggregate.elapsedMs = rounded(aggregate.elapsedMs + elapsedMs);
     aggregate.rankedDomains += Number(telemetry?.rankedDomains || 0);
     aggregate.rankedCandidates += Number(telemetry?.rankedCandidates || 0);
     aggregate.comparatorCalls += Number(telemetry?.comparatorCalls || 0);
     aggregate.maximumDomainSize = Math.max(aggregate.maximumDomainSize, Number(telemetry?.maximumDomainSize || 0));
     aggregate.last = {
+      detail: currentDetail,
       elapsedMs: rounded(elapsedMs),
       rankedDomains: Number(telemetry?.rankedDomains || 0),
       rankedCandidates: Number(telemetry?.rankedCandidates || 0),
       comparatorCalls: Number(telemetry?.comparatorCalls || 0),
       maximumDomainSize: Number(telemetry?.maximumDomainSize || 0),
-      fallback,
-      error,
+      fallbacks: Number(telemetry?.fallbacks || 0),
+      errors: Number(telemetry?.errors || 0),
+      error: telemetry?.lastError || null,
     };
   }
 
   function assignClueTextCellsTopThree(state, random, restarts = 120) {
     if (mode() === "off") return originalAssign(state, random, restarts);
 
+    const currentDetail = detail();
     const sourceRandom = typeof random === "function" ? random : Math.random;
-    const randomValues = [];
-    const recordingRandom = () => {
-      const value = sourceRandom();
-      randomValues.push(value);
-      return value;
-    };
     const started = now();
-    let prepared;
-    try {
-      prepared = prepareSearch(state, recordingRandom, restarts);
-    } catch (error) {
-      const message = String(error?.stack || error);
-      record(null, now() - started, message, true);
-      let replayIndex = 0;
-      const replayRandom = () => {
-        if (replayIndex < randomValues.length) {
-          const value = randomValues[replayIndex];
-          replayIndex += 1;
-          return value;
-        }
-        return sourceRandom();
-      };
-      return originalAssign(state, replayRandom, restarts);
-    }
-
+    const prepared = prepareSearch(state, sourceRandom, restarts, currentDetail === "full");
     const layout = applyBest(state, prepared.items, prepared.best);
-    record(prepared.telemetry, now() - started);
+    record(prepared.telemetry, now() - started, currentDetail);
     return layout;
   }
 
   solver.assignClueTextCellsV2 = assignClueTextCellsTopThree;
   Object.assign(solver, {
     exactAllocatorSelectorModeV1: mode,
+    exactAllocatorSelectorDetailV1: detail,
     selectExactAllocatorStablePrefixV1: selectStablePrefix,
     compareExactAllocatorRankedCandidatesV1: compareRankedCandidates,
     currentExactAllocatorSelectorV1: () => aggregate,
@@ -322,6 +329,7 @@
   window.ScanwordExactAllocatorTopThreeV1 = {
     version: 1,
     mode,
+    detail,
     selectStablePrefix,
     compareRankedCandidates,
     current: () => aggregate,
