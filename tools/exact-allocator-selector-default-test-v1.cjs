@@ -26,6 +26,7 @@ assert(solver, "ScanwordSolver must be loaded by the Node benchmark bootstrap");
 assert(core, "ScanwordCore must be loaded by the Node benchmark bootstrap");
 assert(bootstrap, "Node benchmark bootstrap metadata must be available");
 assert.equal(bootstrap.exactAllocatorSelectorDefault, "linear-top-three");
+assert.equal(process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR, "linear-top-three");
 assert.equal(typeof solver.assignClueTextCellsV2, "function");
 assert.equal(typeof solver.exactAllocatorSelectorModeV1, "function");
 assert.equal(typeof solver.currentExactAllocatorSelectorV1, "function");
@@ -79,9 +80,8 @@ const previousDetail = process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR_DETAIL;
 process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR_DETAIL = "summary";
 
 try {
-  delete process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR;
-  solver.resetExactAllocatorSelectorV1();
   assert.equal(solver.exactAllocatorSelectorModeV1(), "linear-top-three");
+  solver.resetExactAllocatorSelectorV1();
   const defaultState = makeState();
   const defaultLayout = solver.assignClueTextCellsV2(
     defaultState,
@@ -120,8 +120,7 @@ try {
   assert.deepEqual(compact(defaultState, defaultLayout), compact(explicitState, explicitLayout));
   assert.equal(solver.currentExactAllocatorSelectorV1().calls, 1);
 } finally {
-  if (previousSelector == null) delete process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR;
-  else process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR = previousSelector;
+  process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR = previousSelector;
   if (previousDetail == null) delete process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR_DETAIL;
   else process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR_DETAIL = previousDetail;
 }
