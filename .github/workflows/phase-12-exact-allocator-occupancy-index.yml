@@ -15,6 +15,7 @@ on:
       - "tools/node-benchmark-bootstrap-v1.cjs"
       - "tools/construction-pipeline-seed-v1.cjs"
       - "tools/exact-allocator-occupancy-index-test-v1.cjs"
+      - "tools/exact-allocator-occupancy-index-checkpoint-v1.cjs"
       - "research/exact-allocator-acceleration/occupancy-index.md"
       - ".github/workflows/phase-12-exact-allocator-occupancy-index.yml"
   workflow_dispatch:
@@ -48,6 +49,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           node --check construction-exact-allocator-occupancy-index-v1.js
           node --check tools/exact-allocator-occupancy-index-test-v1.cjs
+          node --check tools/exact-allocator-occupancy-index-checkpoint-v1.cjs
           node --check tools/construction-pipeline-seed-v1.cjs
           node --check tools/node-benchmark-bootstrap-v1.cjs
           grep -q 'SCANWORD_EXACT_ALLOCATOR_OCCUPANCY = "off"' index.html
@@ -81,3 +83,42 @@ jobs:
         run: >-
           NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs
           node tools/exact-allocator-occupancy-index-test-v1.cjs
+
+  smoke:
+    needs: exact-occupancy-parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_SEED_LIMIT: 1
+      SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_CONCURRENCY: 1
+      SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_RUNTIME_RATIO: 1.10
+      SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_SEED_TIMEOUT_MS: 7200000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Compare one frozen development seed
+        run: |
+          set -o pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          mkdir -p research-output/exact-allocator-acceleration
+          node tools/exact-allocator-occupancy-index-checkpoint-v1.cjs \
+            development \
+            research-output/exact-allocator-acceleration/occupancy-index-smoke-v1.jsonl \
+            | tee research-output/exact-allocator-acceleration/occupancy-index-smoke-console-v1.jsonl
+
+      - name: Publish smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-12-exact-allocator-occupancy-smoke-${{ env.SOURCE_SHA }}
+          path: research-output/exact-allocator-acceleration/
+          if-no-files-found: error
