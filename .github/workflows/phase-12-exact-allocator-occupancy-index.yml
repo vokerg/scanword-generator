@@ -44,7 +44,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Check syntax and default-off boundary
+      - name: Check syntax and frozen implementation boundary
         run: |
           test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           node --check construction-exact-allocator-occupancy-index-v1.js
@@ -56,6 +56,7 @@ jobs:
           grep -q 'construction-exact-allocator-occupancy-index-v1.js' index.html
           grep -q 'construction-exact-allocator-occupancy-index-v1.js' tools/node-benchmark-bootstrap-v1.cjs
           test "$(git hash-object construction-exact-allocator-top-three-v1.js)" = "e1b970fc1b1c87ad8655141162d10bc4aaf22f0d"
+          test "$(git hash-object construction-exact-allocator-occupancy-index-v1.js)" = "c755c2148e8e4039b9de4fb0c96b3cb7f900d401"
           node - <<'NODE'
           const fs = require('node:fs');
           for (const file of ['index.html', 'tools/node-benchmark-bootstrap-v1.cjs']) {
@@ -84,14 +85,13 @@ jobs:
           NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs
           node tools/exact-allocator-occupancy-index-test-v1.cjs
 
-  smoke:
+  development:
     needs: exact-occupancy-parity
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 360
     env:
       SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_SEED_LIMIT: 1
-      SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_CONCURRENCY: 1
+      SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_CONCURRENCY: 4
       SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_RUNTIME_RATIO: 1.10
       SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_SEED_TIMEOUT_MS: 7200000
     steps:
@@ -105,20 +105,21 @@ jobs:
         with:
           node-version: 22
 
-      - name: Compare one frozen development seed
+      - name: Compare frozen development-20
         run: |
           set -o pipefail
           test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          test "$(git hash-object construction-exact-allocator-occupancy-index-v1.js)" = "c755c2148e8e4039b9de4fb0c96b3cb7f900d401"
           mkdir -p research-output/exact-allocator-acceleration
           node tools/exact-allocator-occupancy-index-checkpoint-v1.cjs \
             development \
-            research-output/exact-allocator-acceleration/occupancy-index-smoke-v1.jsonl \
-            | tee research-output/exact-allocator-acceleration/occupancy-index-smoke-console-v1.jsonl
+            research-output/exact-allocator-acceleration/development-occupancy-index-v1.jsonl \
+            | tee research-output/exact-allocator-acceleration/development-occupancy-index-console-v1.jsonl
 
-      - name: Publish smoke evidence
+      - name: Publish development evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase-12-exact-allocator-occupancy-smoke-${{ env.SOURCE_SHA }}
+          name: phase-12-exact-allocator-occupancy-development-${{ env.SOURCE_SHA }}
           path: research-output/exact-allocator-acceleration/
           if-no-files-found: error
