@@ -85,10 +85,10 @@ jobs:
           NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs
           node tools/exact-allocator-occupancy-index-test-v1.cjs
 
-  development:
+  promotion:
     needs: exact-occupancy-parity
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 480
     env:
       SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_CONCURRENCY: 4
@@ -105,21 +105,21 @@ jobs:
         with:
           node-version: 22
 
-      - name: Compare frozen development-20
+      - name: Compare frozen promotion-50
         run: |
           set -o pipefail
           test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           test "$(git hash-object construction-exact-allocator-occupancy-index-v1.js)" = "c755c2148e8e4039b9de4fb0c96b3cb7f900d401"
           mkdir -p research-output/exact-allocator-acceleration
           node tools/exact-allocator-occupancy-index-checkpoint-v1.cjs \
-            development \
-            research-output/exact-allocator-acceleration/development-occupancy-index-v1.jsonl \
-            | tee research-output/exact-allocator-acceleration/development-occupancy-index-console-v1.jsonl
+            promotion \
+            research-output/exact-allocator-acceleration/promotion-occupancy-index-v1.jsonl \
+            | tee research-output/exact-allocator-acceleration/promotion-occupancy-index-console-v1.jsonl
 
-      - name: Publish development evidence
+      - name: Publish promotion evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase-12-exact-allocator-occupancy-development-${{ env.SOURCE_SHA }}
+          name: phase-12-exact-allocator-occupancy-promotion-${{ env.SOURCE_SHA }}
           path: research-output/exact-allocator-acceleration/
           if-no-files-found: error
