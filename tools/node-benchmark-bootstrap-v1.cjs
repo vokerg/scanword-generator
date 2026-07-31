@@ -16,6 +16,7 @@ const supportedEntries = new Set([
   "exact-allocator-profile-test-v1.cjs",
   "exact-allocator-top-three-test-v1.cjs",
   "exact-allocator-selector-default-test-v1.cjs",
+  "exact-allocator-occupancy-index-test-v1.cjs",
 ]);
 if (!supportedEntries.has(entry)) return;
 
@@ -27,6 +28,9 @@ if (process.env.SCANWORD_WRAPPER_INSTALLATION_LOCK) {
 const selectorSetting = String(process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR || "linear-top-three").toLowerCase();
 process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR = selectorSetting === "off" ? "off" : "linear-top-three";
 window.SCANWORD_EXACT_ALLOCATOR_SELECTOR = process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR;
+const occupancySetting = String(process.env.SCANWORD_EXACT_ALLOCATOR_OCCUPANCY || "off").toLowerCase();
+process.env.SCANWORD_EXACT_ALLOCATOR_OCCUPANCY = occupancySetting === "indexed" ? "indexed" : "off";
+window.SCANWORD_EXACT_ALLOCATOR_OCCUPANCY = process.env.SCANWORD_EXACT_ALLOCATOR_OCCUPANCY;
 
 const bulkEnabled = String(process.env.SCANWORD_BULK_LEXICON || "on").toLowerCase() !== "off";
 const scripts = [
@@ -53,6 +57,7 @@ const scripts = [
   "construction-victim-depth2.js",
   "construction-stage-source-anchor-v2.js",
   "construction-exact-allocator-top-three-v1.js",
+  "construction-exact-allocator-occupancy-index-v1.js",
   "construction-exact-allocator-profile-v1.js",
   "construction-portfolio.js",
   "construction-preallocation-frontier-v1.js",
@@ -113,6 +118,7 @@ const benchmarkEntrypoints = new Set([
   path.join(__dirname, "exact-allocator-profile-test-v1.cjs"),
   path.join(__dirname, "exact-allocator-top-three-test-v1.cjs"),
   path.join(__dirname, "exact-allocator-selector-default-test-v1.cjs"),
+  path.join(__dirname, "exact-allocator-occupancy-index-test-v1.cjs"),
 ]);
 const originalLoad = Module._load;
 Module._load = function loadCanonicalBenchmarkDependency(request, parent, isMain) {
@@ -121,7 +127,7 @@ Module._load = function loadCanonicalBenchmarkDependency(request, parent, isMain
 };
 
 window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
-  version: 10,
+  version: 11,
   bulkEnabled,
   entry,
   scripts,
@@ -135,6 +141,8 @@ window.SCANWORD_NODE_BENCHMARK_BOOTSTRAP = {
   stageSourceAnchor: "construction-stage-source-anchor-v2",
   exactAllocatorSelector: "construction-exact-allocator-top-three-v1",
   exactAllocatorSelectorDefault: process.env.SCANWORD_EXACT_ALLOCATOR_SELECTOR,
+  exactAllocatorOccupancy: "construction-exact-allocator-occupancy-index-v1",
+  exactAllocatorOccupancyDefault: process.env.SCANWORD_EXACT_ALLOCATOR_OCCUPANCY,
   exactAllocatorProfile: "construction-exact-allocator-profile-v1",
   preallocationStructuralFrontier: "construction-preallocation-frontier-v1",
   preallocationRepairPotential: "construction-preallocation-repair-potential-v1",
