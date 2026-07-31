@@ -1,0 +1,176 @@
+name: Phase 12 exact selector default promotion
+
+on:
+  push:
+    branches:
+      - "agent/phase-12-exact-selector-default-promotion"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "index.html"
+      - "construction-exact-allocator-top-three-v1.js"
+      - "tools/node-benchmark-bootstrap-v1.cjs"
+      - "tools/construction-pipeline-seed-v1.cjs"
+      - "tools/exact-allocator-top-three-test-v1.cjs"
+      - "tools/exact-allocator-selector-default-test-v1.cjs"
+      - "tools/exact-allocator-selector-default-checkpoint-v1.cjs"
+      - "tools/phase-12-seed-manifest-v1.cjs"
+      - "research/baselines/v8-production-1.1/config.json"
+      - "research/exact-allocator-acceleration/default-promotion.md"
+      - ".github/workflows/phase-12-exact-selector-default-promotion.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: phase-12-exact-selector-default-promotion-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check promotion syntax and production defaults
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          node --check tools/node-benchmark-bootstrap-v1.cjs
+          node --check tools/construction-pipeline-seed-v1.cjs
+          node --check tools/exact-allocator-top-three-test-v1.cjs
+          node --check tools/exact-allocator-selector-default-test-v1.cjs
+          node --check tools/exact-allocator-selector-default-checkpoint-v1.cjs
+          node --check tools/phase-12-seed-manifest-v1.cjs
+          grep -q 'SCANWORD_EXACT_ALLOCATOR_SELECTOR = "linear-top-three"' index.html
+          grep -q 'SCANWORD_EXACT_ALLOCATOR_SELECTOR || "linear-top-three"' tools/node-benchmark-bootstrap-v1.cjs
+          node -e 'const c=require("./research/baselines/v8-production-1.1/config.json"); if(c.environment.SCANWORD_EXACT_ALLOCATOR_SELECTOR!=="linear-top-three") process.exit(1)'
+          test "$(git hash-object construction-exact-allocator-top-three-v1.js)" = "e1b970fc1b1c87ad8655141162d10bc4aaf22f0d"
+
+      - name: Verify frozen Phase 12 seed sets
+        run: node tools/phase-12-seed-manifest-v1.cjs
+
+      - name: Prove exact selector algorithm parity
+        env:
+          SCANWORD_BULK_LEXICON: "off"
+        run: >-
+          NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs
+          node tools/exact-allocator-top-three-test-v1.cjs
+
+      - name: Prove production default and explicit rollback
+        env:
+          SCANWORD_BULK_LEXICON: "off"
+        run: >-
+          NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs
+          node tools/exact-allocator-selector-default-test-v1.cjs
+
+  development:
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_EXACT_ALLOCATOR_DEFAULT_CONCURRENCY: 4
+      SCANWORD_EXACT_ALLOCATOR_DEFAULT_RUNTIME_RATIO: 1.10
+      SCANWORD_EXACT_ALLOCATOR_DEFAULT_SEED_TIMEOUT_MS: 7200000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate development-20 selector default
+        run: |
+          set -o pipefail
+          mkdir -p research-output/exact-allocator-acceleration
+          node tools/exact-allocator-selector-default-checkpoint-v1.cjs \
+            development \
+            research-output/exact-allocator-acceleration/development-selector-default-v1.jsonl \
+            | tee research-output/exact-allocator-acceleration/development-selector-default-console-v1.jsonl
+      - name: Publish development evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-12-exact-selector-default-development-${{ env.SOURCE_SHA }}
+          path: research-output/exact-allocator-acceleration/
+          if-no-files-found: error
+
+  promotion:
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 480
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_EXACT_ALLOCATOR_DEFAULT_CONCURRENCY: 4
+      SCANWORD_EXACT_ALLOCATOR_DEFAULT_RUNTIME_RATIO: 1.10
+      SCANWORD_EXACT_ALLOCATOR_DEFAULT_SEED_TIMEOUT_MS: 7200000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate promotion-50 selector default
+        run: |
+          set -o pipefail
+          mkdir -p research-output/exact-allocator-acceleration
+          node tools/exact-allocator-selector-default-checkpoint-v1.cjs \
+            promotion \
+            research-output/exact-allocator-acceleration/promotion-selector-default-v1.jsonl \
+            | tee research-output/exact-allocator-acceleration/promotion-selector-default-console-v1.jsonl
+      - name: Publish promotion evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-12-exact-selector-default-promotion-${{ env.SOURCE_SHA }}
+          path: research-output/exact-allocator-acceleration/
+          if-no-files-found: error
+
+  stability:
+    needs: unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 600
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_EXACT_ALLOCATOR_DEFAULT_CONCURRENCY: 4
+      SCANWORD_EXACT_ALLOCATOR_DEFAULT_RUNTIME_RATIO: 1.10
+      SCANWORD_EXACT_ALLOCATOR_DEFAULT_SEED_TIMEOUT_MS: 7200000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate stability-100 selector default
+        run: |
+          set -o pipefail
+          mkdir -p research-output/exact-allocator-acceleration
+          node tools/exact-allocator-selector-default-checkpoint-v1.cjs \
+            stability \
+            research-output/exact-allocator-acceleration/stability-selector-default-v1.jsonl \
+            | tee research-output/exact-allocator-acceleration/stability-selector-default-console-v1.jsonl
+      - name: Publish stability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-12-exact-selector-default-stability-${{ env.SOURCE_SHA }}
+          path: research-output/exact-allocator-acceleration/
+          if-no-files-found: error

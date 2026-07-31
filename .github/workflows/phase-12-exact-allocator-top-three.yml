@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - "agent/phase-12-linear-top-three-selector"
+      - "agent/phase-12-exact-selector-default-promotion"
   pull_request:
     branches:
       - main
@@ -13,8 +14,10 @@ on:
       - "tools/construction-pipeline-seed-v1.cjs"
       - "tools/exact-allocator-top-three-test-v1.cjs"
       - "tools/exact-allocator-top-three-checkpoint-v1.cjs"
+      - "tools/exact-allocator-selector-default-test-v1.cjs"
       - "tools/node-benchmark-bootstrap-v1.cjs"
       - "research/exact-allocator-acceleration/linear-top-three-selector.md"
+      - "research/exact-allocator-acceleration/default-promotion.md"
       - ".github/workflows/phase-12-exact-allocator-top-three.yml"
   workflow_dispatch:
 
@@ -42,17 +45,19 @@ jobs:
         with:
           node-version: 22
 
-      - name: Check selector syntax and default-off boundary
+      - name: Check selector syntax and production default boundary
         run: |
           test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           node --check construction-exact-allocator-top-three-v1.js
           node --check tools/construction-pipeline-seed-v1.cjs
           node --check tools/exact-allocator-top-three-test-v1.cjs
           node --check tools/exact-allocator-top-three-checkpoint-v1.cjs
+          node --check tools/exact-allocator-selector-default-test-v1.cjs
           node --check tools/node-benchmark-bootstrap-v1.cjs
-          grep -q 'SCANWORD_EXACT_ALLOCATOR_SELECTOR = "off"' index.html
+          grep -q 'SCANWORD_EXACT_ALLOCATOR_SELECTOR = "linear-top-three"' index.html
           grep -q 'construction-exact-allocator-top-three-v1.js' index.html
           grep -q 'construction-exact-allocator-top-three-v1.js' tools/node-benchmark-bootstrap-v1.cjs
+          test "$(git hash-object construction-exact-allocator-top-three-v1.js)" = "e1b970fc1b1c87ad8655141162d10bc4aaf22f0d"
 
       - name: Prove stable-prefix and allocator parity
         env:
@@ -60,6 +65,13 @@ jobs:
         run: >-
           NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs
           node tools/exact-allocator-top-three-test-v1.cjs
+
+      - name: Prove production default and rollback
+        env:
+          SCANWORD_BULK_LEXICON: "off"
+        run: >-
+          NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs
+          node tools/exact-allocator-selector-default-test-v1.cjs
 
   stability-selector-profile:
     if: github.event_name == 'workflow_dispatch'
