@@ -152,6 +152,7 @@ const exactAllocatorProfileEnabled = String(
   process.env.SCANWORD_EXACT_ALLOCATOR_PROFILE || "off",
 ).toLowerCase() === "shadow";
 const exactAllocatorSelectorEnabled = solver.exactAllocatorSelectorModeV1?.() === "linear-top-three";
+const exactAllocatorOccupancyEnabled = solver.exactAllocatorOccupancyModeV1?.() === "indexed";
 const summary = {
   seed,
   mode: String(process.env.SCANWORD_EXPLICIT_PIPELINE || "off").toLowerCase(),
@@ -207,6 +208,9 @@ const summary = {
   preallocationFilterPortfolio: filterPortfolio,
   ...(exactAllocatorSelectorEnabled ? {
     exactAllocatorSelector: global.ScanwordExactAllocatorTopThreeV1?.current?.() || null,
+  } : {}),
+  ...(exactAllocatorOccupancyEnabled ? {
+    exactAllocatorOccupancy: global.ScanwordExactAllocatorOccupancyIndexV1?.current?.() || null,
   } : {}),
   ...(exactAllocatorProfileEnabled ? {
     exactAllocatorProfile: global.ScanwordExactAllocatorProfileV1?.current?.() || null,
