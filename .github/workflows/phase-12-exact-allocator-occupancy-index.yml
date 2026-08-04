@@ -86,6 +86,7 @@ jobs:
           node tools/exact-allocator-occupancy-index-test-v1.cjs
 
   promotion:
+    if: github.event_name == 'workflow_dispatch'
     needs: exact-occupancy-parity
     runs-on: ubuntu-latest
     timeout-minutes: 480
@@ -121,5 +122,44 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: phase-12-exact-allocator-occupancy-promotion-${{ env.SOURCE_SHA }}
+          path: research-output/exact-allocator-acceleration/
+          if-no-files-found: error
+
+  stability:
+    needs: exact-occupancy-parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 720
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_CONCURRENCY: 4
+      SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_RUNTIME_RATIO: 1.10
+      SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_SEED_TIMEOUT_MS: 7200000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Compare frozen stability-100
+        run: |
+          set -o pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          test "$(git hash-object construction-exact-allocator-occupancy-index-v1.js)" = "c755c2148e8e4039b9de4fb0c96b3cb7f900d401"
+          mkdir -p research-output/exact-allocator-acceleration
+          node tools/exact-allocator-occupancy-index-checkpoint-v1.cjs \
+            stability \
+            research-output/exact-allocator-acceleration/stability-occupancy-index-v1.jsonl \
+            | tee research-output/exact-allocator-acceleration/stability-occupancy-index-console-v1.jsonl
+
+      - name: Publish stability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-12-exact-allocator-occupancy-stability-${{ env.SOURCE_SHA }}
           path: research-output/exact-allocator-acceleration/
           if-no-files-found: error
