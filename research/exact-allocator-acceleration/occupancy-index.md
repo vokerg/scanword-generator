@@ -1,6 +1,6 @@
 # Phase 12 — exact allocator occupancy index
 
-Status: **development accepted; promotion pending**
+Status: **development and promotion accepted; stability pending**
 
 Source main:
 
@@ -16,7 +16,7 @@ module Git blob:    c755c2148e8e4039b9de4fb0c96b3cb7f900d401
 archive ref:        research/archive-phase-12-exact-occupancy-index-implementation-2026-07-31
 ```
 
-No implementation tuning occurred after the one-seed smoke or during development-20.
+No implementation tuning occurred after the one-seed smoke, during development-20 or after promotion-50.
 
 ## Motivation
 
@@ -127,19 +127,38 @@ seed manifest:   sha256:389647aadef2a55df6f8f7ba3e5dd6c3f26ad86cd9b53030a22f58a9
 | profiler parity / RNG / errors | 0 / 0 / 0 |
 | indexed candidate references | 7,080,138 |
 
-Allocator improvement occurred on all 20 seeds:
+Allocator improvement occurred on all 20 seeds. Per-seed allocator ratios ranged from 0.8325 to 0.9148. Total runtime improved on 11/20 seeds, while aggregate total runtime remained below parity.
+
+## Promotion-50 evidence
 
 ```text
-minimum ratio: 0.8325
-median ratio:  0.8853
-p95 ratio:     0.9113
-maximum ratio: 0.9148
+workflow run:    30609555514
+artifact:        8785624567
+artifact sha256: 92545f20c92dba054760b1c0be6c1202a62d28eb8c1ea4f955401d1c3b9bfdcf
+seed manifest:   sha256:389647aadef2a55df6f8f7ba3e5dd6c3f26ad86cd9b53030a22f58a9e754d2e9
 ```
 
-Total runtime improved on 11/20 seeds. Per-seed total ratios ranged from 0.9335 to 1.0277, while the aggregate remained below parity at 0.9937.
+| metric | result |
+| --- | ---: |
+| exact output parity | 50 / 50 |
+| independent audit parity | 50 / 50 |
+| valid occupancy telemetry | 50 / 50 |
+| valid shadow profile | 50 / 50 |
+| exact allocation calls | 26,521 |
+| canonical allocator time | 282,323.361 ms |
+| indexed allocator time | 248,829.023 ms |
+| aggregate allocator ratio | **0.8814** |
+| median allocator ratio | 0.8871 |
+| aggregate total-runtime ratio | **0.9856** |
+| median total-runtime ratio | 0.9923 |
+| fallbacks / index errors | 0 / 0 |
+| profiler parity / RNG / errors | 0 / 0 / 0 |
+| indexed candidate references | 17,711,548 |
+
+Promotion preserved every output and independent per-call audit. The indexed allocator reduced aggregate allocator time by 11.86% and aggregate total runtime by 1.44%.
 
 ## Decision
 
-The frozen candidate advances to promotion-50 without implementation changes. Promotion must preserve exact output and independent audit parity, retain zero fallback/error counts and remain within the predeclared 1.10 allocator and total-runtime gates.
+The frozen candidate advances to the final stability-100 holdout without implementation changes. Stability must preserve exact output and independent audit parity, retain zero fallback/error counts and remain within the predeclared 1.10 allocator and total-runtime gates.
 
-Stability-100 remains untouched until promotion evidence is accepted.
+This is the final Phase 12 experiment. After its acceptance or rejection, algorithm experimentation stops and the repository moves to production hardening and release.
