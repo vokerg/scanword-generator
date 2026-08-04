@@ -1,6 +1,6 @@
 # Phase 12 — exact allocator occupancy index
 
-Status: **development and promotion accepted; stability pending**
+Status: **development and promotion accepted; stability running**
 
 Source main:
 
@@ -157,8 +157,18 @@ seed manifest:   sha256:389647aadef2a55df6f8f7ba3e5dd6c3f26ad86cd9b53030a22f58a9
 
 Promotion preserved every output and independent per-call audit. The indexed allocator reduced aggregate allocator time by 11.86% and aggregate total runtime by 1.44%.
 
+## Stability-100 execution
+
+```text
+workflow run: 30880073579
+source head:  caca0dfb336d82041a29400c3d235b6173d599c8
+module blob:  c755c2148e8e4039b9de4fb0c96b3cb7f900d401
+```
+
+The exact-head primitive gate passed. Promotion-50 is manual-only and skipped on this run. Stability-100 is the sole active holdout job.
+
 ## Decision
 
-The frozen candidate advances to the final stability-100 holdout without implementation changes. Stability must preserve exact output and independent audit parity, retain zero fallback/error counts and remain within the predeclared 1.10 allocator and total-runtime gates.
+The frozen candidate is in the final stability-100 holdout without implementation changes. Stability must preserve exact output and independent audit parity, retain zero fallback/error counts and remain within the predeclared 1.10 allocator and total-runtime gates.
 
 This is the final Phase 12 experiment. After its acceptance or rejection, algorithm experimentation stops and the repository moves to production hardening and release.
