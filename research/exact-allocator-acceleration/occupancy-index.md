@@ -1,6 +1,6 @@
 # Phase 12 — exact allocator occupancy index
 
-Status: **development and promotion accepted; stability queued**
+Status: **accepted; Phase 12 experimentation concluded**
 
 Source main:
 
@@ -8,19 +8,21 @@ Source main:
 125177d5fecdcb1e7a6930bd8f257427093ae7e2
 ```
 
-Frozen implementation:
+Frozen implementation and evidence:
 
 ```text
 implementation head: a5826b4e250ce39da71edfa0aa715c12146c7992
 module Git blob:    c755c2148e8e4039b9de4fb0c96b3cb7f900d401
-archive ref:        research/archive-phase-12-exact-occupancy-index-implementation-2026-07-31
+implementation ref: research/archive-phase-12-exact-occupancy-index-implementation-2026-07-31
+stability head:     2036baa507a829abd6966a74911d0aee06054984
+stability ref:      research/archive-phase-12-exact-occupancy-index-stability-2026-08-04
 ```
 
-No implementation tuning occurred after the one-seed smoke, during development-20 or after promotion-50.
+No implementation tuning occurred after the one-seed smoke, during development-20, after promotion-50 or after stability-100.
 
 ## Motivation
 
-The accepted Phase 12 profile observed 442,103,640 candidate availability checks across development-20. Exact linear top-three selection reduced ranking cost and is now the production default, but candidate compatibility was still recomputed by scanning every footprint key against the occupied-cell set during every restart.
+The accepted Phase 12 profile observed 442,103,640 candidate availability checks across development-20. Exact linear top-three selection reduced ranking cost and became the production default, but candidate compatibility was still recomputed by scanning every footprint key against the occupied-cell set during every restart.
 
 ## Candidate
 
@@ -35,7 +37,7 @@ build stable candidate IDs in original item/domain order
 -> use the accepted exact linear top-three selector unchanged
 ```
 
-The implementation preserves item and candidate order, scores, signatures, restart order, all RNG draws, stable comparison behavior, strict first-best selection, final output digests, validation, ownership and rollback behavior.
+The implementation preserves item and candidate order, scores, signatures, restart order, every RNG draw, stable comparison behavior, strict first-best selection, final output digests, validation, ownership and rollback behavior.
 
 Validated index-build errors fail open to the current exact production selector before any allocator RNG draw is consumed.
 
@@ -47,7 +49,7 @@ SCANWORD_EXACT_ALLOCATOR_OCCUPANCY=indexed
 SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_DETAIL=summary|full
 ```
 
-Browser and Node defaults remain `off`. Runtime order is accepted selector, default-off occupancy candidate, then independent shadow profiler.
+Browser and Node defaults remain `off` in this integration PR. Runtime order is accepted selector, default-off occupancy index, then independent shadow profiler.
 
 ## Primitive evidence
 
@@ -114,18 +116,38 @@ artifact sha256: 92545f20c92dba054760b1c0be6c1202a62d28eb8c1ea4f955401d1c3b9bfdc
 
 Promotion preserved every output and independent per-call audit. The indexed allocator reduced aggregate allocator time by 11.86% and aggregate total runtime by 1.44%.
 
-## Stability-100 execution
+## Stability-100 evidence
 
 ```text
-workflow run: 30880248418
-source head:  5f32ee3ddbdbd499dfa11c4fe3354ad5623ec204
-module blob:  c755c2148e8e4039b9de4fb0c96b3cb7f900d401
+workflow run:    30880501195
+source head:     2036baa507a829abd6966a74911d0aee06054984
+artifact:        8882662669
+artifact sha256: d7d66c6c4c9edb8d7c9402b2f9c1d70ec72050e9cfd8c8d11bcaabcedd878366
 ```
 
-The exact-head primitive gate passed. Promotion-50 is manual-only and skipped. Stability-100 is the sole queued holdout job.
+| metric | result |
+| --- | ---: |
+| exact output parity | 100 / 100 |
+| independent audit parity | 100 / 100 |
+| valid selector / occupancy / profile telemetry | 100 / 100 |
+| canonical occupancy absent | 100 / 100 |
+| exact allocation calls | 53,622 |
+| canonical allocator time | 567,950.101 ms |
+| indexed allocator time | 511,834.919 ms |
+| aggregate allocator ratio | **0.9012** |
+| median allocator ratio | 0.9038 |
+| canonical total runtime | 5,147,075 ms |
+| indexed total runtime | 5,059,637 ms |
+| aggregate total-runtime ratio | **0.9830** |
+| median total-runtime ratio | 0.9855 |
+| indexed candidate references | 35,772,881 |
+| fallbacks / index errors | 0 / 0 |
+| profiler parity / RNG / errors | 0 / 0 / 0 |
+
+Stability preserved every final output and independent per-call audit across all 100 holdout seeds. The indexed allocator reduced aggregate allocator time by 9.88% and aggregate total runtime by 1.70%.
 
 ## Decision
 
-The frozen candidate is in the final stability-100 holdout without implementation changes. Stability must preserve exact output and independent audit parity, retain zero fallback/error counts and remain within the predeclared 1.10 allocator and total-runtime gates.
+The frozen occupancy index is accepted as an exact, reversible, default-off implementation. Development-20, promotion-50 and stability-100 all met the predeclared exactness and 1.10 runtime gates with no fallback, error, parity or RNG failures.
 
-This is the final Phase 12 experiment. After its acceptance or rejection, algorithm experimentation stops and the repository moves to production hardening and release.
+Stability-100 concludes Phase 12 experimentation. Expensive promotion and stability checkpoints are manual-only; normal pull requests retain the lightweight exact primitive and parity gate. Further algorithm experimentation is out of scope unless a concrete production defect or measured product requirement establishes a new need.
