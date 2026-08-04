@@ -19,6 +19,16 @@ on:
       - "research/exact-allocator-acceleration/occupancy-index.md"
       - ".github/workflows/phase-12-exact-allocator-occupancy-index.yml"
   workflow_dispatch:
+    inputs:
+      checkpoint:
+        description: "Optional expensive checkpoint"
+        required: true
+        default: parity
+        type: choice
+        options:
+          - parity
+          - promotion
+          - stability
 
 concurrency:
   group: phase-12-exact-allocator-occupancy-index-${{ github.event.pull_request.number || github.ref }}
@@ -86,7 +96,7 @@ jobs:
           node tools/exact-allocator-occupancy-index-test-v1.cjs
 
   promotion:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.checkpoint == 'promotion'
     needs: exact-occupancy-parity
     runs-on: ubuntu-latest
     timeout-minutes: 480
@@ -126,6 +136,7 @@ jobs:
           if-no-files-found: error
 
   stability:
+    if: github.event_name == 'workflow_dispatch' && inputs.checkpoint == 'stability'
     needs: exact-occupancy-parity
     runs-on: ubuntu-latest
     timeout-minutes: 720
