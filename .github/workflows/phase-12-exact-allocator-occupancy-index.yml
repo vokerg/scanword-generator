@@ -1,0 +1,176 @@
+name: Phase 12 exact allocator occupancy index
+
+on:
+  push:
+    branches:
+      - "agent/phase-12-exact-occupancy-index"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "construction-exact-allocator-occupancy-index-v1.js"
+      - "construction-exact-allocator-top-three-v1.js"
+      - "construction-exact-allocator-profile-v1.js"
+      - "index.html"
+      - "tools/node-benchmark-bootstrap-v1.cjs"
+      - "tools/construction-pipeline-seed-v1.cjs"
+      - "tools/exact-allocator-occupancy-index-test-v1.cjs"
+      - "tools/exact-allocator-occupancy-index-checkpoint-v1.cjs"
+      - "research/exact-allocator-acceleration/occupancy-index.md"
+      - ".github/workflows/phase-12-exact-allocator-occupancy-index.yml"
+  workflow_dispatch:
+    inputs:
+      checkpoint:
+        description: "Optional expensive checkpoint"
+        required: true
+        default: parity
+        type: choice
+        options:
+          - parity
+          - promotion
+          - stability
+
+concurrency:
+  group: phase-12-exact-allocator-occupancy-index-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  exact-occupancy-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check syntax and frozen implementation boundary
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          node --check construction-exact-allocator-occupancy-index-v1.js
+          node --check tools/exact-allocator-occupancy-index-test-v1.cjs
+          node --check tools/exact-allocator-occupancy-index-checkpoint-v1.cjs
+          node --check tools/construction-pipeline-seed-v1.cjs
+          node --check tools/node-benchmark-bootstrap-v1.cjs
+          grep -q 'SCANWORD_EXACT_ALLOCATOR_OCCUPANCY = "off"' index.html
+          grep -q 'construction-exact-allocator-occupancy-index-v1.js' index.html
+          grep -q 'construction-exact-allocator-occupancy-index-v1.js' tools/node-benchmark-bootstrap-v1.cjs
+          test "$(git hash-object construction-exact-allocator-top-three-v1.js)" = "e1b970fc1b1c87ad8655141162d10bc4aaf22f0d"
+          test "$(git hash-object construction-exact-allocator-occupancy-index-v1.js)" = "c755c2148e8e4039b9de4fb0c96b3cb7f900d401"
+          node - <<'NODE'
+          const fs = require('node:fs');
+          for (const file of ['index.html', 'tools/node-benchmark-bootstrap-v1.cjs']) {
+            const source = fs.readFileSync(file, 'utf8');
+            const selector = source.indexOf('construction-exact-allocator-top-three-v1.js');
+            const occupancy = source.indexOf('construction-exact-allocator-occupancy-index-v1.js');
+            const profile = source.indexOf('construction-exact-allocator-profile-v1.js');
+            if (!(selector >= 0 && selector < occupancy && occupancy < profile)) {
+              throw new Error(`${file}: exact allocator wrapper order is invalid`);
+            }
+          }
+          NODE
+
+      - name: Preserve accepted top-three parity
+        env:
+          SCANWORD_BULK_LEXICON: "off"
+          SCANWORD_EXACT_ALLOCATOR_OCCUPANCY: "off"
+        run: >-
+          NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs
+          node tools/exact-allocator-top-three-test-v1.cjs
+
+      - name: Prove exact occupancy index parity
+        env:
+          SCANWORD_BULK_LEXICON: "off"
+        run: >-
+          NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs
+          node tools/exact-allocator-occupancy-index-test-v1.cjs
+
+  promotion:
+    if: github.event_name == 'workflow_dispatch' && inputs.checkpoint == 'promotion'
+    needs: exact-occupancy-parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 480
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_CONCURRENCY: 4
+      SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_RUNTIME_RATIO: 1.10
+      SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_SEED_TIMEOUT_MS: 7200000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Compare frozen promotion-50
+        run: |
+          set -o pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          test "$(git hash-object construction-exact-allocator-occupancy-index-v1.js)" = "c755c2148e8e4039b9de4fb0c96b3cb7f900d401"
+          mkdir -p research-output/exact-allocator-acceleration
+          node tools/exact-allocator-occupancy-index-checkpoint-v1.cjs \
+            promotion \
+            research-output/exact-allocator-acceleration/promotion-occupancy-index-v1.jsonl \
+            | tee research-output/exact-allocator-acceleration/promotion-occupancy-index-console-v1.jsonl
+
+      - name: Publish promotion evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-12-exact-allocator-occupancy-promotion-${{ env.SOURCE_SHA }}
+          path: research-output/exact-allocator-acceleration/
+          if-no-files-found: error
+
+  stability:
+    if: github.event_name == 'workflow_dispatch' && inputs.checkpoint == 'stability'
+    needs: exact-occupancy-parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 720
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_CONCURRENCY: 4
+      SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_RUNTIME_RATIO: 1.10
+      SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_SEED_TIMEOUT_MS: 7200000
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Compare frozen stability-100
+        run: |
+          set -o pipefail
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          test "$(git hash-object construction-exact-allocator-occupancy-index-v1.js)" = "c755c2148e8e4039b9de4fb0c96b3cb7f900d401"
+          mkdir -p research-output/exact-allocator-acceleration
+          node tools/exact-allocator-occupancy-index-checkpoint-v1.cjs \
+            stability \
+            research-output/exact-allocator-acceleration/stability-occupancy-index-v1.jsonl \
+            | tee research-output/exact-allocator-acceleration/stability-occupancy-index-console-v1.jsonl
+
+      - name: Publish stability evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase-12-exact-allocator-occupancy-stability-${{ env.SOURCE_SHA }}
+          path: research-output/exact-allocator-acceleration/
+          if-no-files-found: error
