@@ -146,10 +146,17 @@ for (const id of [
   assert(new RegExp(`id=["']${id}["']`).test(html), `missing required UI control #${id}`);
 }
 
+assert(ui.includes("function setExportEnabled(enabled)"), "UI export-state helper is missing");
+assert(ui.includes("function setGenerationBusy(busy)"), "UI busy-state helper is missing");
+assert(/function setExportEnabled\(enabled\) \{[\s\S]*?els\.downloadSvg\.disabled = !enabled;[\s\S]*?els\.downloadJson\.disabled = !enabled;[\s\S]*?\}/.test(ui), "export controls are not managed together");
+assert(/function setGenerationBusy\(busy\) \{[\s\S]*?els\.generate\.disabled = busy;[\s\S]*?aria-busy[\s\S]*?if \(busy\) setExportEnabled\(false\);[\s\S]*?\}/.test(ui), "generation busy state does not disable stale exports");
+
 const catchBlock = ui.match(/catch \(error\) \{([\s\S]*?)\n\s*\} finally \{/);
 assert(catchBlock, "ui.js must keep an explicit generation failure boundary");
 for (const expected of [
   "currentResult = null;",
+  "currentSettings = null;",
+  "setExportEnabled(false);",
   "Generation failed.",
   'els.generationStatus.textContent = "no valid grid";',
   'els.stats.innerHTML = "";',
@@ -157,11 +164,16 @@ for (const expected of [
 ]) {
   assert(catchBlock[1].includes(expected), `generation failure path lost: ${expected}`);
 }
-assert(/finally \{[\s\S]*?els\.generate\.disabled = false;[\s\S]*?\}/.test(ui), "Generate button is not restored after failure");
+assert(/finally \{[\s\S]*?setGenerationBusy\(false\);[\s\S]*?\}/.test(ui), "Generate/busy state is not restored after generation completes");
+assert(/function runGeneration\(\) \{[\s\S]*?currentResult = null;[\s\S]*?currentSettings = null;[\s\S]*?setGenerationBusy\(true\);/.test(ui), "old result/settings are not invalidated before generation starts");
+assert(/currentResult = nextResult;[\s\S]*?currentSettings = \{ \.\.\.settings \};[\s\S]*?setExportEnabled\(true\);/.test(ui), "successful generation does not atomically publish exportable state");
+assert(/const generatedSeed = result === currentResult && currentSettings[\s\S]*?\? currentSettings\.seed/.test(ui), "JSON export seed is not bound to generated settings");
 assert(/if \(currentResult\) download\("arrowword-a5\.svg"/.test(ui), "SVG export is not guarded by a valid current result");
 assert(/if \(currentResult\) download\("arrowword-project\.json"/.test(ui), "JSON export is not guarded by a valid current result");
 assert(ui.includes("window.ScanwordGenerator = {"), "public browser generator surface is missing");
 assert(ui.includes("getCurrentResult: () => currentResult"), "current-result inspection hook is missing");
+assert(ui.includes("getCurrentSettings: () => currentSettings ? { ...currentSettings } : null"), "generated-settings inspection hook is missing");
+assert(ui.includes("setExportEnabled(false);\n  runGeneration();"), "exports are not disabled before initial generation");
 
 for (const expected of [
   "const pageWidth = 148;",
@@ -222,6 +234,7 @@ console.log(JSON.stringify({
   browserNodeOrderParity: true,
   productionDefaults: requiredDefaults.length,
   uiFailureBoundary: true,
+  uiExportStateContract: true,
   exportGuards: true,
   renderer: "A5-148x210",
   owners: {
