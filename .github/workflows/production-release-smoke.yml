@@ -12,6 +12,7 @@ on:
       - "tools/construction-pipeline-seed-v1.cjs"
       - "tools/wrapper-retirement-test-v1.cjs"
       - "tools/production-release-smoke-v1.cjs"
+      - "tools/ui-release-state-test-v1.cjs"
       - ".github/workflows/production-release-smoke.yml"
   push:
     branches:
@@ -24,6 +25,7 @@ on:
       - "tools/construction-pipeline-seed-v1.cjs"
       - "tools/wrapper-retirement-test-v1.cjs"
       - "tools/production-release-smoke-v1.cjs"
+      - "tools/ui-release-state-test-v1.cjs"
       - ".github/workflows/production-release-smoke.yml"
   workflow_dispatch:
     inputs:
@@ -57,7 +59,17 @@ jobs:
           node-version: 22
 
       - name: Validate release smoke syntax
-        run: node --check tools/production-release-smoke-v1.cjs
+        run: |
+          node --check ui.js
+          node --check tools/ui-release-state-test-v1.cjs
+          node --check tools/production-release-smoke-v1.cjs
+
+      - name: Verify UI generation and export state
+        run: |
+          set -o pipefail
+          mkdir -p release-output
+          node tools/ui-release-state-test-v1.cjs \
+            | tee release-output/ui-release-state-test-v1.jsonl
 
       - name: Verify browser surface and canonical production runtime
         run: |
