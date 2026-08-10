@@ -60,4 +60,16 @@ jobs:
         run: node --check tools/production-release-smoke-v1.cjs
 
       - name: Verify browser surface and canonical production runtime
-        run: node tools/production-release-smoke-v1.cjs
+        run: |
+          set -o pipefail
+          mkdir -p release-output
+          node tools/production-release-smoke-v1.cjs \
+            | tee release-output/production-release-smoke-v1.jsonl
+
+      - name: Publish release smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-release-smoke-${{ github.event.pull_request.head.sha || github.sha }}
+          path: release-output/
+          if-no-files-found: warn
