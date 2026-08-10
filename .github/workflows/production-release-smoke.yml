@@ -8,11 +8,13 @@ on:
       - "*.js"
       - "bulk-lexicon/**"
       - "index.html"
+      - "styles.css"
       - "tools/node-benchmark-bootstrap-v1.cjs"
       - "tools/construction-pipeline-seed-v1.cjs"
       - "tools/wrapper-retirement-test-v1.cjs"
       - "tools/production-release-smoke-v1.cjs"
       - "tools/ui-release-state-test-v1.cjs"
+      - "tools/a5-print-contract-test-v1.cjs"
       - ".github/workflows/production-release-smoke.yml"
   push:
     branches:
@@ -21,11 +23,13 @@ on:
       - "*.js"
       - "bulk-lexicon/**"
       - "index.html"
+      - "styles.css"
       - "tools/node-benchmark-bootstrap-v1.cjs"
       - "tools/construction-pipeline-seed-v1.cjs"
       - "tools/wrapper-retirement-test-v1.cjs"
       - "tools/production-release-smoke-v1.cjs"
       - "tools/ui-release-state-test-v1.cjs"
+      - "tools/a5-print-contract-test-v1.cjs"
       - ".github/workflows/production-release-smoke.yml"
   workflow_dispatch:
     inputs:
@@ -62,6 +66,7 @@ jobs:
         run: |
           node --check ui.js
           node --check tools/ui-release-state-test-v1.cjs
+          node --check tools/a5-print-contract-test-v1.cjs
           node --check tools/production-release-smoke-v1.cjs
 
       - name: Verify UI generation and export state
@@ -70,6 +75,13 @@ jobs:
           mkdir -p release-output
           node tools/ui-release-state-test-v1.cjs \
             | tee release-output/ui-release-state-test-v1.jsonl
+
+      - name: Verify A5 print contract
+        run: |
+          set -o pipefail
+          mkdir -p release-output
+          node tools/a5-print-contract-test-v1.cjs \
+            | tee release-output/a5-print-contract-test-v1.jsonl
 
       - name: Verify browser surface and canonical production runtime
         run: |
