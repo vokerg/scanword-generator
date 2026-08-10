@@ -1,0 +1,63 @@
+name: Production release smoke
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "*.js"
+      - "bulk-lexicon/**"
+      - "index.html"
+      - "tools/node-benchmark-bootstrap-v1.cjs"
+      - "tools/construction-pipeline-seed-v1.cjs"
+      - "tools/wrapper-retirement-test-v1.cjs"
+      - "tools/production-release-smoke-v1.cjs"
+      - ".github/workflows/production-release-smoke.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "*.js"
+      - "bulk-lexicon/**"
+      - "index.html"
+      - "tools/node-benchmark-bootstrap-v1.cjs"
+      - "tools/construction-pipeline-seed-v1.cjs"
+      - "tools/wrapper-retirement-test-v1.cjs"
+      - "tools/production-release-smoke-v1.cjs"
+      - ".github/workflows/production-release-smoke.yml"
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: Deterministic production smoke seed
+        required: true
+        default: release-smoke-v1
+
+concurrency:
+  group: production-release-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  release-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SCANWORD_RELEASE_SMOKE_SEED: ${{ github.event_name == 'workflow_dispatch' && inputs.seed || 'release-smoke-v1' }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate release smoke syntax
+        run: node --check tools/production-release-smoke-v1.cjs
+
+      - name: Verify browser surface and canonical production runtime
+        run: node tools/production-release-smoke-v1.cjs
