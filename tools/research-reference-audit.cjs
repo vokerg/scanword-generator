@@ -85,17 +85,17 @@ const inScope = (file) => (
 const isText = (file) => /\.(?:md|json|sh|ya?ml|txt)$/i.test(file);
 const files = tracked.filter((file) => inScope(file) && isText(file));
 
-const commitFiles = new Map();
+const objectFiles = new Map();
 const branchFiles = new Map();
-const commitPattern = /(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])/gi;
+const objectPattern = /(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])/gi;
 const branchPattern = /\b(?:r-and-d\/[A-Za-z0-9._/-]+|release\/[A-Za-z0-9._/-]+|research\/(?:archive-|closed-fill-snapshot-)[A-Za-z0-9._-]+)\b/g;
 
 for (const file of files) {
   const text = fs.readFileSync(path.join(root, file), "utf8");
-  for (const match of text.matchAll(commitPattern)) {
+  for (const match of text.matchAll(objectPattern)) {
     const sha = match[0].toLowerCase();
-    if (!commitFiles.has(sha)) commitFiles.set(sha, new Set());
-    commitFiles.get(sha).add(file);
+    if (!objectFiles.has(sha)) objectFiles.set(sha, new Set());
+    objectFiles.get(sha).add(file);
   }
   for (const match of text.matchAll(branchPattern)) {
     const branch = match[0].replace(/[.,;:]+$/, "");
@@ -105,21 +105,45 @@ for (const file of files) {
 }
 
 const archiveRefs = fetchedRefs.filter((item) => item.fetched);
-const commits = uniqueSorted(commitFiles.keys()).map((sha) => {
-  const available = runGit(["cat-file", "-e", `${sha}^{commit}`], { cwd: root }).ok;
-  const inMain = available && mainFetch.ok
+const documentedObjects = uniqueSorted(objectFiles.keys()).map((sha) => {
+  const typeResult = runGit(["cat-file", "-t", sha], { cwd: root });
+  const objectType = typeResult.ok ? typeResult.stdout : null;
+  const availableCommit = objectType === "commit"
+    || runGit(["cat-file", "-e", `${sha}^{commit}`], { cwd: root }).ok;
+  const inMain = availableCommit && mainFetch.ok
     && runGit(["merge-base", "--is-ancestor", sha, mainRef], { cwd: root }).ok;
-  const inArchives = archiveRefs
-    .filter((item) => runGit(["merge-base", "--is-ancestor", sha, item.localRef], { cwd: root }).ok)
-    .map((item) => item.ref);
+  const inArchives = availableCommit
+    ? archiveRefs
+      .filter((item) => runGit(["merge-base", "--is-ancestor", sha, item.localRef], { cwd: root }).ok)
+      .map((item) => item.ref)
+    : [];
   return {
     sha,
-    files: uniqueSorted(commitFiles.get(sha)),
-    available,
+    files: uniqueSorted(objectFiles.get(sha)),
+    objectType,
+    availableCommit,
     inMain,
     inArchives,
   };
 });
+
+const commits = documentedObjects
+  .filter((item) => item.objectType === null || item.availableCommit)
+  .map((item) => ({
+    sha: item.sha,
+    files: item.files,
+    available: item.availableCommit,
+    inMain: item.inMain,
+    inArchives: item.inArchives,
+  }));
+
+const nonCommitObjects = documentedObjects
+  .filter((item) => item.objectType !== null && !item.availableCommit)
+  .map((item) => ({
+    sha: item.sha,
+    files: item.files,
+    objectType: item.objectType,
+  }));
 
 const branches = uniqueSorted(branchFiles.keys()).map((branch) => {
   const remote = runGit(["ls-remote", "--heads", "origin", `refs/heads/${branch}`], { cwd: root });
@@ -179,7 +203,7 @@ for (const commit of commits) {
 }
 
 const report = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   repositoryHead: requireGit(["rev-parse", "HEAD"], { cwd: root }),
   manifest: path.relative(root, manifestPath),
   scannedFiles: files.length,
@@ -187,6 +211,7 @@ const report = {
   mainFetched: mainFetch.ok,
   requiredChecks,
   commits,
+  nonCommitObjects,
   branches,
   failures: uniqueSorted(failures),
   passed: failures.length === 0,
