@@ -23,6 +23,18 @@
   };
 
   let currentResult = null;
+  let currentSettings = null;
+
+  function setExportEnabled(enabled) {
+    els.downloadSvg.disabled = !enabled;
+    els.downloadJson.disabled = !enabled;
+  }
+
+  function setGenerationBusy(busy) {
+    els.generate.disabled = busy;
+    els.preview.setAttribute("aria-busy", busy ? "true" : "false");
+    if (busy) setExportEnabled(false);
+  }
 
   function renderStats(result) {
     const validity = result.validation?.valid ? "YES" : "NO";
@@ -63,30 +75,15 @@
   }
 
   function exportResult(result) {
+    const generatedSeed = result === currentResult && currentSettings
+      ? currentSettings.seed
+      : els.seed.value.trim();
     return {
       version: "0.9.0",
       page: { format: "A5", orientation: "portrait", widthMm: 148, heightMm: 210 },
       grid: { rows: result.rows, cols: result.cols },
-      seed: els.seed.value.trim(),
+      seed: generatedSeed,
       generatedPoolSize: result.pool.length,
-      quality: {
-        structurallyValid: result.validation?.valid || false,
-        accidentalRuns: result.validation?.accidentalRuns?.length || 0,
-        conflicts: result.validation?.conflicts || 0,
-        orphanLetters: result.validation?.orphanLetters || 0,
-        clueDirectionConflicts: result.validation?.clueDirectionConflicts || 0,
-        panelCells: result.panelCells,
-        panelRatio: result.panelRatio,
-        activeCoverage: result.fillRatio,
-        answerCoverage: result.answerCoverage,
-        coverageCheckpoint: result.coverageCheckpoint,
-        intersections: result.intersections,
-        components: result.components,
-        externalClueTexts: result.externalClueTexts || 0,
-        clueTextCells: result.clueTextCells || 0,
-        panelRegions: result.panelRegions || 0,
-        isolatedPanels: result.isolatedPanels || 0,
-      },
       placedWords: result.placed,
       cells: result.grid.map((row) => row.map((cell) => ({
         type: cell.type,
@@ -126,12 +123,14 @@
 
   function runGeneration() {
     const settings = readSettings();
+    currentResult = null;
+    currentSettings = null;
     els.generationStatus.textContent = "generating…";
-    els.generate.disabled = true;
+    setGenerationBusy(true);
 
     window.setTimeout(() => {
       try {
-        currentResult = generateBest(
+        const nextResult = generateBest(
           settings.seed,
           settings.poolSize,
           settings.rows,
@@ -139,19 +138,24 @@
           settings.targetWords,
           settings.clueDensity,
         );
-        currentResult.validation = validateGrid(currentResult.grid, currentResult.placed);
+        nextResult.validation = validateGrid(nextResult.grid, nextResult.placed);
+        currentResult = nextResult;
+        currentSettings = { ...settings };
         rerenderSvg();
         renderStats(currentResult);
         renderWords(currentResult);
+        setExportEnabled(true);
         els.generationStatus.textContent = `selected attempt ${currentResult.attempt + 1} · searched ${currentResult.attemptBudget || "?"} · valid · ${currentResult.components} component · active ${(currentResult.fillRatio * 100).toFixed(1)}%`;
       } catch (error) {
         currentResult = null;
+        currentSettings = null;
+        setExportEnabled(false);
         els.preview.innerHTML = `<div class="generation-error"><strong>Generation failed.</strong><br>${escapeXml(error.message)}</div>`;
         els.stats.innerHTML = "";
         els.wordsTable.innerHTML = "";
         els.generationStatus.textContent = "no valid grid";
       } finally {
-        els.generate.disabled = false;
+        setGenerationBusy(false);
       }
     }, 20);
   }
@@ -174,6 +178,8 @@
     extractSlots,
     analyzeAssignments,
     getCurrentResult: () => currentResult,
+    getCurrentSettings: () => currentSettings ? { ...currentSettings } : null,
   };
+  setExportEnabled(false);
   runGeneration();
 })();
