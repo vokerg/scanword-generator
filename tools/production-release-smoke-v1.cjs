@@ -10,6 +10,12 @@ const bootstrapPath = path.join(root, "tools", "node-benchmark-bootstrap-v1.cjs"
 const uiPath = path.join(root, "ui.js");
 const rendererPath = path.join(root, "renderer.js");
 
+const DEFAULT_RELEASE_SMOKE = Object.freeze({
+  seed: "release-smoke-v1",
+  gridDigest: "85bc32d1dd4be3b511ee73a91d0b66ada9c26cb7e32f140fc1a7fbce868d34ef",
+  placedDigest: "0d2971716aaadeced6a2b93459bc45b93b5271f9f921fa59e7009b7de7208d11",
+});
+
 function fail(message) {
   throw new Error(`Production release smoke failed: ${message}`);
 }
@@ -179,7 +185,7 @@ assert(wrapperReport.report?.activeGenerateBestOwner === "construction-pipeline-
 assert(wrapperReport.report?.executionOwner === "direct-production-stage-runtime-v2", "unexpected production execution owner");
 assert(wrapperReport.report?.rollbackOwner === "legacy-wrapper-chain", "legacy rollback owner is unavailable");
 
-const seed = process.env.SCANWORD_RELEASE_SMOKE_SEED || "release-smoke-v1";
+const seed = process.env.SCANWORD_RELEASE_SMOKE_SEED || DEFAULT_RELEASE_SMOKE.seed;
 const seedOutput = execFileSync(
   process.execPath,
   [path.join(root, "tools", "construction-pipeline-seed-v1.cjs"), seed],
@@ -198,6 +204,18 @@ assert(Number(result.answers) > 0, "canonical smoke seed placed no answers");
 assert(Number(result.exactAllocationCalls) > 0, "canonical smoke seed did not exercise exact clue allocation");
 assert(result.retirementAudit?.passed === true, "canonical smoke seed lost production ownership audit");
 
+const baselinePinned = seed === DEFAULT_RELEASE_SMOKE.seed;
+if (baselinePinned) {
+  assert(
+    result.gridDigest === DEFAULT_RELEASE_SMOKE.gridDigest,
+    `default smoke grid digest drifted: expected ${DEFAULT_RELEASE_SMOKE.gridDigest}, got ${result.gridDigest}`,
+  );
+  assert(
+    result.placedDigest === DEFAULT_RELEASE_SMOKE.placedDigest,
+    `default smoke placed digest drifted: expected ${DEFAULT_RELEASE_SMOKE.placedDigest}, got ${result.placedDigest}`,
+  );
+}
+
 console.log(JSON.stringify({
   passed: true,
   browserScripts: browserScripts.length,
@@ -213,6 +231,7 @@ console.log(JSON.stringify({
   },
   seed: {
     name: result.seed,
+    baselinePinned,
     valid: result.valid,
     components: result.components,
     answers: result.answers,
