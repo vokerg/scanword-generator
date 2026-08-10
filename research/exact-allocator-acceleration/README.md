@@ -1,28 +1,29 @@
 # Phase 12 — exact allocator acceleration
 
-Status: active research
+Status: **closed; experimentation concluded**
 
 Started: 2026-07-29
 
-Draft PR: `#26`
+Closed by accepted stability evidence on: 2026-08-04
 
-Source branch:
-
-```text
-agent/phase-12-exact-allocator-acceleration
-```
-
-Source baseline:
-
-```text
-ab9f43f525280a674c49ecd7304f62cc4eb0c15c
-```
+Integrated through PRs `#26`–`#30`.
 
 ## Question
 
 Can `assignClueTextCellsV2` be accelerated internally while preserving byte-identical selected outputs, deterministic restart behavior, complete validation and existing production ownership?
 
-Phase 11 showed that skipping pre-allocation candidates can reduce allocator work, but one locked stability seed changed the canonical winner. Phase 12 therefore keeps the candidate set and final comparison unchanged and focuses only on eliminating repeated exact-allocation work.
+## Answer
+
+Yes, within the exactness contract.
+
+Phase 12 produced two accepted exact optimizations:
+
+1. an exact linear top-three selector, promoted to the browser and Node production default;
+2. an exact occupancy compatibility index, accepted and retained as reversible default-off code.
+
+No accepted Phase 12 candidate changed final grid, placed-answer, clue or geometry digests on the locked development/promotion/stability sequences. Independent allocator replay/audit and RNG parity also remained exact.
+
+Phase 12 algorithm experimentation is complete. Further algorithm work is out of scope unless a concrete production defect or measured product requirement establishes a new need.
 
 ## Non-negotiable acceptance hierarchy
 
@@ -32,54 +33,7 @@ Phase 11 showed that skipping pre-allocation candidates can reduce allocator wor
 4. Lower allocator time and total runtime.
 5. Promotion only after fresh development, promotion and stability holdouts.
 
-Phase 11 promotion and stability seeds, including `v8-stability-058`, are not tuning data for this phase.
-
-## Initial call-graph finding
-
-The active production portfolio allocates clue text once for every structurally eligible base or fallback state and again for every generated victim-replacement finalist. Targeted downstream victim repair also invokes the same allocator. The allocator currently:
-
-```text
-build panel-region sizes once
--> enumerate up to 96 clue-footprint domains per clue item
--> run 120/160 randomized greedy restarts
--> filter every candidate footprint against occupied cells
--> rank every available candidate with RNG jitter
--> retain the strict first best score
--> apply the selected footprints
-```
-
-Phase 11 measured complete allocator calls and elapsed time at the boundary, but did not separate immutable region/domain construction from per-restart ordering, availability filtering and ranking. That is the first Phase 12 observability gap.
-
-## Default-off shadow profiler
-
-The first implementation is telemetry only:
-
-```text
-construction-exact-allocator-profile-v1.js
-```
-
-Controls:
-
-```text
-SCANWORD_EXACT_ALLOCATOR_PROFILE=off      # canonical default
-SCANWORD_EXACT_ALLOCATOR_PROFILE=shadow   # record and replay exact allocator work
-SCANWORD_EXACT_ALLOCATOR_PROFILE_DETAIL=summary
-SCANWORD_EXACT_ALLOCATOR_PROFILE_DETAIL=full
-```
-
-Shadow mode records every random draw used by the authoritative allocator, returns the authoritative result unchanged, then replays the exact algorithm on a cloned pre-allocation state. The replay measures:
-
-- panel-region and footprint-domain construction time;
-- clue items, footprint candidates and zero-domain items;
-- per-restart ordering, availability filtering and ranking time;
-- candidate availability checks, available/ranked candidates and assignments;
-- best-score updates, covered cells and assigned clues;
-- application time and total replay time;
-- exact layout/grid parity and random-draw parity.
-
-Heavy observations are attached non-enumerably to the allocated grid. Compact process-wide aggregates are exposed through `ScanwordSolver.currentExactAllocatorProfileV1()`. Replay errors fail open and never replace or mutate the authoritative returned layout.
-
-No optimization has been implemented or promoted. Browser and Node defaults remain `off`.
+Phase 11 promotion and stability seeds, including `v8-stability-058`, were not tuning data for this phase.
 
 ## Frozen Phase 12 seed boundary
 
@@ -103,88 +57,175 @@ Canonical manifest digest:
 389647aadef2a55df6f8f7ba3e5dd6c3f26ad86cd9b53030a22f58a9e754d2e9
 ```
 
-The deterministic materializer and verifier is `tools/phase-12-seed-manifest-v1.cjs`. The seed namespace, split counts, derivation and digest are frozen before any cache or pruning candidate is introduced.
+## Observability baseline
 
-## Frozen-seed profiling checkpoint
-
-`tools/exact-allocator-profile-checkpoint-v1.cjs` runs each selected seed twice:
+The default-off shadow profiler established the exact allocator work boundary before optimization:
 
 ```text
-canonical profile-off baseline
--> profile-shadow authoritative run plus exact replay
--> exact final-output digest comparison
--> per-call replay and RNG parity validation
--> aggregate immutable setup, restart search and application work
+construction-exact-allocator-profile-v1.js
 ```
 
-The checkpoint does not treat shadow overhead as an optimization result. Its purpose is to establish where authoritative allocator work is spent and to reject any profiler or wrapper behavior that changes selected output.
-
-Reproduce the frozen development split:
-
-```bash
-node tools/exact-allocator-profile-checkpoint-v1.cjs \
-  development \
-  research-output/exact-allocator-acceleration/development-profile-v1.jsonl
-```
-
-The Phase 12 workflow exposes this as a manual `development-profile` job and uploads the JSONL evidence artifact.
-
-## Planned investigation
-
-1. **Completed:** locate the complete `assignClueTextCellsV2` call graph and restart boundary.
-2. **Completed:** add default-off allocation telemetry with deterministic counters and timing summaries.
-3. **Completed:** freeze fresh Phase 12 development, promotion and stability seed manifests before tuning.
-4. **Ready to execute:** measure repeated immutable work across restarts and candidates on development-20.
-5. Introduce one bounded optimization at a time behind an explicit default-off flag.
-6. Require exact digest parity before considering runtime evidence.
-7. Preserve the exact implementation head under an immutable `research/archive-*` ref before documentation-only closure commits.
-
-## Profiler validation
-
-Primitive validation passed in workflow run:
+Controls:
 
 ```text
-30421463278
+SCANWORD_EXACT_ALLOCATOR_PROFILE=off
+SCANWORD_EXACT_ALLOCATOR_PROFILE=shadow
+SCANWORD_EXACT_ALLOCATOR_PROFILE_DETAIL=summary|full
 ```
 
-The job proved exact replayed layout/grid parity, exact random-draw consumption, full restart summaries in diagnostic mode, frozen seed-manifest integrity and zero observations when the feature is off.
+The profiler records authoritative RNG draws, replays the exact allocator on a cloned pre-allocation state and checks layout/grid/RNG parity. Replay errors fail open and never replace or mutate the authoritative returned layout.
 
-Local commands:
+Frozen profiler archive refs:
+
+```text
+1acbbdcd7f4c233f6382c99b4ee7cf93ec762843
+refs/heads/research/archive-phase-12-exact-allocator-profile-instrumentation-2026-07-29
+
+0c624a5948dc15382518ed6fc05de7fb4dfe81f7
+refs/heads/research/archive-phase-12-development-profile-evidence-2026-07-30
+```
+
+## Accepted optimization 1: exact linear top-three selector
+
+The allocator assigns jitter to every available footprint candidate, but only the first three ranked candidates can affect the final random choice. The accepted selector preserves all jitter draws and stable comparator semantics while retaining the exact top three in linear time instead of fully sorting the domain.
+
+Frozen implementation:
+
+```text
+5db8d25de2422ce1f62d21d4ffa2da7bb3cafb3e
+```
+
+Archived research head:
+
+```text
+5efa28f684e9ab605acc8fe1c8b46a1c47a89a29
+refs/heads/research/archive-phase-12-linear-top-three-selector-2026-07-30
+```
+
+Accepted corpus evidence:
+
+| split | exact/audit parity | allocator ratio | total ratio | fallbacks/errors |
+| --- | ---: | ---: | ---: | ---: |
+| development-20 | 20/20 | 0.9590 | 0.9940 | 0/0 |
+| promotion-50 | 50/50 | 0.9500 | 0.9900 | 0/0 |
+| stability-100 | 100/100 | 0.9562 | 0.9891 | 0/0 |
+
+Stability workflow/artifact:
+
+```text
+workflow run:    30520073731
+artifact:        8752036962
+artifact sha256: f54cad7882f25cf63a0412febf75a501e0620b195f44ce1a16bf7dce09a4d6d4
+exact calls:     53,622
+```
+
+### Production promotion
+
+The accepted selector algorithm was promoted unchanged to the browser and Node default.
+
+Promotion archive:
+
+```text
+77616780d11377f1fe44bcd74d17ba8f0adb5cae
+refs/heads/research/archive-phase-12-exact-selector-default-promotion-2026-07-31
+```
+
+Production contract:
+
+```text
+absent SCANWORD_EXACT_ALLOCATOR_SELECTOR -> linear-top-three
+SCANWORD_EXACT_ALLOCATOR_SELECTOR=linear-top-three -> linear-top-three
+SCANWORD_EXACT_ALLOCATOR_SELECTOR=off -> canonical stable full-sort rollback
+```
+
+Detailed ledgers:
+
+```text
+research/exact-allocator-acceleration/linear-top-three-selector.md
+research/exact-allocator-acceleration/default-promotion.md
+```
+
+## Accepted optimization 2: exact occupancy compatibility index
+
+The second candidate avoids repeated full candidate-footprint compatibility scans during every restart. It builds stable candidate IDs and a deterministic cell-to-candidate reference map, then incrementally invalidates candidates overlapping newly occupied cells while enumerating survivors in original order.
+
+Controls:
+
+```text
+SCANWORD_EXACT_ALLOCATOR_OCCUPANCY=off
+SCANWORD_EXACT_ALLOCATOR_OCCUPANCY=indexed
+SCANWORD_EXACT_ALLOCATOR_OCCUPANCY_DETAIL=summary|full
+```
+
+Frozen implementation:
+
+```text
+a5826b4e250ce39da71edfa0aa715c12146c7992
+refs/heads/research/archive-phase-12-exact-occupancy-index-implementation-2026-07-31
+```
+
+Frozen stability head:
+
+```text
+2036baa507a829abd6966a74911d0aee06054984
+refs/heads/research/archive-phase-12-exact-occupancy-index-stability-2026-08-04
+```
+
+Accepted evidence:
+
+| checkpoint | exact/audit parity | allocator ratio | total ratio | fallbacks/errors |
+| --- | ---: | ---: | ---: | ---: |
+| development-20 | 20/20 | 0.8845 | 0.9937 | 0/0 |
+| promotion-50 | 50/50 | 0.8814 | 0.9856 | 0/0 |
+| stability-100 | 100/100 | 0.9012 | 0.9830 | 0/0 |
+
+Stability workflow/artifact:
+
+```text
+workflow run:    30880501195
+artifact:        8882662669
+artifact sha256: d7d66c6c4c9edb8d7c9402b2f9c1d70ec72050e9cfd8c8d11bcaabcedd878366
+exact calls:     53,622
+candidate refs:  35,772,881
+```
+
+On stability-100 the indexed allocator reduced aggregate allocator time by 9.88% and aggregate total runtime by 1.70%.
+
+Decision: accepted as exact, reversible, default-off code. Browser and Node defaults remain:
+
+```text
+SCANWORD_EXACT_ALLOCATOR_OCCUPANCY=off
+```
+
+Detailed ledger:
+
+```text
+research/exact-allocator-acceleration/occupancy-index.md
+```
+
+## Closure decision
+
+Phase 12 met its research objective and is closed.
+
+The production default is the exact linear top-three selector. The occupancy index is retained as an accepted default-off implementation rather than promoted automatically because its end-to-end benefit is modest and no current product requirement requires the additional production-path complexity.
+
+Expensive promotion and stability checkpoints are manual-only. Normal pull requests retain lightweight exact parity coverage.
+
+No Phase 13 is implied by this closure. A new algorithm phase requires a concrete measured product problem, explicit acceptance criteria and fresh development/promotion/stability boundaries.
+
+Canonical closure record:
+
+```text
+docs/milestones/phase-12-exact-allocator-research-closure.md
+```
+
+## Required lightweight exact gates
 
 ```bash
-node --check construction-exact-allocator-profile-v1.js
-node --check tools/construction-pipeline-seed-v1.cjs
-node --check tools/exact-allocator-profile-test-v1.cjs
-node --check tools/exact-allocator-profile-checkpoint-v1.cjs
-node --check tools/phase-12-seed-manifest-v1.cjs
-node tools/phase-12-seed-manifest-v1.cjs
 NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
-  node tools/exact-allocator-profile-test-v1.cjs
+  node tools/exact-allocator-top-three-test-v1.cjs
+NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
+  node tools/exact-allocator-occupancy-index-test-v1.cjs
 ```
 
-## Required baseline gates
-
-```bash
-node tools/preallocation-structural-frontier-test-v1.cjs
-node tools/preallocation-repair-potential-test-v1.cjs
-node tools/preallocation-ranked-frontier-test-v1.cjs
-node tools/preallocation-filter-test-v1.cjs
-node tools/complete-pipeline-frontier-test-v1.cjs
-node tools/construction-stage-runtime-test-v2.cjs
-NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
-  node tools/wrapper-retirement-test-v1.cjs
-```
-
-Every changed JavaScript or CommonJS file must also pass `node --check` and its matching deterministic primitive test.
-
-## Evidence ledger
-
-Record each experiment here with:
-
-- exact source commit and feature flags;
-- corpus, configuration and seed digests;
-- baseline and candidate allocator counters;
-- runtime median, p95 and maximum;
-- per-seed digest parity and regressions;
-- workflow run, artifact ID and reproduction command;
-- explicit promote, reject or defer decision.
+Historical evidence, measurement defects and intermediate experiment records remain in this directory and must not be rewritten out of history.
