@@ -44,6 +44,7 @@ const elements = {
   generate: makeElement(),
   downloadSvg: makeElement(),
   downloadJson: makeElement(),
+  printA5: makeElement(),
   stats: makeElement(),
   preview: makeElement(),
   wordsTable: makeElement(),
@@ -53,6 +54,7 @@ const elements = {
 const timers = [];
 let shouldFail = false;
 let generationCalls = 0;
+let printCalls = 0;
 
 function escapeXml(value) {
   return String(value)
@@ -120,6 +122,9 @@ window.setTimeout = (callback) => {
   timers.push(callback);
   return timers.length;
 };
+window.print = () => {
+  printCalls += 1;
+};
 window.RUSSIAN_WORDS = Array.from({ length: 40966 }, (_, index) => `WORD-${index}`);
 window.ScanwordCore = {
   DIRECTIONS: {
@@ -166,12 +171,13 @@ const api = window.ScanwordGenerator;
 assert(api && typeof api.getCurrentResult === "function", "public generator state API is unavailable");
 assert(typeof api.getCurrentSettings === "function", "current settings snapshot API is unavailable");
 
-// Initial automatic generation must not expose stale or partial exports.
+// Initial automatic generation must not expose stale or partial exports/print.
 assert(api.getCurrentResult() === null, "result must be empty while initial generation is pending");
 assert(api.getCurrentSettings() === null, "settings must be empty while initial generation is pending");
 assert(elements.generate.disabled === true, "Generate must be disabled while initial generation is pending");
 assert(elements.downloadSvg.disabled === true, "SVG export must be disabled while initial generation is pending");
 assert(elements.downloadJson.disabled === true, "JSON export must be disabled while initial generation is pending");
+assert(elements.printA5.disabled === true, "A5 print must be disabled while initial generation is pending");
 assert(elements.preview.getAttribute("aria-busy") === "true", "preview must expose aria-busy during generation");
 assert(elements.generationStatus.textContent === "generating…", "initial generation status is incorrect");
 
@@ -182,8 +188,11 @@ assert(firstResult, "successful initial generation did not publish a result");
 assert(elements.generate.disabled === false, "Generate was not restored after success");
 assert(elements.downloadSvg.disabled === false, "SVG export was not enabled after success");
 assert(elements.downloadJson.disabled === false, "JSON export was not enabled after success");
+assert(elements.printA5.disabled === false, "A5 print was not enabled after success");
 assert(elements.preview.getAttribute("aria-busy") === "false", "preview stayed busy after success");
 assert(api.getCurrentSettings()?.seed === "ui-state-a", "generated settings did not preserve the original seed");
+elements.printA5.dispatch("click");
+assert(printCalls === 1, `expected one print call after valid generation, got ${printCalls}`);
 
 const copiedSettings = api.getCurrentSettings();
 copiedSettings.seed = "tampered";
@@ -198,7 +207,7 @@ assert(exported.quality?.structurallyValid === true, "existing export quality sc
 assert(exported.quality?.panelCells === 5, "existing export quality metrics were not preserved");
 assert(Array.isArray(exported.placedWords) && exported.placedWords.length === 1, "placedWords export changed unexpectedly");
 
-// A retry immediately invalidates the previous exportable result before work starts.
+// A retry immediately invalidates the previous exportable/printable result before work starts.
 shouldFail = true;
 elements.generate.dispatch("click");
 assert(api.getCurrentResult() === null, "old result remained current during retry");
@@ -206,6 +215,7 @@ assert(api.getCurrentSettings() === null, "old settings remained current during 
 assert(elements.generate.disabled === true, "Generate must be disabled during retry");
 assert(elements.downloadSvg.disabled === true, "SVG export remained enabled during retry");
 assert(elements.downloadJson.disabled === true, "JSON export remained enabled during retry");
+assert(elements.printA5.disabled === true, "A5 print remained enabled during retry");
 assert(elements.preview.getAttribute("aria-busy") === "true", "retry did not mark preview busy");
 
 flushGeneration();
@@ -215,34 +225,42 @@ assert(api.getCurrentSettings() === null, "failed retry published settings");
 assert(elements.generate.disabled === false, "Generate was not restored after failure");
 assert(elements.downloadSvg.disabled === true, "SVG export became enabled after failure");
 assert(elements.downloadJson.disabled === true, "JSON export became enabled after failure");
+assert(elements.printA5.disabled === true, "A5 print became enabled after failure");
 assert(elements.preview.getAttribute("aria-busy") === "false", "preview stayed busy after failure");
 assert(elements.generationStatus.textContent === "no valid grid", "failure status is incorrect");
 assert(elements.preview.innerHTML.includes("Generation failed."), "failure message was not rendered");
 assert(elements.preview.innerHTML.includes("synthetic failure &lt;unsafe&gt;"), "failure message was not escaped");
 assert(elements.stats.innerHTML === "", "stale stats remained after failure");
 assert(elements.wordsTable.innerHTML === "", "stale word table remained after failure");
+assert(printCalls === 1, "failed generation triggered print unexpectedly");
 
-// Recovery from failure must publish a new state and re-enable exports.
+// Recovery from failure must publish a new state and re-enable exports/print.
 shouldFail = false;
 elements.seed.value = "ui-state-c";
 elements.generate.dispatch("click");
 assert(elements.downloadJson.disabled === true, "JSON export was enabled before recovery generation completed");
+assert(elements.printA5.disabled === true, "A5 print was enabled before recovery generation completed");
 flushGeneration();
 assert(api.getCurrentResult(), "successful recovery did not publish a result");
 assert(api.getCurrentSettings()?.seed === "ui-state-c", "recovery settings were not captured");
 assert(elements.downloadSvg.disabled === false, "SVG export was not restored after recovery");
 assert(elements.downloadJson.disabled === false, "JSON export was not restored after recovery");
+assert(elements.printA5.disabled === false, "A5 print was not restored after recovery");
 assert(api.exportResult(api.getCurrentResult()).seed === "ui-state-c", "recovery export seed is incorrect");
+elements.printA5.dispatch("click");
+assert(printCalls === 2, `expected print to recover after valid retry, got ${printCalls} calls`);
 assert(generationCalls === 3, `expected three generation attempts, got ${generationCalls}`);
 
 console.log(JSON.stringify({
   passed: true,
   generationCalls,
+  printCalls,
   initialBusyContract: true,
   generatedSettingsSnapshot: true,
   exportSeedBoundToResult: true,
   exportQualitySchemaPreserved: true,
   staleExportBlockedDuringRetry: true,
+  a5PrintStateBound: true,
   failureStateSafe: true,
   retryRecovery: true,
 }));
