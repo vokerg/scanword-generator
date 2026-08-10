@@ -16,6 +16,7 @@
     generate: document.querySelector("#generate"),
     downloadSvg: document.querySelector("#downloadSvg"),
     downloadJson: document.querySelector("#downloadJson"),
+    printA5: document.querySelector("#printA5"),
     stats: document.querySelector("#stats"),
     preview: document.querySelector("#preview"),
     wordsTable: document.querySelector("#wordsTable"),
@@ -28,6 +29,7 @@
   function setExportEnabled(enabled) {
     els.downloadSvg.disabled = !enabled;
     els.downloadJson.disabled = !enabled;
+    els.printA5.disabled = !enabled;
   }
 
   function setGenerationBusy(busy) {
@@ -185,6 +187,9 @@
   });
   els.downloadJson.addEventListener("click", () => {
     if (currentResult) download("arrowword-project.json", JSON.stringify(exportResult(currentResult), null, 2), "application/json;charset=utf-8");
+  });
+  els.printA5.addEventListener("click", () => {
+    if (currentResult) window.print();
   });
 
   window.ScanwordGenerator = {
