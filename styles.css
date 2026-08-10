@@ -139,7 +139,7 @@ h2 { font-size: 26px; }
 }
 
 .check-row input { width: auto; margin: 0; }
-.button-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 9px; }
+.button-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 9px; }
 
 .stats {
   display: grid;
@@ -215,6 +215,66 @@ table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th, td { border-bottom: 1px solid var(--line); padding: 10px 9px; text-align: left; }
 th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
 td.word { font-weight: 850; letter-spacing: .08em; }
+
+@page {
+  size: A5 portrait;
+  margin: 0;
+}
+
+@media print {
+  html,
+  body {
+    width: 148mm;
+    height: 210mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
+
+  body { min-width: 0; }
+  .hero,
+  .controls-panel,
+  .preview-toolbar,
+  .words-panel { display: none !important; }
+
+  .app-shell {
+    width: 148mm;
+    margin: 0;
+    padding: 0;
+  }
+
+  .workspace { display: block; }
+
+  .preview-panel {
+    width: 148mm;
+    height: 210mm;
+    border: 0;
+    border-radius: 0;
+    background: #fff;
+    box-shadow: none;
+    overflow: visible;
+  }
+
+  .paper-wrap {
+    width: 148mm;
+    height: 210mm;
+    min-height: 210mm;
+    display: block;
+    padding: 0;
+    background: #fff;
+  }
+
+  .paper-wrap svg {
+    display: block;
+    width: 148mm;
+    height: 210mm;
+    max-width: none;
+    background: #fff;
+    box-shadow: none;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
 
 @media (max-width: 900px) {
   .hero { align-items: flex-start; }
