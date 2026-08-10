@@ -1,6 +1,6 @@
 # Phase 12 experiment — exact linear top-three selection
 
-Status: accepted research candidate; development, promotion and stability checkpoints passed
+Status: **accepted; promoted to production default**
 
 Source baseline:
 
@@ -8,7 +8,7 @@ Source baseline:
 e270e07e4747c18d3d59a5a9c26a6d68b43e8a5e
 ```
 
-Branch:
+Original research branch:
 
 ```text
 agent/phase-12-linear-top-three-selector
@@ -16,13 +16,13 @@ agent/phase-12-linear-top-three-selector
 
 ## Hypothesis
 
-The exact clue allocator currently assigns one RNG jitter to every available footprint candidate, fully sorts the jitter-ranked candidates, and then chooses one of the first three with one additional RNG draw.
+The exact clue allocator assigns one RNG jitter to every available footprint candidate, fully sorts the jitter-ranked candidates, and then chooses one of the first three with one additional RNG draw.
 
-Because only the first three sorted elements can affect the selected candidate, a linear bounded selector may preserve the exact result while avoiding full `O(n log n)` sorting work.
+Because only the first three sorted elements can affect the selected candidate, a linear bounded selector can preserve the exact result while avoiding full `O(n log n)` sorting work.
 
 ## Required equivalence
 
-The experiment must preserve:
+The experiment preserves:
 
 - one jitter RNG draw for every available candidate, in original iteration order;
 - the existing descending-rank comparator;
@@ -32,17 +32,18 @@ The experiment must preserve:
 - strict first-best restart behavior;
 - byte-identical layout, grid, placed-answer, clue and geometry digests.
 
-## Controls
+## Controls and production contract
 
-The implementation is default-off:
+The research implementation originally landed default-off. It was subsequently promoted unchanged to the browser and Node default:
 
 ```text
-SCANWORD_EXACT_ALLOCATOR_SELECTOR=off
-SCANWORD_EXACT_ALLOCATOR_SELECTOR=linear-top-three
+absent SCANWORD_EXACT_ALLOCATOR_SELECTOR -> linear-top-three
+SCANWORD_EXACT_ALLOCATOR_SELECTOR=linear-top-three -> linear-top-three
+SCANWORD_EXACT_ALLOCATOR_SELECTOR=off -> canonical stable full-sort rollback
 SCANWORD_EXACT_ALLOCATOR_SELECTOR_DETAIL=summary|full
 ```
 
-A selector failure falls back to the canonical stable full sort for that domain. Summary mode avoids hot-path diagnostic counters; full detail is reserved for deterministic primitive tests.
+A selector-domain failure falls back to the canonical stable full sort for that domain. Summary mode avoids hot-path diagnostic counters; full detail is reserved for deterministic primitive tests.
 
 ## Primitive validation
 
@@ -59,19 +60,19 @@ The deterministic primitive test covers:
 
 ### Hot-path instrumentation defect
 
-The first production smoke recorded every selector RNG draw and comparison. Exact parity passed, and the selector was faster than the same-run canonical replay, but instrumentation made the independent runtime comparison invalid. Summary mode now removes those counters from the authoritative hot path.
+The first production smoke recorded every selector RNG draw and comparison. Exact parity passed, and the selector was faster than the same-run canonical replay, but instrumentation made the independent runtime comparison invalid. Summary mode removed those counters from the authoritative hot path.
 
 ### Profile-boundary runtime defect
 
-The first development-20 harness timed the shadow-profiled selector against an unprofiled canonical baseline. The profiler's RNG recorder made the candidate appear 8.44% slower even though it was 24.11% faster than the canonical replay in the same process.
-
-The corrected harness uses three isolated runs per seed:
+The first development-20 harness timed the shadow-profiled selector against an unprofiled canonical baseline. The corrected harness used three isolated runs per seed:
 
 ```text
 canonical, profiler off       -> baseline runtime
 selector, profiler off        -> candidate runtime and final parity
 selector, shadow profiler on  -> independent per-call layout and RNG audit
 ```
+
+These defects remain part of the evidence history and are not acceptance data.
 
 ## Exact implementation head
 
@@ -81,11 +82,16 @@ The selector implementation was frozen before the accepted corpus sequence at:
 5db8d25de2422ce1f62d21d4ffa2da7bb3cafb3e
 ```
 
-Later branch commits change only evidence documentation and workflow dispatch boundaries.
+Archived accepted research head:
+
+```text
+5efa28f684e9ab605acc8fe1c8b46a1c47a89a29
+refs/heads/research/archive-phase-12-linear-top-three-selector-2026-07-30
+```
+
+Later research-branch commits changed evidence documentation and workflow boundaries, not the selector algorithm.
 
 ## Accepted development-20 checkpoint
-
-Evidence:
 
 ```text
 workflow run:    30517578909
@@ -96,23 +102,15 @@ artifact sha256: ccb42dd41e5a26bf28f7743cb3712da4e4bd5c322b79b01eb3bd8cfb3a3c21c
 | metric | result |
 | --- | ---: |
 | exact final-output parity | 20 / 20 |
-| independent shadow-audit output parity | 20 / 20 |
-| selector-valid seeds | 20 / 20 |
-| profiler-valid seeds | 20 / 20 |
-| selector fallbacks | 0 |
-| selector errors | 0 |
+| independent audit parity | 20 / 20 |
 | exact allocator calls | 10,648 |
 | aggregate allocator runtime ratio | 0.9590 |
-| median allocator runtime ratio | 0.9551 |
 | aggregate total runtime ratio | 0.9940 |
-| median total runtime ratio | 0.9935 |
-| audit selector / canonical replay ratio | 0.7297 |
+| selector fallbacks / errors | 0 / 0 |
 
-Decision: **development checkpoint passed**. The selector reduced measured exact-allocation time by 4.10% aggregate and total runtime by 0.60% while preserving every final digest and every audited allocator result.
+Decision: development checkpoint passed.
 
 ## Accepted promotion-50 checkpoint
-
-Evidence:
 
 ```text
 workflow run:    30518444936
@@ -123,25 +121,15 @@ artifact sha256: 2d7008cff5455d8321b4babde8b36ff1580ea3db8e6815c3fe166040c40cf74
 | metric | result |
 | --- | ---: |
 | exact final-output parity | 50 / 50 |
-| independent shadow-audit output parity | 50 / 50 |
-| selector-valid seeds | 50 / 50 |
-| profiler-valid seeds | 50 / 50 |
-| selector fallbacks | 0 |
-| selector errors | 0 |
+| independent audit parity | 50 / 50 |
 | exact allocator calls | 26,521 |
 | aggregate allocator runtime ratio | 0.9500 |
-| median allocator runtime ratio | 0.9487 |
-| allocator-faster seeds | 48 / 50 |
 | aggregate total runtime ratio | 0.9900 |
-| median total runtime ratio | 0.9945 |
-| total-runtime-faster seeds | 32 / 50 |
-| audit selector / canonical replay ratio | 0.7562 |
+| selector fallbacks / errors | 0 / 0 |
 
-Decision: **promotion checkpoint passed**. Exact-allocation time fell 5.00% aggregate and total runtime fell 1.00% aggregate. Every final and audited allocator result remained identical.
+Decision: promotion checkpoint passed.
 
 ## Accepted stability-100 checkpoint
-
-Evidence:
 
 ```text
 workflow run:    30520073731
@@ -152,30 +140,37 @@ artifact sha256: f54cad7882f25cf63a0412febf75a501e0620b195f44ce1a16bf7dce09a4d6d
 | metric | result |
 | --- | ---: |
 | exact final-output parity | 100 / 100 |
-| independent shadow-audit output parity | 100 / 100 |
-| selector-valid seeds | 100 / 100 |
-| profiler-valid seeds | 100 / 100 |
-| selector fallbacks | 0 |
-| selector errors | 0 |
+| independent audit parity | 100 / 100 |
 | exact allocator calls | 53,622 |
 | aggregate allocator runtime ratio | 0.9562 |
-| median allocator runtime ratio | 0.9606 |
 | aggregate total runtime ratio | 0.9891 |
-| median total runtime ratio | 0.9941 |
-| audit selector / canonical replay ratio | 0.7327 |
+| selector fallbacks / errors | 0 / 0 |
 
-Decision: **stability checkpoint passed**. Exact-allocation time fell 4.38% aggregate and total runtime fell 1.09% aggregate over the locked 100-seed holdout. Every final digest and every independent allocator audit remained identical.
+Decision: stability checkpoint passed. Exact-allocation time fell 4.38% aggregate and total runtime fell 1.09% aggregate over the locked 100-seed holdout. Every final digest and every independent allocator audit remained identical.
+
+## Production promotion outcome
+
+The accepted implementation was promoted unchanged through PR `#29`.
+
+Frozen promotion head:
+
+```text
+77616780d11377f1fe44bcd74d17ba8f0adb5cae
+refs/heads/research/archive-phase-12-exact-selector-default-promotion-2026-07-31
+```
+
+Integrated production-default merge:
+
+```text
+125177d5fecdcb1e7a6930bd8f257427093ae7e2
+```
+
+The separate promotion gate passed rollback parity and independent audit parity on development-20, promotion-50 and stability-100 with zero fallbacks/errors.
 
 ## Conclusion
 
-The exact linear top-three selector passed the complete 20/50/100 corpus sequence without tuning, output drift, RNG drift, fallback or error. This PR should land the default-off implementation and evidence. Production activation belongs in a separate branch with an explicit default-promotion gate and rollback contract.
+The exact linear top-three selector passed the complete 20/50/100 research sequence without tuning, output drift, RNG drift, fallback or error and was promoted unchanged to the production default.
 
-## Evidence sequence
+Explicit `SCANWORD_EXACT_ALLOCATOR_SELECTOR=off` remains the exact canonical stable full-sort rollback.
 
-1. **passed:** deterministic primitive equivalence;
-2. **passed:** exact replay parity and inherited contracts;
-3. **passed:** frozen one-seed production smoke after measurement correction;
-4. **passed:** frozen development-20 runtime and digest comparison;
-5. **passed:** frozen promotion-50 without tuning;
-6. **passed:** frozen stability-100 without tuning;
-7. **next branch:** controlled production default promotion with unchanged selector implementation.
+Phase 12 continued with the occupancy-index experiment and concluded after its stability-100 checkpoint. See `occupancy-index.md` and the Phase 12 closure milestone for the final research decision.

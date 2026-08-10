@@ -2,25 +2,25 @@
 
 This file is the canonical operating guide for the repository root and every subdirectory unless a more specific `AGENTS.md` exists.
 
-Read `CONTINUATION.md` before starting a new phase.
+Read `CONTINUATION.md` before starting a new phase or substantial product change.
 
 ## Source of truth
 
 - `main` is the only long-lived development branch.
-- Current production behavior is defined by `index.html`, Node bootstrap order, explicit feature flags and the latest accepted production milestone.
-- Accepted production baseline: `docs/milestones/v1.3-complete-pipeline-frontier.md`.
+- Current production behavior is defined by `index.html`, Node bootstrap order, explicit feature flags and the latest accepted production/closure records.
+- Accepted layout baseline: `docs/milestones/v1.3-complete-pipeline-frontier.md`.
 - Phase 11 closure: `docs/milestones/phase-11-preallocation-research-closure.md`.
+- Phase 12 closure: `docs/milestones/phase-12-exact-allocator-research-closure.md`.
 - Experiments, harness defects and negative results live in `research/` and remain reproducible.
 - Never weaken the complete validator or canonical comparison to make an experiment pass.
 
 ## Current production baseline
 
-Complete frontier 1.3:
-
 ```text
 40,966-entry attributed corpus v8
 -> deterministic active sets at 2,500 and 3,500 entries
--> indexed construction and exact clue allocation
+-> indexed construction
+-> exact clue allocation with linear top-three selection
 -> width-four repair-potential complete-pipeline frontier
 -> directly ordered clue, repair and editorial runtime per finalist
 -> complete validation
@@ -39,9 +39,18 @@ SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER=off
 SCANWORD_FULL_CORPUS_RETRIEVAL=off
 SCANWORD_CLUE_FEASIBILITY=off
 SCANWORD_PARTIAL_SEARCH=off
+SCANWORD_EXACT_ALLOCATOR_SELECTOR=linear-top-three
+SCANWORD_EXACT_ALLOCATOR_OCCUPANCY=off
+SCANWORD_EXACT_ALLOCATOR_PROFILE=off
 ```
 
-Exact Phase 9 rollback:
+Exact allocator rollback:
+
+```text
+SCANWORD_EXACT_ALLOCATOR_SELECTOR=off
+```
+
+Exact Phase 9 frontier rollback:
 
 ```text
 SCANWORD_COMPLETE_PIPELINE_FRONTIER=off
@@ -53,11 +62,11 @@ Historical wrapper-chain rollback:
 SCANWORD_EXPLICIT_PIPELINE=off
 ```
 
-Node benchmarks must set feature modes explicitly. Do not silently rewrite locked historical configurations.
+Node benchmarks must set historical feature modes explicitly. Do not silently rewrite locked configurations.
 
 ## Phase 11 closure
 
-Phase 11’s width-96 pre-allocation filter remains default-off research.
+Phase 11's width-96 pre-allocation filter remains default-off research.
 
 Frozen implementation:
 
@@ -82,6 +91,46 @@ Retain the Phase 11 modules, tests and harness on `main`, but keep:
 SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER=off
 ```
 
+## Phase 12 closure
+
+Phase 12 optimized exact allocator internals while preserving byte-identical outputs and deterministic RNG behavior.
+
+The accepted exact linear top-three selector is the production default. Its frozen implementation is:
+
+```text
+5db8d25de2422ce1f62d21d4ffa2da7bb3cafb3e
+refs/heads/research/archive-phase-12-linear-top-three-selector-2026-07-30
+```
+
+Its production-promotion head is:
+
+```text
+77616780d11377f1fe44bcd74d17ba8f0adb5cae
+refs/heads/research/archive-phase-12-exact-selector-default-promotion-2026-07-31
+```
+
+Stability-100 preserved 100/100 final-output and independent allocator-audit parity with zero fallbacks/errors. Aggregate allocator ratio was `0.9562`; aggregate total-runtime ratio was `0.9891`.
+
+The exact occupancy compatibility index is accepted but remains default-off. Frozen implementation and stability heads:
+
+```text
+a5826b4e250ce39da71edfa0aa715c12146c7992
+refs/heads/research/archive-phase-12-exact-occupancy-index-implementation-2026-07-31
+
+2036baa507a829abd6966a74911d0aee06054984
+refs/heads/research/archive-phase-12-exact-occupancy-index-stability-2026-08-04
+```
+
+Its stability-100 result preserved 100/100 output/audit parity, reduced aggregate allocator time by 9.88%, reduced aggregate total runtime by 1.70%, and had zero fallbacks, index errors or RNG mismatches.
+
+Keep:
+
+```text
+SCANWORD_EXACT_ALLOCATOR_OCCUPANCY=off
+```
+
+Phase 12 experimentation is closed. Expensive Phase 12 checkpoints are manual-only. Do not open a Phase 13 algorithm experiment without a concrete measured production/product requirement.
+
 ## Production ownership
 
 After initialization:
@@ -90,7 +139,6 @@ After initialization:
 active generateBest owner: construction-pipeline-v1
 execution owner:            direct-production-stage-runtime-v2
 rollback owner:             legacy-wrapper-chain
-installation lock:          explicit-pipeline-v1
 ```
 
 `construction-pipeline-v1.js` is the sole active global production owner. No later module may replace `ScanwordSolver.generateBest`.
@@ -113,6 +161,24 @@ weak fill, clue-text cells and external capacity
 Every retained finalist executes the complete repair and editorial chain. Only valid, connected, exact-clue candidates are eligible. Complete ties select the lowest frontier index, preserving member zero.
 
 Do not multiply unrestricted construction attempts or legacy guard generation by frontier width.
+
+## Exact allocator contracts
+
+The production linear top-three selector must preserve:
+
+- original candidate iteration order;
+- one jitter RNG draw per available candidate in the original order;
+- existing comparator and signature tie-break semantics;
+- stable input order for equal comparator keys;
+- the final top-three RNG choice;
+- strict first-best restart behavior;
+- byte-identical grid, placed-answer, clue and geometry digests.
+
+`SCANWORD_EXACT_ALLOCATOR_SELECTOR=off` is the exact stable full-sort rollback.
+
+The default-off occupancy index must additionally preserve candidate availability order and fail open before allocator RNG consumption on validated index-build failure.
+
+Do not change these contracts incidentally during product work.
 
 ## Explicit stage boundary
 
@@ -154,6 +220,9 @@ base dictionaries and corpus
 -> direct stage source and runtime
 -> vocabulary portfolio
 -> CandidateState, telemetry and explicit pipeline
+-> exact allocator selector
+-> default-off occupancy index
+-> default-off exact allocator profiler
 -> wrapper-retirement audit
 -> renderer and UI
 ```
@@ -214,6 +283,15 @@ NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
   node tools/wrapper-retirement-test-v1.cjs
 ```
 
+For exact allocator behavior:
+
+```bash
+NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
+  node tools/exact-allocator-top-three-test-v1.cjs
+NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
+  node tools/exact-allocator-occupancy-index-test-v1.cjs
+```
+
 For retained Phase 11 modules:
 
 ```bash
@@ -255,32 +333,32 @@ Development data is for iteration. Promotion and stability data are holdouts. A 
 ## Archive and integration policy
 
 1. Branch from current `main`.
-2. Keep one logical phase per PR.
-3. Run the phase gate on the exact implementation head.
-4. Preserve the exact implementation under an immutable `research/archive-*` ref before documentation-only commits.
-5. Update the research ledger, archive manifest, root handoff, README, AGENTS and decision record.
+2. Keep one logical phase or product block per PR.
+3. Run the relevant gate on the exact implementation head.
+4. Preserve exact research implementations under immutable `research/archive-*` refs before documentation-only closure commits.
+5. Update the research ledger, archive manifest, root handoff, README, AGENTS and decision record when closing research.
 6. Confirm browser defaults, Node benchmark flags and production ownership.
 7. Run exact final-head CI.
 8. Squash-merge to `main`.
 9. Verify the squash commit and post-merge checks.
 10. Archive superseded unmerged branches before closing their PRs.
-11. Start the next phase from updated `main`.
+11. Start subsequent work from updated `main`.
 
 Archive refs are immutable evidence. They are not active development branches.
 
-## Next architectural investigation
+## Current work boundary
 
-Phase 12: exact allocator acceleration.
+There is no automatic next algorithm phase.
 
-Do not skip candidate states or tune the failed width-96 filter. Optimize `assignClueTextCellsV2` internally:
+Prioritize productization unless a measured requirement establishes a new research problem:
 
 ```text
-profile exact allocation
--> cache immutable geometry-derived domains and compatibility data
--> reuse safe work across deterministic restarts
--> add admissible branch-and-bound pruning
--> preserve RNG sequence and exact selected layout
--> prove byte-identical output on new seed sets
+release robustness and regression coverage
+-> user-facing generation and failure handling
+-> export/print/A5 quality
+-> packaging/deployment
+-> measure remaining product bottlenecks
+-> only then define a new algorithm phase if required
 ```
 
-Primary acceptance is exact grid, placed-answer, clue and geometry digest parity. Runtime improvement is secondary. Create fresh development, promotion and stability seed sets before optimization.
+Any future research phase must declare its concrete product problem, acceptance metric, fresh development/promote/stability data boundary and rollback contract before tuning begins.

@@ -6,19 +6,21 @@ A browser-based generator for Russian Swedish-style crosswords (arrowwords / sca
 
 New contributors and continuation chats should read:
 
-- [`CONTINUATION.md`](CONTINUATION.md) — current production state, Phase 11 closure and exact next steps;
+- [`CONTINUATION.md`](CONTINUATION.md) — canonical current state and next work boundary;
 - [`AGENTS.md`](AGENTS.md) — repository operating rules;
-- [`docs/milestones/v1.3-complete-pipeline-frontier.md`](docs/milestones/v1.3-complete-pipeline-frontier.md) — accepted production baseline;
-- [`research/preallocation-structural-frontier/README.md`](research/preallocation-structural-frontier/README.md) — complete Phase 11 evidence and negative result.
+- [`docs/milestones/v1.3-complete-pipeline-frontier.md`](docs/milestones/v1.3-complete-pipeline-frontier.md) — accepted production layout baseline;
+- [`docs/milestones/phase-12-exact-allocator-research-closure.md`](docs/milestones/phase-12-exact-allocator-research-closure.md) — Phase 12 closure and production handoff;
+- [`research/exact-allocator-acceleration/README.md`](research/exact-allocator-acceleration/README.md) — complete Phase 12 evidence ledger.
 
-## Current production baseline: complete frontier 1.3
+## Current production baseline
 
 The canonical browser path is:
 
 ```text
 40,966-entry attributed corpus v8
 -> deterministic 2,500/3,500 seed-specific working sets
--> indexed construction and exact clue allocation
+-> indexed construction
+-> exact clue allocation with linear top-three selection
 -> width-four repair-potential complete-pipeline frontier
 -> complete clue and repair chain per finalist
 -> same-geometry editorial repair
@@ -46,9 +48,20 @@ SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER=off
 SCANWORD_FULL_CORPUS_RETRIEVAL=off
 SCANWORD_CLUE_FEASIBILITY=off
 SCANWORD_PARTIAL_SEARCH=off
+SCANWORD_EXACT_ALLOCATOR_SELECTOR=linear-top-three
+SCANWORD_EXACT_ALLOCATOR_OCCUPANCY=off
+SCANWORD_EXACT_ALLOCATOR_PROFILE=off
 ```
 
-Exact Phase 9 rollback:
+Exact allocator rollback:
+
+```text
+SCANWORD_EXACT_ALLOCATOR_SELECTOR=off
+```
+
+This restores the canonical stable full-sort selector while preserving exact allocator behavior.
+
+Exact Phase 9 frontier rollback:
 
 ```text
 SCANWORD_COMPLETE_PIPELINE_FRONTIER=off
@@ -60,66 +73,74 @@ Historical wrapper-chain rollback:
 SCANWORD_EXPLICIT_PIPELINE=off
 ```
 
-## Accepted Phase 10 evidence
+## Phase 12 closure
 
-All 170 locked A/B pairs were valid, connected and exact-clue-only. The width-four complete frontier had zero canonical regressions.
+Phase 12 accelerated exact clue allocation internally while preserving byte-identical output and deterministic RNG behavior.
 
-| seed set | wins | ties | regressions | panels baseline → frontier | runtime ratio |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| development-20 | 16 | 4 | 0 | 5.30 → 4.65 | 1.1676 |
-| promotion-50 | 41 | 9 | 0 | 5.10 → 4.60 | 1.1815 |
-| stability-100 | 63 | 37 | 0 | 4.84 → 4.37 | 1.1850 |
+### Production selector
 
-Frozen Phase 10 implementation:
+The accepted linear top-three selector replaced the full jitter-ranked candidate sort without changing the chosen candidate domain, RNG sequence, restart behavior or final digests. It is now the browser and Node production default.
 
-```text
-df537dd5f47712062fb6224d4e42cb67e41876b3
-refs/heads/research/archive-phase-10-complete-pipeline-frontier-evidence-2026-07-23
-```
+| seed set | exact/audit parity | allocator ratio | total ratio | fallbacks/errors |
+| --- | ---: | ---: | ---: | ---: |
+| development-20 | 20/20 | 0.9590 | 0.9940 | 0/0 |
+| promotion-50 | 50/50 | 0.9500 | 0.9900 | 0/0 |
+| stability-100 | 100/100 | 0.9562 | 0.9891 | 0/0 |
 
-## Phase 11 research closure
-
-Phase 11 moved a deterministic frontier before exact clue allocation and measured real allocator work.
-
-The width-96 rank-only filter achieved:
-
-| seed set | exact parity | total allocation reduction | runtime ratio |
-| --- | ---: | ---: | ---: |
-| development-20 | 20/20 | 48.46% | 0.9146 |
-| promotion-50 | 50/50 | 48.79% | 0.9306 |
-| stability-100 | 99/100 | 48.98% | 0.9442 |
-
-Production promotion is rejected because `v8-stability-058` changed from 4 residual panels to 7. The result remained valid and exact-clue-only, but violated the primary canonical objective.
-
-The Phase 11 code, telemetry, deterministic tests, rejected variants and benchmark harness remain on `main` as default-off research:
+Frozen selector implementation:
 
 ```text
-SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER=off
+5db8d25de2422ce1f62d21d4ffa2da7bb3cafb3e
+refs/heads/research/archive-phase-12-linear-top-three-selector-2026-07-30
 ```
 
-Frozen implementation:
+Default-promotion head:
 
 ```text
-5f8fb8dcb446d1dcf13e1ef5fc1cee0c151906e4
-refs/heads/research/archive-phase-11-preallocation-structural-filter-evidence-2026-07-25
+77616780d11377f1fe44bcd74d17ba8f0adb5cae
+refs/heads/research/archive-phase-12-exact-selector-default-promotion-2026-07-31
 ```
 
-See [`docs/milestones/phase-11-preallocation-research-closure.md`](docs/milestones/phase-11-preallocation-research-closure.md).
+### Default-off occupancy index
 
-## Next investigation
+The exact occupancy compatibility index also passed development, promotion and stability without output, audit or RNG drift. On stability-100 it reduced aggregate allocator time by 9.88% and aggregate total runtime by 1.70%.
 
-Phase 12 should accelerate exact clue allocation internally instead of skipping candidates:
+| seed set | exact/audit parity | allocator ratio | total ratio | fallbacks/errors |
+| --- | ---: | ---: | ---: | ---: |
+| development-20 | 20/20 | 0.8845 | 0.9937 | 0/0 |
+| promotion-50 | 50/50 | 0.8814 | 0.9856 | 0/0 |
+| stability-100 | 100/100 | 0.9012 | 0.9830 | 0/0 |
+
+Frozen occupancy implementation and stability evidence:
 
 ```text
-profile assignClueTextCellsV2
--> cache immutable geometry/domain work
--> reuse safe work across deterministic restarts
--> add admissible branch-and-bound pruning
--> preserve exact selected layouts and digests
--> validate on fresh seed sets
+a5826b4e250ce39da71edfa0aa715c12146c7992
+refs/heads/research/archive-phase-12-exact-occupancy-index-implementation-2026-07-31
+
+2036baa507a829abd6966a74911d0aee06054984
+refs/heads/research/archive-phase-12-exact-occupancy-index-stability-2026-08-04
 ```
 
-Do not tune against Phase 11 promotion or stability seeds. The detailed execution boundary is in [`CONTINUATION.md`](CONTINUATION.md).
+The occupancy index remains accepted, reversible and default-off:
+
+```text
+SCANWORD_EXACT_ALLOCATOR_OCCUPANCY=off
+```
+
+Stability-100 concludes Phase 12 algorithm experimentation. Expensive Phase 12 promotion and stability checkpoints are manual-only; normal pull requests retain lightweight exact parity coverage.
+
+## Current work boundary
+
+There is no automatically scheduled Phase 13. Do not start another algorithm experiment merely because Phase 12 is complete.
+
+New algorithm research requires a concrete trigger such as:
+
+- a reproducible production defect;
+- a measured product/runtime requirement the current baseline misses;
+- a quality regression or new acceptance objective;
+- a product feature whose implementation exposes a specific algorithmic bottleneck.
+
+Until such a trigger exists, prioritize productization, release robustness, UX/export/print behavior and regression coverage around the accepted generator.
 
 ## Production ownership
 
@@ -186,6 +207,10 @@ node tools/preallocation-structural-frontier-test-v1.cjs
 node tools/preallocation-repair-potential-test-v1.cjs
 node tools/preallocation-ranked-frontier-test-v1.cjs
 node tools/preallocation-filter-test-v1.cjs
+NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
+  node tools/exact-allocator-top-three-test-v1.cjs
+NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
+  node tools/exact-allocator-occupancy-index-test-v1.cjs
 ```
 
 Historical locked configurations set feature modes explicitly and must remain reproducible.
@@ -195,14 +220,17 @@ Historical locked configurations set feature modes explicitly and must remain re
 ```text
 index.html                                  browser defaults and script order
 solver.js                                   base placement, metrics and validation
-construction-portfolio.js                   construction ranking and Phase 10 frontier
+construction-portfolio.js                   construction ranking and complete frontier
 construction-preallocation-*.js             default-off Phase 11 research
+construction-exact-allocator-top-three-v1.js accepted production selector
+construction-exact-allocator-occupancy-index-v1.js accepted default-off Phase 12 candidate
+construction-exact-allocator-profile-v1.js  default-off exact allocator profiler
 construction-stage-runtime-v2.js            complete finalist processing and comparison
 construction-pipeline-v1.js                 sole production orchestrator
 research/                                   evidence ledgers and negative results
 docs/milestones/                            accepted and closed phase decisions
 tools/                                      builders, tests and benchmarks
-CONTINUATION.md                              canonical handoff and next plan
+CONTINUATION.md                              canonical handoff and current work boundary
 ```
 
 ## Merge and archive policy
