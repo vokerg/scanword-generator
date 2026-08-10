@@ -160,6 +160,22 @@ refs/heads/research/archive-phase-12-development-profile-evidence-2026-07-30
 
 The profiler remains default-off and must not affect authoritative output.
 
+## Archive-integrity harness correction
+
+Updating the archive manifest to include Phase 12 exposed a preservation-tooling defect: `tools/research-reference-audit.cjs` treated every documented 40-hex Git object ID as a commit SHA. Phase 12 workflows intentionally pin the accepted selector and occupancy modules by Git **blob** IDs, so the audit incorrectly reported those existing blobs as unfetchable commits.
+
+The closure branch corrects the audit classification without weakening commit preservation:
+
+```text
+40-hex object id
+-> resolve Git object type when present
+-> commit: require preservation by main or a required archive ref
+-> blob/tree/tag: report separately as a non-commit object
+-> unresolved id: keep treating it as a documented commit candidate and fail if unavailable
+```
+
+The two Phase 12 frozen module blobs that exposed the defect remain pinned by their workflows. This correction changes research-preservation tooling only; it does not change generator code, production flags, allocator behavior or accepted evidence.
+
 ## Final decision
 
 Phase 12 experimentation is complete.
