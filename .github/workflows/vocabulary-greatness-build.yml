@@ -98,6 +98,21 @@ jobs:
           }));
           NODE
 
+      - name: Verify corpus workflow lifecycle boundary
+        run: |
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const source = fs.readFileSync(".github/workflows/vocabulary-greatness-build.yml", "utf8");
+          const pr = source.match(/  pull_request:\n([\s\S]*?)(?=\n  workflow_dispatch:)/)?.[0] || "";
+          const live = source.match(/  live-upstream-rebuild:\n([\s\S]*?)$/)?.[0] || "";
+          for (const owned of ["tools/build-bulk-lexicon*.py", "bulk-lexicon/**", ".github/workflows/vocabulary-greatness-build.yml"]) {
+            if (!pr.includes(owned)) throw new Error(`Missing corpus-owned PR path: ${owned}`);
+          }
+          if (source.includes("bulk-lexicon-runtime.js")) throw new Error("Runtime loader must not trigger the corpus contract");
+          if (!live.includes("if: github.event_name == 'workflow_dispatch'")) throw new Error("Mutable upstream rebuild must remain manual-only");
+          if (!live.includes("download.geonames.org/export/dump/")) throw new Error("Live-upstream diagnostic lost its mutable GeoNames source boundary");
+          NODE
+
       - name: Publish committed corpus contract evidence
         if: always()
         uses: actions/upload-artifact@v4
