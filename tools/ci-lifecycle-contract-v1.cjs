@@ -191,6 +191,25 @@ for (const workflow of archivedManualOnlyWorkflows) {
   assert(!/(?:^|\n)  pull_request:\n/m.test(source), `${workflow}: archived workflow must not retain automatic PR triggers`);
 }
 
+const corpusBuildWorkflow = ".github/workflows/vocabulary-greatness-build.yml";
+const corpusBuildSource = read(corpusBuildWorkflow);
+const corpusBuildPr = pullRequestBlock(corpusBuildWorkflow);
+for (const expected of [
+  "tools/build-bulk-lexicon*.py",
+  "bulk-lexicon/**",
+  ".github/workflows/vocabulary-greatness-build.yml",
+]) {
+  assert(corpusBuildPr.includes(expected), `${corpusBuildWorkflow}: lost corpus-owned PR path ${expected}`);
+}
+assert(
+  !corpusBuildSource.includes("bulk-lexicon-runtime.js"),
+  `${corpusBuildWorkflow}: runtime loader must not trigger the external corpus rebuild`,
+);
+assert(
+  (corpusBuildSource.match(/bulk-lexicon\/\*\*/g) || []).length === 2,
+  `${corpusBuildWorkflow}: committed corpus must be owned on both PR and main push`,
+);
+
 const retiredBrowserWorkflow = path.join(root, ".github", "workflows", "browser-release-smoke.yml");
 assert(!fs.existsSync(retiredBrowserWorkflow), "duplicate standalone browser release workflow must remain retired");
 const staticPackageWorkflow = ".github/workflows/static-release-package.yml";
@@ -267,6 +286,7 @@ console.log(JSON.stringify({
   vocabularyLifecycleWorkflows: vocabularyLifecycle.length,
   retainedVocabularyResearchWorkflows: retainedVocabularyResearch.length,
   archivedManualOnlyWorkflows: archivedManualOnlyWorkflows.length,
+  corpusBuildOwnership: true,
   consolidatedReleaseAcceptance: true,
   retiredLexiconWriter: true,
   writeCapableWorkflows,
