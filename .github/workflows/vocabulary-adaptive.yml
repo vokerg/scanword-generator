@@ -24,10 +24,36 @@ permissions:
   contents: read
 
 jobs:
-  compare:
+  adaptive-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate retained adaptive research tooling
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          node --check tools/node-benchmark-bootstrap-v1.cjs
+          node --check construction-vocabulary-portfolio-v1.js
+          node --check tools/vocabulary-adaptive-checkpoint.cjs
+
+  comparison:
+    if: github.event_name == 'workflow_dispatch'
+    needs: adaptive-contract
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
+      SOURCE_SHA: ${{ github.sha }}
       SCANWORD_ADAPTIVE_CONCURRENCY: 2
       SCANWORD_PORTFOLIO_ATTEMPTS: 240
       SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
@@ -47,25 +73,22 @@ jobs:
       SCANWORD_EDITORIAL_BUNDLE_SOLUTIONS: 24
       SCANWORD_EDITORIAL_BUNDLE_VARIANTS: 24
     steps:
-      - name: Check out candidate
+      - name: Check out exact candidate head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Validate adaptive runtime
-        run: |
-          node --check tools/node-benchmark-bootstrap-v1.cjs
-          node --check construction-vocabulary-portfolio-v1.js
-          node --check tools/vocabulary-adaptive-checkpoint.cjs
-
-      - name: Compare full and adaptive portfolios
+      - name: Compare retained full and adaptive portfolios
         env:
           NODE_OPTIONS: --require=${{ github.workspace }}/tools/node-benchmark-bootstrap-v1.cjs
-          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '10' }}
+          SEED_COUNT: ${{ inputs.seeds }}
         run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           mkdir -p research-output
           node tools/vocabulary-adaptive-checkpoint.cjs "${SEED_COUNT}" \
             | tee "research-output/vocabulary-adaptive-${SEED_COUNT}.jsonl"
@@ -74,6 +97,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: vocabulary-adaptive-${{ github.sha }}
+          name: vocabulary-adaptive-${{ env.SOURCE_SHA }}
           path: research-output/
           if-no-files-found: error
