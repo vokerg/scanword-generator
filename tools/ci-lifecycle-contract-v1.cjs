@@ -82,6 +82,30 @@ for (const [workflow, job] of manualResearchJobs) {
   );
 }
 
+const productionPromotionLifecycle = [
+  [".github/workflows/explicit-pipeline-parity.yml", "unit", ["development-parity"]],
+  [".github/workflows/direct-stage-runtime.yml", "unit", ["development-parity"]],
+  [".github/workflows/explicit-default-promotion.yml", "unit", ["development", "promotion", "stability"]],
+  [".github/workflows/phase-12-exact-selector-default-promotion.yml", "unit", ["development", "promotion", "stability"]],
+];
+for (const [workflow, automaticJob, manualJobs] of productionPromotionLifecycle) {
+  const source = read(workflow);
+  const pr = pullRequestBlock(workflow);
+  assert(pr.includes("paths:"), `${workflow}: production-promotion gate must keep explicit PR path ownership`);
+  assert(!hasIndexTrigger(workflow), `${workflow}: index-only production defaults belong to Production release smoke`);
+  assert(!/(?:^|\n)  push:\n/m.test(source), `${workflow}: accepted promotion gate must not retain one-off push triggers`);
+  assert(
+    !jobBlock(workflow, automaticJob).includes("github.event_name == 'workflow_dispatch'"),
+    `${workflow}:${automaticJob} must remain an automatic deterministic contract`,
+  );
+  for (const job of manualJobs) {
+    assert(
+      jobBlock(workflow, job).includes("github.event_name == 'workflow_dispatch'"),
+      `${workflow}:${job} must remain workflow_dispatch-only`,
+    );
+  }
+}
+
 const qualityWorkflow = ".github/workflows/quality.yml";
 const qualitySource = read(qualityWorkflow);
 const qualityPullRequest = pullRequestBlock(qualityWorkflow);
@@ -265,6 +289,10 @@ const centralizedDefaults = [
   'window.SCANWORD_VOCABULARY_PORTFOLIO = "on"',
   'window.SCANWORD_VOCABULARY_PORTFOLIO_LIMITS = "2500,3500"',
   'window.SCANWORD_VOCABULARY_PORTFOLIO_MODE = "full"',
+  'window.SCANWORD_EXPLICIT_PIPELINE = "on"',
+  'window.SCANWORD_PIPELINE_STAGE_RUNTIME = "explicit"',
+  'window.SCANWORD_WRAPPER_INSTALLATION_LOCK = "explicit-pipeline-v1"',
+  'window.SCANWORD_EXACT_ALLOCATOR_SELECTOR = "linear-top-three"',
   'window.SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER = "off"',
   'window.SCANWORD_FULL_CORPUS_RETRIEVAL = "off"',
   'window.SCANWORD_CLUE_FEASIBILITY = "off"',
@@ -281,6 +309,7 @@ console.log(JSON.stringify({
   productionIndexOwner: productionWorkflow,
   defaultOffResearchWorkflows: defaultOffResearchWorkflows.length,
   manualResearchJobs: manualResearchJobs.length,
+  productionPromotionWorkflows: productionPromotionLifecycle.length,
   qualityPathScoped: true,
   manualHistoricalQualityJobs: manualHistoricalJobs.length,
   vocabularyLifecycleWorkflows: vocabularyLifecycle.length,
