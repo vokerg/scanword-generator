@@ -1,0 +1,63 @@
+name: CI lifecycle contract
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/complete-pipeline-frontier.yml"
+      - ".github/workflows/preallocation-structural-frontier.yml"
+      - ".github/workflows/full-corpus-retrieval.yml"
+      - ".github/workflows/clue-feasibility.yml"
+      - ".github/workflows/bounded-partial-search.yml"
+      - ".github/workflows/adaptive-partial-search.yml"
+      - ".github/workflows/phase-12-exact-allocator-occupancy-index.yml"
+      - ".github/workflows/phase-12-exact-allocator-profile.yml"
+      - ".github/workflows/production-release-smoke.yml"
+      - "tools/production-release-smoke-v1.cjs"
+      - "tools/ci-lifecycle-contract-v1.cjs"
+      - ".github/workflows/ci-lifecycle-contract.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/complete-pipeline-frontier.yml"
+      - ".github/workflows/preallocation-structural-frontier.yml"
+      - ".github/workflows/full-corpus-retrieval.yml"
+      - ".github/workflows/clue-feasibility.yml"
+      - ".github/workflows/bounded-partial-search.yml"
+      - ".github/workflows/adaptive-partial-search.yml"
+      - ".github/workflows/phase-12-exact-allocator-occupancy-index.yml"
+      - ".github/workflows/phase-12-exact-allocator-profile.yml"
+      - ".github/workflows/production-release-smoke.yml"
+      - "tools/production-release-smoke-v1.cjs"
+      - "tools/ci-lifecycle-contract-v1.cjs"
+      - ".github/workflows/ci-lifecycle-contract.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-lifecycle-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lifecycle-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify CI lifecycle ownership
+        run: |
+          node --check tools/ci-lifecycle-contract-v1.cjs
+          node tools/ci-lifecycle-contract-v1.cjs
