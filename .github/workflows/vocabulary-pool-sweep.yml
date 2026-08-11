@@ -11,13 +11,6 @@ on:
         description: Comma-separated active pool limits
         required: true
         default: "2500,3500,5000,7500"
-  push:
-    branches:
-      - r-and-d/lexical-pareto-frontier
-    paths:
-      - core.js
-      - tools/vocabulary-pool-sweep.cjs
-      - .github/workflows/vocabulary-pool-sweep.yml
 
 concurrency:
   group: vocabulary-pool-sweep-${{ github.ref }}

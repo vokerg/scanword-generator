@@ -7,18 +7,6 @@ on:
         description: Number of identical-seed A/B pairs
         required: true
         default: "20"
-  push:
-    branches:
-      - r-and-d/lexical-pareto-frontier
-    paths:
-      - core.js
-      - dictionary-policy.js
-      - bulk-lexicon-runtime.js
-      - two-letter-words.js
-      - bulk-lexicon/**
-      - tools/benchmark-seed-v3.cjs
-      - tools/vocabulary-first-checkpoint.cjs
-      - .github/workflows/vocabulary-confirmation.yml
 
 concurrency:
   group: vocabulary-confirmation-${{ github.ref }}
