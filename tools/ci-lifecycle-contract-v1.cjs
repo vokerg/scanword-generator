@@ -175,6 +175,17 @@ assert(
   "closed Phase 1 evidence must not trigger the retained editorial unit gate",
 );
 
+const archivedManualOnlyWorkflows = [
+  ".github/workflows/dictionary-count.yml",
+  ".github/workflows/lexical-frontier.yml",
+];
+for (const workflow of archivedManualOnlyWorkflows) {
+  const source = read(workflow);
+  assert(/(?:^|\n)  workflow_dispatch:\n?/m.test(source), `${workflow}: archived workflow must keep manual dispatch`);
+  assert(!/(?:^|\n)  push:\n/m.test(source), `${workflow}: archived workflow must not retain automatic push triggers`);
+  assert(!/(?:^|\n)  pull_request:\n/m.test(source), `${workflow}: archived workflow must not retain automatic PR triggers`);
+}
+
 const retiredLexiconWriter = path.join(root, ".github", "workflows", "build-bulk-lexicon.yml");
 assert(!fs.existsSync(retiredLexiconWriter), "obsolete research lexicon writer must remain retired");
 
@@ -223,6 +234,7 @@ console.log(JSON.stringify({
   manualHistoricalQualityJobs: manualHistoricalJobs.length,
   vocabularyLifecycleWorkflows: vocabularyLifecycle.length,
   retainedVocabularyResearchWorkflows: retainedVocabularyResearch.length,
+  archivedManualOnlyWorkflows: archivedManualOnlyWorkflows.length,
   retiredLexiconWriter: true,
   writeCapableWorkflows,
   centralizedDefaultChecks: centralizedDefaults.length,
