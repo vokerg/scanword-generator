@@ -34,10 +34,120 @@ function contentType(file) {
   }
 }
 
+function interactionHarnessSource() {
+  return String.raw`(() => {
+    "use strict";
+
+    function mark(report) {
+      const marker = document.createElement("div");
+      marker.id = "browserInteractionResult";
+      marker.hidden = true;
+      for (const [key, value] of Object.entries(report)) {
+        marker.setAttribute("data-" + key, String(value));
+      }
+      document.body.appendChild(marker);
+    }
+
+    let polls = 0;
+    function exercise() {
+      polls += 1;
+      const generator = window.ScanwordGenerator;
+      const preview = document.querySelector("#preview");
+      const status = document.querySelector("#generationStatus")?.textContent || "";
+      const result = generator?.getCurrentResult?.();
+      if (!generator || !preview || !result || preview.getAttribute("aria-busy") !== "false" || /generating/i.test(status)) {
+        if (polls < 4000) {
+          window.setTimeout(exercise, 25);
+        } else {
+          mark({ passed: false, error: "initial-state-timeout" });
+        }
+        return;
+      }
+
+      try {
+        const settings = generator.getCurrentSettings();
+        const showAnswers = document.querySelector("#showAnswers");
+        const seed = document.querySelector("#seed");
+        const downloadSvg = document.querySelector("#downloadSvg");
+        const downloadJson = document.querySelector("#downloadJson");
+        const printA5 = document.querySelector("#printA5");
+        if (!settings || !showAnswers || !seed || !downloadSvg || !downloadJson || !printA5) {
+          throw new Error("missing interaction surface");
+        }
+
+        const initialSvg = preview.innerHTML;
+        showAnswers.checked = true;
+        showAnswers.dispatchEvent(new Event("change", { bubbles: true }));
+        const revealedSvg = preview.innerHTML;
+        const revealChanged = revealedSvg !== initialSvg;
+        showAnswers.checked = false;
+        showAnswers.dispatchEvent(new Event("change", { bubbles: true }));
+        const revealRestored = preview.innerHTML === initialSvg;
+
+        const originalFieldSeed = seed.value;
+        seed.value = "browser-smoke-uncommitted-seed";
+        const exported = generator.exportResult(result);
+        const exportSeedBound = exported.seed === settings.seed && exported.seed !== seed.value;
+        const exportA5 = exported.page?.format === "A5"
+          && exported.page?.widthMm === 148
+          && exported.page?.heightMm === 210
+          && exported.placedWords?.length === result.placed.length;
+        seed.value = originalFieldSeed;
+
+        const downloads = [];
+        const originalAnchorClick = HTMLAnchorElement.prototype.click;
+        HTMLAnchorElement.prototype.click = function smokeAnchorClick() {
+          downloads.push(this.download || "");
+        };
+        try {
+          downloadSvg.click();
+          downloadJson.click();
+        } finally {
+          HTMLAnchorElement.prototype.click = originalAnchorClick;
+        }
+        const svgDownload = downloads.includes("arrowword-a5.svg");
+        const jsonDownload = downloads.includes("arrowword-project.json");
+
+        let printCalled = false;
+        const originalPrint = window.print;
+        window.print = () => { printCalled = true; };
+        try {
+          printA5.click();
+        } finally {
+          window.print = originalPrint;
+        }
+
+        const passed = revealChanged
+          && revealRestored
+          && exportSeedBound
+          && exportA5
+          && svgDownload
+          && jsonDownload
+          && printCalled;
+        mark({
+          passed,
+          revealChanged,
+          revealRestored,
+          exportSeedBound,
+          exportA5,
+          svgDownload,
+          jsonDownload,
+          printCalled,
+        });
+      } catch (error) {
+        mark({ passed: false, error: encodeURIComponent(error?.message || String(error)) });
+      }
+    }
+
+    window.setTimeout(exercise, 0);
+  })();`;
+}
+
 function serve(directory) {
   const server = http.createServer((request, response) => {
     try {
-      const pathname = decodeURIComponent(new URL(request.url, "http://127.0.0.1").pathname);
+      const parsedUrl = new URL(request.url, "http://127.0.0.1");
+      const pathname = decodeURIComponent(parsedUrl.pathname);
       const relative = pathname === "/" ? "index.html" : pathname.replace(/^\/+/, "");
       const normalized = path.posix.normalize(relative);
       if (normalized === ".." || normalized.startsWith("../") || path.posix.isAbsolute(normalized)) {
@@ -49,6 +159,22 @@ function serve(directory) {
         response.writeHead(404).end("not found");
         return;
       }
+
+      if (normalized === "index.html" && parsedUrl.searchParams.get("scanwordBrowserSmoke") === "interaction") {
+        const originalHtml = fs.readFileSync(file, "utf8");
+        assert(originalHtml.includes("</body>"), "packaged index.html has no closing body for interaction harness");
+        const instrumentedHtml = originalHtml.replace(
+          "</body>",
+          `<script>${interactionHarnessSource()}</script></body>`,
+        );
+        response.writeHead(200, {
+          "content-type": contentType(file),
+          "cache-control": "no-store",
+        });
+        response.end(instrumentedHtml);
+        return;
+      }
+
       response.writeHead(200, {
         "content-type": contentType(file),
         "cache-control": "no-store",
@@ -134,6 +260,10 @@ function textContent(dom, id) {
   return match[1].replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function attributeIsTrue(tag, name) {
+  return new RegExp(`\\b${name}=["']true["']`, "i").test(tag);
+}
+
 async function main() {
   assert(browserBinary, "SCANWORD_BROWSER_BIN is required");
   assert(fs.existsSync(browserBinary), `browser binary does not exist: ${browserBinary}`);
@@ -144,7 +274,7 @@ async function main() {
   const { server, url } = await serve(siteDirectory);
   let result;
   try {
-    result = await runBrowser(url, profileDirectory);
+    result = await runBrowser(`${url}?scanwordBrowserSmoke=interaction`, profileDirectory);
   } finally {
     await new Promise((resolve) => server.close(resolve));
     fs.rmSync(profileDirectory, { recursive: true, force: true });
@@ -174,6 +304,20 @@ async function main() {
   assert(answerRows >= 12, `browser rendered too few assigned answers: ${answerRows}`);
   assert(/class=["'][^"']*stat[^"']*["']/i.test(dom), "browser stats were not rendered");
 
+  const interactionTag = openingTag(dom, "browserInteractionResult");
+  assert(attributeIsTrue(interactionTag, "data-passed"), `browser interaction harness failed: ${interactionTag}`);
+  for (const name of [
+    "data-revealChanged",
+    "data-revealRestored",
+    "data-exportSeedBound",
+    "data-exportA5",
+    "data-svgDownload",
+    "data-jsonDownload",
+    "data-printCalled",
+  ]) {
+    assert(attributeIsTrue(interactionTag, name), `browser interaction assertion failed for ${name}: ${interactionTag}`);
+  }
+
   const manifest = JSON.parse(fs.readFileSync(path.join(siteDirectory, "release-manifest.json"), "utf8"));
   console.log(JSON.stringify({
     passed: true,
@@ -185,6 +329,15 @@ async function main() {
     a5SvgRendered: true,
     exportsEnabled: true,
     previewBusy: false,
+    interactions: {
+      revealAnswers: true,
+      revealRestore: true,
+      exportSeedBound: true,
+      exportA5: true,
+      svgDownloadHandler: true,
+      jsonDownloadHandler: true,
+      printA5Handler: true,
+    },
     domBytes: Buffer.byteLength(dom),
     domDigest: sha256(dom),
   }));
