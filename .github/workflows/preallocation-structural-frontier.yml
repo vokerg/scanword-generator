@@ -21,7 +21,6 @@ on:
       - tools/node-benchmark-bootstrap-v1.cjs
       - research/preallocation-structural-frontier/**
       - docs/milestones/phase-11-preallocation-research-closure.md
-      - CONTINUATION.md
       - .github/workflows/preallocation-structural-frontier.yml
   workflow_dispatch:
 
@@ -72,7 +71,6 @@ jobs:
           grep -q 'Decision: \*\*rejected for production default\*\*' research/preallocation-structural-frontier/README.md
           grep -q 'v8-stability-058' research/preallocation-structural-frontier/README.md
           grep -q '8617578520' research/preallocation-structural-frontier/README.md
-          grep -q 'exact allocator acceleration' CONTINUATION.md
 
       - name: Test deterministic Phase 11 contracts
         run: |

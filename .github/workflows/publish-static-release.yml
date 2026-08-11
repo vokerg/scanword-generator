@@ -151,7 +151,7 @@ jobs:
             | tee release/scanword-generator-site.tar.gz.sha256
           cp release/scanword-generator-site/release-manifest.json release/release-manifest.json
 
-      - name: Prepare immutable release metadata
+      - name: Prepare commit-addressed release metadata
         id: metadata
         shell: bash
         run: |
@@ -164,13 +164,15 @@ jobs:
           echo "bundle_digest=${BUNDLE_DIGEST}" >> "$GITHUB_OUTPUT"
           echo "archive_sha=${ARCHIVE_SHA}" >> "$GITHUB_OUTPUT"
           cat > release/release-notes.md <<EOF
-          Immutable static Scanword Generator distribution.
+          Reproducible, commit-addressed static Scanword Generator distribution.
 
           Source commit: ${GITHUB_SHA}
           Bundle digest: ${BUNDLE_DIGEST}
           Archive SHA-256: ${ARCHIVE_SHA}
 
           The workflow re-ran UI/A5 contracts, the pinned canonical production seed, byte-identical bundle reconstruction, manifest verification, packaged-site HTTP smoke and deterministic archive reconstruction before publication.
+
+          The tag is SHA-derived and this workflow refuses to overwrite an existing tag/release. GitHub Release objects remain administratively editable unless repository-level release immutability is enabled separately.
           EOF
 
       - name: Publish GitHub prerelease
@@ -191,6 +193,41 @@ jobs:
             release/scanword-generator-site.tar.gz \
             release/scanword-generator-site.tar.gz.sha256 \
             release/release-manifest.json
+
+      - name: Verify published release identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.metadata.outputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" > release-output/published-release.json
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const release = JSON.parse(fs.readFileSync('release-output/published-release.json', 'utf8'));
+          const expectedTag = process.env.RELEASE_TAG;
+          const expectedSha = process.env.GITHUB_SHA;
+          const expectedAssets = [
+            'release-manifest.json',
+            'scanword-generator-site.tar.gz',
+            'scanword-generator-site.tar.gz.sha256',
+          ];
+          if (release.tag_name !== expectedTag) throw new Error(`tag mismatch: ${release.tag_name}`);
+          if (release.target_commitish !== expectedSha) throw new Error(`target mismatch: ${release.target_commitish}`);
+          if (!release.prerelease || release.draft) throw new Error('release state is not prerelease/non-draft');
+          const assets = (release.assets || []).map((asset) => asset.name).sort();
+          if (JSON.stringify(assets) !== JSON.stringify(expectedAssets.sort())) {
+            throw new Error(`asset set mismatch: ${JSON.stringify(assets)}`);
+          }
+          console.log(JSON.stringify({
+            passed: true,
+            tag: release.tag_name,
+            targetCommit: release.target_commitish,
+            prerelease: release.prerelease,
+            platformImmutable: Boolean(release.immutable),
+            assets,
+          }));
+          NODE
 
       - name: Upload release publication evidence
         if: always()
