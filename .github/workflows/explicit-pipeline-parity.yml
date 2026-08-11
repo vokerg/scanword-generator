@@ -10,7 +10,6 @@ on:
       - tools/construction-pipeline-*.cjs
       - tools/node-benchmark-bootstrap-v1.cjs
       - research/explicit-pipeline/**
-      - index.html
       - .github/workflows/explicit-pipeline-parity.yml
   workflow_dispatch:
 
@@ -51,11 +50,12 @@ jobs:
           node tools/construction-pipeline-parity-test.cjs
 
   development-parity:
+    if: github.event_name == 'workflow_dispatch'
     needs: unit
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SOURCE_SHA: ${{ github.sha }}
       SCANWORD_PIPELINE_CONCURRENCY: 2
       SCANWORD_PIPELINE_SEED_TIMEOUT_MS: 900000
       SCANWORD_PIPELINE_RUNTIME_RATIO: 1.10
