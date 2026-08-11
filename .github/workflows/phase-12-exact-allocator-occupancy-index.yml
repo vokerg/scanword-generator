@@ -11,7 +11,6 @@ on:
       - "construction-exact-allocator-occupancy-index-v1.js"
       - "construction-exact-allocator-top-three-v1.js"
       - "construction-exact-allocator-profile-v1.js"
-      - "index.html"
       - "tools/node-benchmark-bootstrap-v1.cjs"
       - "tools/construction-pipeline-seed-v1.cjs"
       - "tools/exact-allocator-occupancy-index-test-v1.cjs"
