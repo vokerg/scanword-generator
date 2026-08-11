@@ -1,0 +1,118 @@
+name: Static release package
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "*.js"
+      - "bulk-lexicon/**"
+      - "index.html"
+      - "styles.css"
+      - ".gitignore"
+      - "tools/node-benchmark-bootstrap-v1.cjs"
+      - "tools/construction-pipeline-seed-v1.cjs"
+      - "tools/wrapper-retirement-test-v1.cjs"
+      - "tools/production-release-smoke-v1.cjs"
+      - "tools/ui-release-state-test-v1.cjs"
+      - "tools/a5-print-contract-test-v1.cjs"
+      - "tools/build-static-release-v1.cjs"
+      - "tools/verify-static-release-v1.cjs"
+      - "tools/static-release-reproducibility-test-v1.cjs"
+      - "tools/static-release-http-smoke-v1.cjs"
+      - ".github/workflows/static-release-package.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "*.js"
+      - "bulk-lexicon/**"
+      - "index.html"
+      - "styles.css"
+      - ".gitignore"
+      - "tools/node-benchmark-bootstrap-v1.cjs"
+      - "tools/construction-pipeline-seed-v1.cjs"
+      - "tools/wrapper-retirement-test-v1.cjs"
+      - "tools/production-release-smoke-v1.cjs"
+      - "tools/ui-release-state-test-v1.cjs"
+      - "tools/a5-print-contract-test-v1.cjs"
+      - "tools/build-static-release-v1.cjs"
+      - "tools/verify-static-release-v1.cjs"
+      - "tools/static-release-reproducibility-test-v1.cjs"
+      - "tools/static-release-http-smoke-v1.cjs"
+      - ".github/workflows/static-release-package.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: static-release-package-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate release tooling syntax
+        run: |
+          node --check tools/build-static-release-v1.cjs
+          node --check tools/verify-static-release-v1.cjs
+          node --check tools/static-release-reproducibility-test-v1.cjs
+          node --check tools/static-release-http-smoke-v1.cjs
+
+      - name: Re-run production release contracts
+        run: |
+          set -o pipefail
+          mkdir -p release-output
+          node tools/ui-release-state-test-v1.cjs | tee release-output/ui-release-state-test-v1.jsonl
+          node tools/a5-print-contract-test-v1.cjs | tee release-output/a5-print-contract-test-v1.jsonl
+          node tools/production-release-smoke-v1.cjs | tee release-output/production-release-smoke-v1.jsonl
+
+      - name: Prove byte-identical rebuilds
+        run: |
+          set -o pipefail
+          node tools/static-release-reproducibility-test-v1.cjs \
+            | tee release-output/static-release-reproducibility-test-v1.jsonl
+
+      - name: Build exact static release
+        run: node tools/build-static-release-v1.cjs release/scanword-generator-site
+
+      - name: Verify manifest and dependency closure
+        run: |
+          set -o pipefail
+          node tools/verify-static-release-v1.cjs release/scanword-generator-site \
+            | tee release-output/verify-static-release-v1.jsonl
+
+      - name: Smoke-test packaged site over HTTP
+        run: |
+          set -o pipefail
+          node tools/static-release-http-smoke-v1.cjs release/scanword-generator-site \
+            | tee release-output/static-release-http-smoke-v1.jsonl
+
+      - name: Upload deployable static site
+        uses: actions/upload-artifact@v4
+        with:
+          name: scanword-generator-static-${{ github.event.pull_request.head.sha || github.sha }}
+          path: release/scanword-generator-site/
+          include-hidden-files: true
+          if-no-files-found: error
+
+      - name: Upload release evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-release-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: release-output/
+          if-no-files-found: warn
