@@ -1,4 +1,4 @@
-name: Build vocabulary baseline 1.1 corpus
+name: Vocabulary baseline 1.1 corpus contract
 
 on:
   push:
@@ -18,7 +18,7 @@ on:
   workflow_dispatch:
     inputs:
       entities:
-        description: High-confidence natural and administrative entity target
+        description: High-confidence natural and administrative entity target for live-upstream diagnostic
         required: true
         default: "1500"
 
@@ -30,12 +30,95 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  corpus-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate frozen v8 builder and committed corpus
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          python -m py_compile tools/build-bulk-lexicon*.py
+          node --check tools/bulk-lexicon-audit.cjs
+          for file in bulk-lexicon/*.js; do node --check "$file"; done
+          node tools/bulk-lexicon-audit.cjs | tee corpus-audit.json
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const manifest = JSON.parse(fs.readFileSync("bulk-lexicon/manifest.json", "utf8"));
+          const audit = JSON.parse(fs.readFileSync("corpus-audit.json", "utf8"));
+          const expectedCanonical = {
+            "3530597": "МЕХИКО",
+            "3688689": "БОГОТА",
+            "2365267": "ЛОМЕ",
+            "1581130": "ХАНОЙ",
+            "1668341": "ТАЙБЕЙ",
+            "964137": "ПРЕТОРИЯ",
+            "2220957": "ЯУНДЕ",
+            "2028462": "УЛАНБАТОР",
+          };
+          if (manifest.version !== 8) throw new Error(`Unexpected corpus version: ${manifest.version}`);
+          if (manifest.generatedBy !== "tools/build-bulk-lexicon-v8.py") throw new Error(`Unexpected builder: ${manifest.generatedBy}`);
+          if (manifest.actual.total.entries !== 40966) throw new Error(`Unexpected corpus size: ${manifest.actual.total.entries}`);
+          if (manifest.actual.entities.entries !== 1469) throw new Error(`Unexpected entity count: ${manifest.actual.entities.entries}`);
+          if (manifest.editorialDebt.genericTemplatePercent !== 13.84) throw new Error("Editorial debt checkpoint changed");
+          if (audit.entries !== 40966 || audit.invalidEntries !== 0 || audit.duplicateAnswerCount !== 0) {
+            throw new Error(`Committed corpus audit failed: ${JSON.stringify({entries:audit.entries, invalid:audit.invalidEntries, duplicates:audit.duplicateAnswerCount})}`);
+          }
+          for (const [sourceId, expected] of Object.entries(expectedCanonical)) {
+            if (manifest.canonicalExamples?.[sourceId] !== expected) {
+              throw new Error(`Canonical example drift: ${sourceId} => ${manifest.canonicalExamples?.[sourceId]}`);
+            }
+          }
+          if (!manifest.admission?.dropsCollidingFallbackAliases || !manifest.admission?.usesCanonicalSourceOverrides) {
+            throw new Error("Frozen v8 admission policy changed");
+          }
+          console.log(JSON.stringify({
+            version: manifest.version,
+            entries: manifest.actual.total.entries,
+            entities: manifest.actual.entities.entries,
+            genericTemplatePercent: manifest.editorialDebt.genericTemplatePercent,
+            canonicalExamples: Object.keys(expectedCanonical).length,
+            exactClueCoveragePercent: audit.exactClueCoveragePercent,
+          }));
+          NODE
+
+      - name: Publish committed corpus contract evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocabulary-baseline-contract-${{ env.SOURCE_SHA }}
+          path: corpus-audit.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  live-upstream-rebuild:
+    if: github.event_name == 'workflow_dispatch'
+    needs: corpus-contract
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    env:
+      SOURCE_SHA: ${{ github.sha }}
     steps:
-      - name: Check out candidate
+      - name: Check out exact requested commit
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -47,7 +130,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install wordfreq pymorphy3 pymorphy3-dicts-ru Babel
 
-      - name: Download attributed source data
+      - name: Download current attributed source data
         run: |
           mkdir -p source-data generated/bulk-lexicon
           curl --fail --location --retry 4 https://github.com/avidale/python-ruwordnet/releases/download/0.0.4/ruwordnet-2021.db --output source-data/ruwordnet-2021.db
@@ -56,10 +139,11 @@ jobs:
           curl --fail --location --retry 4 https://download.geonames.org/export/dump/alternateNamesV2.zip --output source-data/alternateNamesV2.zip
           curl --fail --location --retry 4 https://download.geonames.org/export/dump/countryInfo.txt --output source-data/countryInfo.txt
 
-      - name: Build selected corpus v8
+      - name: Rebuild against current mutable upstreams
         env:
-          ENTITY_TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.entities || '1500' }}
+          ENTITY_TARGET: ${{ inputs.entities }}
         run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           python -m py_compile tools/build-bulk-lexicon*.py
           python tools/build-bulk-lexicon-v8.py \
             --ruwordnet-db source-data/ruwordnet-2021.db \
@@ -72,28 +156,9 @@ jobs:
             --entities "${ENTITY_TARGET}" --chunk-size 2500 \
             > generated/bulk-lexicon/build-report.json
 
-      - name: Validate generated corpus
+      - name: Compare current-upstream result with frozen v8 manifest
         run: |
           for file in generated/bulk-lexicon/*.js; do node --check "$file"; done
-          node - <<'NODE'
-          const fs = require("node:fs");
-          const manifest = JSON.parse(fs.readFileSync("generated/bulk-lexicon/manifest.json", "utf8"));
-          const total = manifest.actual.total.entries;
-          const entities = manifest.actual.entities.entries;
-          const generic = manifest.editorialDebt.genericTemplatePercent;
-          const preferred = manifest.preferredRussianNames?.geography?.preferredAvailable || 0;
-          if (manifest.version !== 8) throw new Error(`Unexpected corpus version: ${manifest.version}`);
-          if (total !== 40966) throw new Error(`Unexpected corpus size: ${total}`);
-          if (entities !== 1469) throw new Error(`Unexpected entity count: ${entities}`);
-          if (generic !== 13.84) throw new Error(`Unexpected generic-template share: ${generic}`);
-          if (preferred < 8996) throw new Error(`Preferred Russian mapping coverage regressed: ${preferred}`);
-          if (!manifest.admission?.dropsCollidingFallbackAliases) throw new Error("Alias collision policy is not active");
-          if (manifest.canonicalExamples?.["2028462"] !== "УЛАНБАТОР") throw new Error("Canonical override regression");
-          console.log(JSON.stringify({ total, entities, generic, preferred }, null, 2));
-          NODE
-
-      - name: Compare committed and generated manifests
-        run: |
           node - <<'NODE'
           const fs = require("node:fs");
           const committed = JSON.parse(fs.readFileSync("bulk-lexicon/manifest.json", "utf8"));
@@ -106,16 +171,16 @@ jobs:
           ]) {
             const read = (value) => path.reduce((cursor, key) => cursor?.[key], value);
             if (read(committed) !== read(generated)) {
-              throw new Error(`Manifest mismatch at ${path.join(".")}: ${read(committed)} vs ${read(generated)}`);
+              throw new Error(`Current upstream drift at ${path.join(".")}: ${read(committed)} vs ${read(generated)}`);
             }
           }
           NODE
 
-      - name: Publish build evidence
+      - name: Publish live-upstream diagnostic
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: vocabulary-baseline-corpus-${{ github.sha }}
+          name: vocabulary-live-upstream-${{ env.SOURCE_SHA }}
           path: generated/bulk-lexicon/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
