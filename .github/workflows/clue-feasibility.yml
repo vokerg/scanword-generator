@@ -10,7 +10,6 @@ on:
       - tools/clue-feasibility-*.cjs
       - tools/node-benchmark-bootstrap-v1.cjs
       - research/clue-feasibility/**
-      - index.html
       - .github/workflows/clue-feasibility.yml
   workflow_dispatch:
 
@@ -78,11 +77,12 @@ jobs:
           if-no-files-found: warn
 
   development:
+    if: github.event_name == 'workflow_dispatch'
     needs: unit
     runs-on: ubuntu-latest
     timeout-minutes: 75
     env:
-      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SOURCE_SHA: ${{ github.sha }}
       SCANWORD_CLUE_FEASIBILITY_CONCURRENCY: 2
       SCANWORD_CLUE_FEASIBILITY_ENFORCE: 0
       SCANWORD_CLUE_FEASIBILITY_MODES: off,shadow
