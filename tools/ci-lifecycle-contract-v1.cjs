@@ -127,6 +127,29 @@ for (const [workflow, job] of manualHistoricalJobs) {
   );
 }
 
+const vocabularyLifecycle = [
+  [".github/workflows/vocabulary-release.yml", "milestone-contract", "release-comparison"],
+  [".github/workflows/vocabulary-greatness-1.1.yml", "baseline-contract", "historical-comparison"],
+];
+for (const [workflow, automaticJob, manualJob] of vocabularyLifecycle) {
+  const source = read(workflow);
+  const pr = pullRequestBlock(workflow);
+  assert(pr.includes("paths:"), `${workflow}: must keep explicit PR path ownership`);
+  assert(!hasIndexTrigger(workflow), `${workflow}: production index changes belong to release smoke`);
+  assert(!/(?:^|\n)  push:\n/m.test(source), `${workflow}: milestone comparison must not auto-run on main push`);
+  assert(
+    !jobBlock(workflow, automaticJob).includes("github.event_name == 'workflow_dispatch'"),
+    `${workflow}:${automaticJob} must remain an automatic lightweight PR contract`,
+  );
+  assert(
+    jobBlock(workflow, manualJob).includes("github.event_name == 'workflow_dispatch'"),
+    `${workflow}:${manualJob} must remain workflow_dispatch-only`,
+  );
+  for (const forbidden of ["README.md", "AGENTS.md", "CONTINUATION.md"]) {
+    assert(!pr.includes(forbidden), `${workflow}: must not own documentation-only PR path ${forbidden}`);
+  }
+}
+
 const retiredLexiconWriter = path.join(root, ".github", "workflows", "build-bulk-lexicon.yml");
 assert(!fs.existsSync(retiredLexiconWriter), "obsolete research lexicon writer must remain retired");
 
@@ -152,6 +175,9 @@ assert(
 
 const releaseSmoke = read("tools/production-release-smoke-v1.cjs");
 const centralizedDefaults = [
+  'window.SCANWORD_VOCABULARY_PORTFOLIO = "on"',
+  'window.SCANWORD_VOCABULARY_PORTFOLIO_LIMITS = "2500,3500"',
+  'window.SCANWORD_VOCABULARY_PORTFOLIO_MODE = "full"',
   'window.SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER = "off"',
   'window.SCANWORD_FULL_CORPUS_RETRIEVAL = "off"',
   'window.SCANWORD_CLUE_FEASIBILITY = "off"',
@@ -170,6 +196,7 @@ console.log(JSON.stringify({
   manualResearchJobs: manualResearchJobs.length,
   qualityPathScoped: true,
   manualHistoricalQualityJobs: manualHistoricalJobs.length,
+  vocabularyLifecycleWorkflows: vocabularyLifecycle.length,
   retiredLexiconWriter: true,
   writeCapableWorkflows,
   centralizedDefaultChecks: centralizedDefaults.length,

@@ -1,23 +1,6 @@
 name: Vocabulary baseline 1.1
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - tools/node-benchmark-bootstrap-v1.cjs
-      - tools/build-bulk-lexicon*.py
-      - tools/bulk-lexicon-audit.cjs
-      - tools/vocabulary-adaptive-checkpoint.cjs
-      - construction-vocabulary-portfolio-v1.js
-      - bulk-lexicon-runtime.js
-      - bulk-lexicon/**
-      - research/vocabulary-greatness-1.1/**
-      - docs/milestones/v1.1-vocabulary-greatness.md
-      - README.md
-      - AGENTS.md
-      - index.html
-      - .github/workflows/vocabulary-greatness-1.1.yml
   pull_request:
     branches:
       - main
@@ -29,11 +12,6 @@ on:
       - construction-vocabulary-portfolio-v1.js
       - bulk-lexicon-runtime.js
       - bulk-lexicon/**
-      - research/vocabulary-greatness-1.1/**
-      - docs/milestones/v1.1-vocabulary-greatness.md
-      - README.md
-      - AGENTS.md
-      - index.html
       - .github/workflows/vocabulary-greatness-1.1.yml
   workflow_dispatch:
     inputs:
@@ -50,28 +28,25 @@ permissions:
   contents: read
 
 jobs:
-  canonical-runtime:
+  baseline-contract:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 10
     env:
-      SCANWORD_PORTFOLIO_ATTEMPTS: 240
-      SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
-      SCANWORD_EDITORIAL_REPAIR: "on"
-      SCANWORD_CONSTRUCTION_MODE: portfolio
-      SCANWORD_VOCABULARY_PORTFOLIO: "on"
-      SCANWORD_VOCABULARY_PORTFOLIO_LIMITS: 2500,3500
-      SCANWORD_VOCABULARY_PORTFOLIO_MODE: full
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
-      - name: Check out candidate
+      - name: Check out exact candidate head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Validate runtime files
+      - name: Validate retained v1.1 corpus contract
         run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           node --check tools/node-benchmark-bootstrap-v1.cjs
           node --check construction-vocabulary-portfolio-v1.js
           node --check bulk-lexicon-runtime.js
@@ -89,11 +64,45 @@ jobs:
           if (manifest.editorialDebt.genericTemplatePercent !== 13.84) throw new Error('Editorial debt checkpoint changed');
           NODE
 
+      - name: Publish corpus contract evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vocabulary-baseline-contract-${{ env.SOURCE_SHA }}
+          path: corpus-audit.json
+          if-no-files-found: warn
+
+  historical-comparison:
+    if: github.event_name == 'workflow_dispatch'
+    needs: baseline-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      SOURCE_SHA: ${{ github.sha }}
+      SCANWORD_PORTFOLIO_ATTEMPTS: 240
+      SCANWORD_PORTFOLIO_CLUE_RESTARTS: 160
+      SCANWORD_EDITORIAL_REPAIR: "on"
+      SCANWORD_CONSTRUCTION_MODE: portfolio
+      SCANWORD_VOCABULARY_PORTFOLIO: "on"
+      SCANWORD_VOCABULARY_PORTFOLIO_LIMITS: 2500,3500
+      SCANWORD_VOCABULARY_PORTFOLIO_MODE: full
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Prove browser-equivalent benchmark bootstrap
         env:
           NODE_OPTIONS: --require=${{ github.workspace }}/tools/node-benchmark-bootstrap-v1.cjs
           SCANWORD_BULK_LEXICON: "on"
         run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           node tools/benchmark-seed-v3.cjs vocabulary-baseline-bootstrap \
             | tee bootstrap.json
           node - <<'NODE'
@@ -114,32 +123,31 @@ jobs:
           }, null, 2));
           NODE
 
-      - name: Run short truthful release comparison
+      - name: Run retained truthful release comparison
         env:
           NODE_OPTIONS: --require=${{ github.workspace }}/tools/node-benchmark-bootstrap-v1.cjs
-          SEEDS: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '3' }}
+          SEEDS: ${{ inputs.seeds }}
           SCANWORD_RELEASE_CONCURRENCY: 1
         run: |
           mkdir -p research-output
           node tools/vocabulary-release-checkpoint.cjs "${SEEDS}" vocabulary-baseline-truth \
             | tee "research-output/truth-${SEEDS}.jsonl"
 
-      - name: Compare full and adaptive portfolio
+      - name: Compare retained full and adaptive portfolios
         env:
           NODE_OPTIONS: --require=${{ github.workspace }}/tools/node-benchmark-bootstrap-v1.cjs
-          SEEDS: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '3' }}
+          SEEDS: ${{ inputs.seeds }}
           SCANWORD_ADAPTIVE_CONCURRENCY: 1
         run: |
           node tools/vocabulary-adaptive-checkpoint.cjs "${SEEDS}" vocabulary-baseline-adaptive \
             | tee "research-output/adaptive-${SEEDS}.jsonl"
 
-      - name: Publish evidence
+      - name: Publish historical comparison evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: vocabulary-baseline-${{ github.sha }}
+          name: vocabulary-baseline-comparison-${{ env.SOURCE_SHA }}
           path: |
-            corpus-audit.json
             bootstrap.json
             research-output/
           if-no-files-found: warn
