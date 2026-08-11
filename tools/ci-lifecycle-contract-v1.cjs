@@ -150,6 +150,31 @@ for (const [workflow, automaticJob, manualJob] of vocabularyLifecycle) {
   }
 }
 
+const retainedVocabularyResearch = [
+  [".github/workflows/vocabulary-adaptive.yml", "adaptive-contract", "comparison"],
+  [".github/workflows/vocabulary-editorial-quality.yml", "unit", "comparison"],
+];
+for (const [workflow, automaticJob, manualJob] of retainedVocabularyResearch) {
+  const source = read(workflow);
+  const pr = pullRequestBlock(workflow);
+  assert(pr.includes("paths:"), `${workflow}: retained research must keep explicit PR path ownership`);
+  assert(!hasIndexTrigger(workflow), `${workflow}: retained research must not own index-only PRs`);
+  assert(!/(?:^|\n)  push:\n/m.test(source), `${workflow}: retained research must not auto-run on main push`);
+  assert(
+    !jobBlock(workflow, automaticJob).includes("github.event_name == 'workflow_dispatch'"),
+    `${workflow}:${automaticJob} must remain an automatic lightweight PR contract`,
+  );
+  assert(
+    jobBlock(workflow, manualJob).includes("github.event_name == 'workflow_dispatch'"),
+    `${workflow}:${manualJob} must remain workflow_dispatch-only`,
+  );
+}
+const editorialResearchPr = pullRequestBlock(".github/workflows/vocabulary-editorial-quality.yml");
+assert(
+  !editorialResearchPr.includes("research/selected-grid-editorial-quality-1.2/**"),
+  "closed Phase 1 evidence must not trigger the retained editorial unit gate",
+);
+
 const retiredLexiconWriter = path.join(root, ".github", "workflows", "build-bulk-lexicon.yml");
 assert(!fs.existsSync(retiredLexiconWriter), "obsolete research lexicon writer must remain retired");
 
@@ -197,6 +222,7 @@ console.log(JSON.stringify({
   qualityPathScoped: true,
   manualHistoricalQualityJobs: manualHistoricalJobs.length,
   vocabularyLifecycleWorkflows: vocabularyLifecycle.length,
+  retainedVocabularyResearchWorkflows: retainedVocabularyResearch.length,
   retiredLexiconWriter: true,
   writeCapableWorkflows,
   centralizedDefaultChecks: centralizedDefaults.length,
