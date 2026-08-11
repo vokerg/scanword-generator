@@ -191,6 +191,33 @@ for (const workflow of archivedManualOnlyWorkflows) {
   assert(!/(?:^|\n)  pull_request:\n/m.test(source), `${workflow}: archived workflow must not retain automatic PR triggers`);
 }
 
+const retiredBrowserWorkflow = path.join(root, ".github", "workflows", "browser-release-smoke.yml");
+assert(!fs.existsSync(retiredBrowserWorkflow), "duplicate standalone browser release workflow must remain retired");
+const staticPackageWorkflow = ".github/workflows/static-release-package.yml";
+const staticPackageSource = read(staticPackageWorkflow);
+const staticPackagePr = pullRequestBlock(staticPackageWorkflow);
+assert(hasIndexTrigger(staticPackageWorkflow), "Static release package must own index.html package acceptance");
+assert(
+  staticPackagePr.includes('"tools/browser-release-smoke-v1.cjs"'),
+  "Static release package must own the real-browser smoke tool",
+);
+for (const expected of [
+  "static-release-reproducibility-test-v1.cjs",
+  "build-static-release-v1.cjs release/scanword-generator-site",
+  "verify-static-release-v1.cjs release/scanword-generator-site",
+  "static-release-http-smoke-v1.cjs release/scanword-generator-site",
+  "browser-release-smoke-v1.cjs release/scanword-generator-site",
+]) {
+  assert(staticPackageSource.includes(expected), `Static release package lost consolidated acceptance step: ${expected}`);
+}
+for (const duplicate of [
+  "production-release-smoke-v1.cjs",
+  "ui-release-state-test-v1.cjs",
+  "a5-print-contract-test-v1.cjs",
+]) {
+  assert(!staticPackageSource.includes(duplicate), `Static release package must not duplicate canonical production contract: ${duplicate}`);
+}
+
 const retiredLexiconWriter = path.join(root, ".github", "workflows", "build-bulk-lexicon.yml");
 assert(!fs.existsSync(retiredLexiconWriter), "obsolete research lexicon writer must remain retired");
 
@@ -240,6 +267,7 @@ console.log(JSON.stringify({
   vocabularyLifecycleWorkflows: vocabularyLifecycle.length,
   retainedVocabularyResearchWorkflows: retainedVocabularyResearch.length,
   archivedManualOnlyWorkflows: archivedManualOnlyWorkflows.length,
+  consolidatedReleaseAcceptance: true,
   retiredLexiconWriter: true,
   writeCapableWorkflows,
   centralizedDefaultChecks: centralizedDefaults.length,
