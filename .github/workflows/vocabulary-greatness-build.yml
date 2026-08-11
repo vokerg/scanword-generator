@@ -106,7 +106,8 @@ jobs:
           const pr = source.match(/  pull_request:\n([\s\S]*?)(?=\n  workflow_dispatch:)/)?.[0] || "";
           const live = source.match(/  live-upstream-rebuild:\n([\s\S]*?)$/)?.[0] || "";
           const runtimeLoader = ["bulk", "lexicon-runtime.js"].join("-");
-          for (const owned of ["tools/build-bulk-lexicon*.py", "bulk-lexicon/**", ".github/workflows/vocabulary-greatness-build.yml"]) {
+          const corpusPath = ["bulk", "lexicon/**"].join("-");
+          for (const owned of ["tools/build-bulk-lexicon*.py", corpusPath, ".github/workflows/vocabulary-greatness-build.yml"]) {
             if (!pr.includes(owned)) throw new Error(`Missing corpus-owned PR path: ${owned}`);
           }
           if (pr.includes(runtimeLoader)) throw new Error("Runtime loader must not trigger the corpus contract");
