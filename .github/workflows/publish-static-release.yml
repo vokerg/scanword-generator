@@ -1,0 +1,205 @@
+name: Publish static GitHub release
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "tools/build-static-release-v1.cjs"
+      - "tools/verify-static-release-v1.cjs"
+      - "tools/static-release-reproducibility-test-v1.cjs"
+      - "tools/static-release-http-smoke-v1.cjs"
+      - "tools/build-static-release-archive-v1.cjs"
+      - ".github/workflows/publish-static-release.yml"
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-static-release-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  dry-run:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate publishing tooling syntax
+        run: |
+          node --check tools/build-static-release-archive-v1.cjs
+          node --check tools/build-static-release-v1.cjs
+          node --check tools/verify-static-release-v1.cjs
+          node --check tools/static-release-reproducibility-test-v1.cjs
+          node --check tools/static-release-http-smoke-v1.cjs
+
+      - name: Re-run production release contracts
+        run: |
+          set -o pipefail
+          mkdir -p release-output
+          node tools/ui-release-state-test-v1.cjs | tee release-output/ui-release-state-test-v1.jsonl
+          node tools/a5-print-contract-test-v1.cjs | tee release-output/a5-print-contract-test-v1.jsonl
+          node tools/production-release-smoke-v1.cjs | tee release-output/production-release-smoke-v1.jsonl
+
+      - name: Prove static bundle reproducibility
+        run: |
+          set -o pipefail
+          node tools/static-release-reproducibility-test-v1.cjs \
+            | tee release-output/static-release-reproducibility-test-v1.jsonl
+
+      - name: Build and verify deployable site
+        run: |
+          set -o pipefail
+          node tools/build-static-release-v1.cjs release/scanword-generator-site \
+            | tee release-output/build-static-release-v1.jsonl
+          node tools/verify-static-release-v1.cjs release/scanword-generator-site \
+            | tee release-output/verify-static-release-v1.jsonl
+          node tools/static-release-http-smoke-v1.cjs release/scanword-generator-site \
+            | tee release-output/static-release-http-smoke-v1.jsonl
+
+      - name: Prove deterministic release archive
+        run: |
+          set -o pipefail
+          node tools/build-static-release-archive-v1.cjs \
+            release/scanword-generator-site release/archive-a.tar.gz \
+            | tee release-output/archive-a.jsonl
+          node tools/build-static-release-archive-v1.cjs \
+            release/scanword-generator-site release/archive-b.tar.gz \
+            | tee release-output/archive-b.jsonl
+          cmp release/archive-a.tar.gz release/archive-b.tar.gz
+          sha256sum release/archive-a.tar.gz | tee release-output/archive-a.sha256
+
+      - name: Upload publish dry-run evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-release-publish-dry-run-${{ github.event.pull_request.head.sha }}
+          path: |
+            release-output/
+            release/archive-a.tar.gz
+            release/scanword-generator-site/release-manifest.json
+          if-no-files-found: warn
+
+  publish:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[release-static]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    steps:
+      - name: Check out exact main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Re-run production release contracts
+        run: |
+          set -o pipefail
+          mkdir -p release-output
+          node tools/ui-release-state-test-v1.cjs | tee release-output/ui-release-state-test-v1.jsonl
+          node tools/a5-print-contract-test-v1.cjs | tee release-output/a5-print-contract-test-v1.jsonl
+          node tools/production-release-smoke-v1.cjs | tee release-output/production-release-smoke-v1.jsonl
+
+      - name: Prove static bundle reproducibility
+        run: |
+          set -o pipefail
+          node tools/static-release-reproducibility-test-v1.cjs \
+            | tee release-output/static-release-reproducibility-test-v1.jsonl
+
+      - name: Build and verify exact deployable site
+        run: |
+          set -o pipefail
+          node tools/build-static-release-v1.cjs release/scanword-generator-site \
+            | tee release-output/build-static-release-v1.jsonl
+          node tools/verify-static-release-v1.cjs release/scanword-generator-site \
+            | tee release-output/verify-static-release-v1.jsonl
+          node tools/static-release-http-smoke-v1.cjs release/scanword-generator-site \
+            | tee release-output/static-release-http-smoke-v1.jsonl
+
+      - name: Build deterministic distribution archive
+        run: |
+          set -o pipefail
+          node tools/build-static-release-archive-v1.cjs \
+            release/scanword-generator-site release/archive-a.tar.gz \
+            | tee release-output/archive-a.jsonl
+          node tools/build-static-release-archive-v1.cjs \
+            release/scanword-generator-site release/archive-b.tar.gz \
+            | tee release-output/archive-b.jsonl
+          cmp release/archive-a.tar.gz release/archive-b.tar.gz
+          mv release/archive-a.tar.gz release/scanword-generator-site.tar.gz
+          rm release/archive-b.tar.gz
+          sha256sum release/scanword-generator-site.tar.gz \
+            | tee release/scanword-generator-site.tar.gz.sha256
+          cp release/scanword-generator-site/release-manifest.json release/release-manifest.json
+
+      - name: Prepare immutable release metadata
+        id: metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          SHORT_SHA="$(git rev-parse --short=12 HEAD)"
+          TAG="static-${SHORT_SHA}"
+          BUNDLE_DIGEST="$(node -p "require('./release/release-manifest.json').bundleDigest")"
+          ARCHIVE_SHA="$(cut -d' ' -f1 release/scanword-generator-site.tar.gz.sha256)"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "bundle_digest=${BUNDLE_DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "archive_sha=${ARCHIVE_SHA}" >> "$GITHUB_OUTPUT"
+          cat > release/release-notes.md <<EOF
+          Immutable static Scanword Generator distribution.
+
+          Source commit: ${GITHUB_SHA}
+          Bundle digest: ${BUNDLE_DIGEST}
+          Archive SHA-256: ${ARCHIVE_SHA}
+
+          The workflow re-ran UI/A5 contracts, the pinned canonical production seed, byte-identical bundle reconstruction, manifest verification, packaged-site HTTP smoke and deterministic archive reconstruction before publication.
+          EOF
+
+      - name: Publish GitHub prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.metadata.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists" >&2
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" \
+            --target "$GITHUB_SHA" \
+            --title "Scanword Generator static ${RELEASE_TAG#static-}" \
+            --prerelease \
+            --notes-file release/release-notes.md \
+            release/scanword-generator-site.tar.gz \
+            release/scanword-generator-site.tar.gz.sha256 \
+            release/release-manifest.json
+
+      - name: Upload release publication evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-release-publication-${{ github.sha }}
+          path: |
+            release-output/
+            release/release-notes.md
+            release/release-manifest.json
+            release/scanword-generator-site.tar.gz.sha256
+          if-no-files-found: warn
