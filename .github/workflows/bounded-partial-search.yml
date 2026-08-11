@@ -12,7 +12,6 @@ on:
       - tools/bounded-partial-search-*.cjs
       - tools/node-benchmark-bootstrap-v1.cjs
       - research/bounded-partial-search/**
-      - index.html
       - .github/workflows/bounded-partial-search.yml
   workflow_dispatch:
 
@@ -77,11 +76,12 @@ jobs:
           if-no-files-found: warn
 
   development:
+    if: github.event_name == 'workflow_dispatch'
     needs: unit
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SOURCE_SHA: ${{ github.sha }}
       SCANWORD_PARTIAL_SEARCH_CONCURRENCY: 2
       SCANWORD_PARTIAL_SEARCH_ENFORCE: 0
       SCANWORD_PARTIAL_SEARCH_MODES: off,shadow,beam
