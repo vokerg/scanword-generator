@@ -127,6 +127,29 @@ for (const [workflow, job] of manualHistoricalJobs) {
   );
 }
 
+const retiredLexiconWriter = path.join(root, ".github", "workflows", "build-bulk-lexicon.yml");
+assert(!fs.existsSync(retiredLexiconWriter), "obsolete research lexicon writer must remain retired");
+
+const workflowsDir = path.join(root, ".github", "workflows");
+const workflowFiles = fs.readdirSync(workflowsDir)
+  .filter((name) => /\.ya?ml$/i.test(name))
+  .sort();
+const writeCapableWorkflows = workflowFiles.filter((name) => /(?:^|\n)\s*contents:\s*write\s*(?:\n|$)/m.test(
+  fs.readFileSync(path.join(workflowsDir, name), "utf8"),
+));
+assert(
+  JSON.stringify(writeCapableWorkflows) === JSON.stringify(["publish-static-release.yml"]),
+  `unexpected contents:write workflow set: ${JSON.stringify(writeCapableWorkflows)}`,
+);
+const publishWorkflow = ".github/workflows/publish-static-release.yml";
+const publishJob = jobBlock(publishWorkflow, "publish");
+assert(publishJob.includes("contents: write"), "static release publish job lost explicit write permission");
+assert(
+  publishJob.includes("github.event_name == 'workflow_dispatch'")
+    && publishJob.includes("contains(github.event.head_commit.message, '[release-static]')"),
+  "static release publish write path lost explicit dispatch/release-marker guard",
+);
+
 const releaseSmoke = read("tools/production-release-smoke-v1.cjs");
 const centralizedDefaults = [
   'window.SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER = "off"',
@@ -147,5 +170,7 @@ console.log(JSON.stringify({
   manualResearchJobs: manualResearchJobs.length,
   qualityPathScoped: true,
   manualHistoricalQualityJobs: manualHistoricalJobs.length,
+  retiredLexiconWriter: true,
+  writeCapableWorkflows,
   centralizedDefaultChecks: centralizedDefaults.length,
 }));
