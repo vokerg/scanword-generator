@@ -9,7 +9,6 @@ on:
       - main
     paths:
       - "construction-exact-allocator-profile-v1.js"
-      - "index.html"
       - "tools/construction-pipeline-seed-v1.cjs"
       - "tools/exact-allocator-profile-test-v1.cjs"
       - "tools/exact-allocator-profile-checkpoint-v1.cjs"
