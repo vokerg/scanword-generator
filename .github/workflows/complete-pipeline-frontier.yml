@@ -14,10 +14,7 @@ on:
       - tools/node-benchmark-bootstrap-v1.cjs
       - research/baselines/v8-production-1.1/config.json
       - research/complete-pipeline-frontier/**
-      - research/archive-manifest.json
-      - docs/milestones/**
-      - README.md
-      - AGENTS.md
+      - docs/milestones/v1.3-complete-pipeline-frontier.md
       - .github/workflows/complete-pipeline-frontier.yml
   workflow_dispatch:
 
@@ -65,11 +62,12 @@ jobs:
         run: node tools/construction-stage-runtime-test-v2.cjs
 
   development:
+    if: github.event_name == 'workflow_dispatch'
     needs: unit
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
-      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SOURCE_SHA: ${{ github.sha }}
       SCANWORD_FRONTIER_CONCURRENCY: 4
       SCANWORD_FRONTIER_RUNTIME_RATIO: 1.35
       SCANWORD_FRONTIER_SEED_TIMEOUT_MS: 1200000
@@ -104,11 +102,12 @@ jobs:
           if-no-files-found: error
 
   promotion:
+    if: github.event_name == 'workflow_dispatch'
     needs: development
     runs-on: ubuntu-latest
     timeout-minutes: 360
     env:
-      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SOURCE_SHA: ${{ github.sha }}
       SCANWORD_FRONTIER_CONCURRENCY: 4
       SCANWORD_FRONTIER_RUNTIME_RATIO: 1.35
       SCANWORD_FRONTIER_SEED_TIMEOUT_MS: 1200000
@@ -143,11 +142,12 @@ jobs:
           if-no-files-found: error
 
   stability:
+    if: github.event_name == 'workflow_dispatch'
     needs: promotion
     runs-on: ubuntu-latest
     timeout-minutes: 480
     env:
-      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SOURCE_SHA: ${{ github.sha }}
       SCANWORD_FRONTIER_CONCURRENCY: 4
       SCANWORD_FRONTIER_RUNTIME_RATIO: 1.35
       SCANWORD_FRONTIER_SEED_TIMEOUT_MS: 1200000
