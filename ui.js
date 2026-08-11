@@ -170,7 +170,7 @@
         currentResult = null;
         currentSettings = null;
         setExportEnabled(false);
-        els.preview.innerHTML = `<div class="generation-error"><strong>Generation failed.</strong><br>${escapeXml(error.message)}</div>`;
+        els.preview.innerHTML = `<div class="generation-error" role="alert"><strong>Generation failed.</strong><br>${escapeXml(error.message)}</div>`;
         els.stats.innerHTML = "";
         els.wordsTable.innerHTML = "";
         els.generationStatus.textContent = "no valid grid";
@@ -203,6 +203,9 @@
     getCurrentResult: () => currentResult,
     getCurrentSettings: () => currentSettings ? { ...currentSettings } : null,
   };
+  els.generationStatus.setAttribute("role", "status");
+  els.generationStatus.setAttribute("aria-live", "polite");
+  els.generationStatus.setAttribute("aria-atomic", "true");
   setExportEnabled(false);
   runGeneration();
 })();
