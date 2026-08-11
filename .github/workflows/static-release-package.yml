@@ -10,16 +10,11 @@ on:
       - "index.html"
       - "styles.css"
       - ".gitignore"
-      - "tools/node-benchmark-bootstrap-v1.cjs"
-      - "tools/construction-pipeline-seed-v1.cjs"
-      - "tools/wrapper-retirement-test-v1.cjs"
-      - "tools/production-release-smoke-v1.cjs"
-      - "tools/ui-release-state-test-v1.cjs"
-      - "tools/a5-print-contract-test-v1.cjs"
       - "tools/build-static-release-v1.cjs"
       - "tools/verify-static-release-v1.cjs"
       - "tools/static-release-reproducibility-test-v1.cjs"
       - "tools/static-release-http-smoke-v1.cjs"
+      - "tools/browser-release-smoke-v1.cjs"
       - ".github/workflows/static-release-package.yml"
   push:
     branches:
@@ -30,16 +25,11 @@ on:
       - "index.html"
       - "styles.css"
       - ".gitignore"
-      - "tools/node-benchmark-bootstrap-v1.cjs"
-      - "tools/construction-pipeline-seed-v1.cjs"
-      - "tools/wrapper-retirement-test-v1.cjs"
-      - "tools/production-release-smoke-v1.cjs"
-      - "tools/ui-release-state-test-v1.cjs"
-      - "tools/a5-print-contract-test-v1.cjs"
       - "tools/build-static-release-v1.cjs"
       - "tools/verify-static-release-v1.cjs"
       - "tools/static-release-reproducibility-test-v1.cjs"
       - "tools/static-release-http-smoke-v1.cjs"
+      - "tools/browser-release-smoke-v1.cjs"
       - ".github/workflows/static-release-package.yml"
   workflow_dispatch:
 
@@ -53,7 +43,7 @@ permissions:
 jobs:
   package:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - name: Check out exact candidate head
         uses: actions/checkout@v4
@@ -71,14 +61,10 @@ jobs:
           node --check tools/verify-static-release-v1.cjs
           node --check tools/static-release-reproducibility-test-v1.cjs
           node --check tools/static-release-http-smoke-v1.cjs
+          node --check tools/browser-release-smoke-v1.cjs
 
-      - name: Re-run production release contracts
-        run: |
-          set -o pipefail
-          mkdir -p release-output
-          node tools/ui-release-state-test-v1.cjs | tee release-output/ui-release-state-test-v1.jsonl
-          node tools/a5-print-contract-test-v1.cjs | tee release-output/a5-print-contract-test-v1.jsonl
-          node tools/production-release-smoke-v1.cjs | tee release-output/production-release-smoke-v1.jsonl
+      - name: Prepare release evidence directory
+        run: mkdir -p release-output
 
       - name: Prove byte-identical rebuilds
         run: |
@@ -87,7 +73,10 @@ jobs:
             | tee release-output/static-release-reproducibility-test-v1.jsonl
 
       - name: Build exact static release
-        run: node tools/build-static-release-v1.cjs release/scanword-generator-site
+        run: |
+          set -o pipefail
+          node tools/build-static-release-v1.cjs release/scanword-generator-site \
+            | tee release-output/build-static-release-v1.jsonl
 
       - name: Verify manifest and dependency closure
         run: |
@@ -100,6 +89,27 @@ jobs:
           set -o pipefail
           node tools/static-release-http-smoke-v1.cjs release/scanword-generator-site \
             | tee release-output/static-release-http-smoke-v1.jsonl
+
+      - name: Locate installed headless browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          BROWSER_BIN=""
+          for candidate in google-chrome google-chrome-stable chromium chromium-browser; do
+            if command -v "$candidate" >/dev/null 2>&1; then
+              BROWSER_BIN="$(command -v "$candidate")"
+              break
+            fi
+          done
+          test -n "$BROWSER_BIN"
+          echo "SCANWORD_BROWSER_BIN=$BROWSER_BIN" >> "$GITHUB_ENV"
+          "$BROWSER_BIN" --version | tee release-output/browser-version.txt
+
+      - name: Verify packaged app in a real browser
+        run: |
+          set -o pipefail
+          node tools/browser-release-smoke-v1.cjs release/scanword-generator-site \
+            | tee release-output/browser-release-smoke-v1.jsonl
 
       - name: Upload deployable static site
         uses: actions/upload-artifact@v4
