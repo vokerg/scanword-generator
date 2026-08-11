@@ -12,7 +12,6 @@ on:
       - tools/clue-disambiguation-test.cjs
       - tools/vocabulary-editorial-checkpoint.cjs
       - tools/render-selected-grid-clues.cjs
-      - research/selected-grid-editorial-quality-1.2/**
       - .github/workflows/vocabulary-editorial-quality.yml
   workflow_dispatch:
     inputs:
@@ -29,10 +28,45 @@ permissions:
   contents: read
 
 jobs:
-  compare:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate retained clue-quality tooling
+        run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
+          node --check construction-selected-grid-clue-metrics-v1.js
+          node --check construction-clue-disambiguation-v1.js
+          node --check tools/node-editorial-bootstrap-v1.cjs
+          node --check tools/selected-grid-clue-metrics-test.cjs
+          node --check tools/clue-disambiguation-test.cjs
+          node --check tools/vocabulary-editorial-checkpoint.cjs
+          node --check tools/render-selected-grid-clues.cjs
+
+      - name: Run deterministic editorial fixtures
+        run: |
+          node tools/selected-grid-clue-metrics-test.cjs
+          node tools/clue-disambiguation-test.cjs
+
+  comparison:
+    if: github.event_name == 'workflow_dispatch'
+    needs: unit
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
+      SOURCE_SHA: ${{ github.sha }}
       SCANWORD_EDITORIAL_CONCURRENCY: 1
       SCANWORD_EDITORIAL_ENFORCE: 1
       SCANWORD_PORTFOLIO_ATTEMPTS: 240
@@ -47,31 +81,22 @@ jobs:
       SCANWORD_REPACK_NODES: 600000
       SCANWORD_REPACK_BRANCH: 24
     steps:
-      - name: Check out candidate
+      - name: Check out exact candidate head
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Validate clue-quality runtime
-        run: |
-          node --check construction-selected-grid-clue-metrics-v1.js
-          node --check construction-clue-disambiguation-v1.js
-          node --check tools/node-editorial-bootstrap-v1.cjs
-          node --check tools/selected-grid-clue-metrics-test.cjs
-          node --check tools/clue-disambiguation-test.cjs
-          node --check tools/vocabulary-editorial-checkpoint.cjs
-          node --check tools/render-selected-grid-clues.cjs
-          node tools/selected-grid-clue-metrics-test.cjs
-          node tools/clue-disambiguation-test.cjs
-
-      - name: Compare 20 identical seeds
+      - name: Compare retained identical-seed editorial pairs
         env:
           NODE_OPTIONS: --require=${{ github.workspace }}/tools/node-benchmark-bootstrap-v1.cjs --require=${{ github.workspace }}/tools/node-editorial-bootstrap-v1.cjs
-          SEED_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.seeds || '20' }}
+          SEED_COUNT: ${{ inputs.seeds }}
         run: |
+          test "$(git rev-parse HEAD)" = "${SOURCE_SHA}"
           mkdir -p research-output
           node tools/vocabulary-editorial-checkpoint.cjs "${SEED_COUNT}" \
             | tee "research-output/selected-grid-clues-${SEED_COUNT}.jsonl"
@@ -86,6 +111,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: phase-1-selected-grid-clues-${{ github.sha }}
+          name: phase-1-selected-grid-clues-${{ env.SOURCE_SHA }}
           path: research-output/
           if-no-files-found: error
