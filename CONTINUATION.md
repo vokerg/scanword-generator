@@ -2,15 +2,15 @@
 
 Last updated: 2026-08-11
 
-This file is the first handoff to read in a new chat or coding session. Phase 12 algorithm experimentation is complete, and the initial productization sequence through reproducible packaging/distribution is now complete. Do not treat the old Phase 12 plan or productization items 1-4 as pending work.
+This file is the first handoff to read in a new chat or coding session. Phase 12 algorithm experimentation is complete, the initial productization sequence through reproducible packaging/distribution is complete, and the first post-productization CI/browser hardening pass is also complete. Do not treat the old Phase 12 plan, productization items 1-4, CI lifecycle cleanup, or baseline real-browser release acceptance as pending work.
 
 Current `main` before this handoff update:
 
 ```text
-97847f42412e81af88194c7cfe04261f2a2f7c0a
+1a84dec71d35b5dae82ddf1f04995c84fcab2843
 ```
 
-That squash merge added the commit-addressed static GitHub prerelease publisher and intentionally carried the `[release-static]` marker. The exact-main publish workflow completed successfully and created the first verified static distribution.
+That squash merge added the real-browser static release smoke. The exact-main browser workflow completed successfully after merge, on top of the already-pinned production smoke and reproducible static package contract.
 
 ## Current production baseline
 
@@ -147,6 +147,60 @@ release-manifest.json
 
 The workflow uses a SHA-derived tag and refuses to overwrite an existing release/tag. This is a commit-addressed reproducibility guarantee from our workflow; do not describe it as GitHub platform-level release immutability unless that repository setting is separately enabled. The GitHub API reported the first release object's `immutable` field as `false`.
 
+## Post-productization hardening completed
+
+### CI lifecycle ownership
+
+PRs #37-#41 retired stale research CI coupling without weakening accepted production checks:
+
+```text
+#37 merge: cfae37eac624c4a5dd384f0b725ff31bfb9b8920
+#38 merge: f91650ab42034240ccae2f55111d2595036816f9
+#39 merge: 6e29c996c800b4d4a9f42f61a63588bcc7690867
+#40 merge: 69ec9df94fd4369a90d936ca4c31dc9b3a20fd61
+#41 merge: b6dede503c16840a057213a9366dd73788c27d4b
+```
+
+Current CI lifecycle contract:
+
+- `Production release smoke` owns `index.html` changes and the canonical browser defaults.
+- Closed/default-off Phase 11/12, retrieval, feasibility and partial-search research gates no longer launch on index-only product changes.
+- Historical development/promotion/stability corpus checkpoints for closed experiments are manual-only.
+- Relevant module/unit/parity tests still run when their implementation, tests, research evidence or workflow definitions change.
+- `tools/ci-lifecycle-contract-v1.cjs` protects this ownership boundary from accidental regression.
+
+Do not restore automatic historical corpus fan-out merely to increase check count.
+
+### Real-browser release acceptance
+
+PR #42 added a dependency-free real-browser release smoke:
+
+```text
+merge: 1a84dec71d35b5dae82ddf1f04995c84fcab2843
+PR-head run: 31477195809
+exact-main run: 31477324555
+```
+
+The workflow first re-runs the pinned production release smoke, then builds/verifies the exact static package and loads that package over local HTTP in an installed headless Chrome/Chromium browser.
+
+PR-head browser evidence:
+
+```text
+browser:        Google Chrome 150.0.7871.128
+payload files:  86
+payload bytes:  19,327,085
+bundle digest:  636c695161dce8b9cef793564a4fe0aaa0c09c486172ec03b91c0b7df770d820
+status:         selected attempt 106 · searched 120 · valid · 1 component · active 96.8%
+answer rows:    47
+DOM bytes:      85,747
+DOM SHA256:     ff585b4eb4bec36bd40f32da39b04e12b489abcc6fd431809edc0c505247fbe0
+artifact:       9095723118
+```
+
+It also verifies the A5 SVG viewBox, enabled SVG/JSON/Print controls, non-busy preview state, populated stats/answer table and absence of the generation-error boundary. The exact-main post-merge run completed successfully as well.
+
+The serialized DOM digest is evidence for that exact browser/run, not a new cross-version product invariant. Do not pin browser-version-specific DOM bytes unless a concrete compatibility requirement calls for it.
+
 ## Live hosting boundary
 
 GitHub Pages is not currently configured for this repository. The verified static package is deployable, but there is no canonical live Pages URL yet.
@@ -157,13 +211,13 @@ If live hosting becomes a product requirement, consume the already-verified stat
 
 ## What to do next
 
-There is still no pre-approved Phase 13 algorithm experiment. Productization items 1-4 from the previous handoff are complete.
+There is still no pre-approved Phase 13 algorithm experiment. Productization items 1-4, the first CI lifecycle cleanup, and baseline real-browser release acceptance are complete.
 
 Default next work should be driven by an actual product/release need. The highest-value candidates are:
 
-1. **CI lifecycle cleanup:** narrow historical research/promotion workflows that still launch on unrelated product-facing files such as `index.html`, while retaining production regression gates. Do not weaken `Production release smoke`, `Static release package` or accepted lightweight parity checks.
+1. **Production CI path-scope audit:** `Arrowword quality gate` remains a real production gate and must not be casually disabled, but audit whether it needs to launch on workflow/docs-only pull requests. If narrowing it, scope paths to files that can affect its assertions and prove that production/runtime changes still trigger it. Keep this as a separate logical PR.
 2. **Live-host activation if required:** enable/configure the chosen static host at repository/account level, then deploy the exact verified bundle and add post-deploy HTTP checks. GitHub Releases already provide the reproducible distribution fallback.
-3. **Real-browser acceptance:** add targeted browser-level checks only for concrete gaps not covered by the current fake-DOM/state, print-contract and packaged HTTP tests.
+3. **Targeted browser/platform defects:** extend browser acceptance only when a concrete browser, printing, download or interaction defect supplies a reproducible acceptance criterion. Do not turn one Chrome smoke into a broad compatibility matrix without evidence of need.
 4. **Measured product defects:** only open new layout/allocator research when a reproducible user-facing defect or explicit requirement provides a measurable acceptance criterion and a fresh tuning/holdout boundary.
 
 Do not invent Phase 13 solely to continue experiment numbering.
@@ -182,7 +236,10 @@ node tools/verify-static-release-v1.cjs release/scanword-generator-site
 node tools/static-release-http-smoke-v1.cjs release/scanword-generator-site
 node tools/build-static-release-archive-v1.cjs \
   release/scanword-generator-site release/scanword-generator-site.tar.gz
+node tools/ci-lifecycle-contract-v1.cjs
 ```
+
+`Browser release smoke` is the real-browser packaging acceptance workflow. It intentionally discovers the installed runner browser and is not a replacement for the deterministic Node contracts above.
 
 Core generator checks remain:
 
