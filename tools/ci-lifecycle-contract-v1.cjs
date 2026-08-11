@@ -178,6 +178,11 @@ assert(
 const archivedManualOnlyWorkflows = [
   ".github/workflows/dictionary-count.yml",
   ".github/workflows/lexical-frontier.yml",
+  ".github/workflows/vocabulary-confirmation.yml",
+  ".github/workflows/vocabulary-2500-confirmation.yml",
+  ".github/workflows/vocabulary-pool-sweep.yml",
+  ".github/workflows/vocabulary-category-balance.yml",
+  ".github/workflows/vocabulary-active-repair.yml",
 ];
 for (const workflow of archivedManualOnlyWorkflows) {
   const source = read(workflow);
