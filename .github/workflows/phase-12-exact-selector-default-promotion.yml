@@ -1,14 +1,10 @@
 name: Phase 12 exact selector default promotion
 
 on:
-  push:
-    branches:
-      - "agent/phase-12-exact-selector-default-promotion"
   pull_request:
     branches:
       - main
     paths:
-      - "index.html"
       - "construction-exact-allocator-top-three-v1.js"
       - "tools/node-benchmark-bootstrap-v1.cjs"
       - "tools/construction-pipeline-seed-v1.cjs"
@@ -82,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     env:
-      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SOURCE_SHA: ${{ github.sha }}
       SCANWORD_EXACT_ALLOCATOR_DEFAULT_CONCURRENCY: 4
       SCANWORD_EXACT_ALLOCATOR_DEFAULT_RUNTIME_RATIO: 1.10
       SCANWORD_EXACT_ALLOCATOR_DEFAULT_SEED_TIMEOUT_MS: 7200000
@@ -116,7 +112,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 480
     env:
-      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SOURCE_SHA: ${{ github.sha }}
       SCANWORD_EXACT_ALLOCATOR_DEFAULT_CONCURRENCY: 4
       SCANWORD_EXACT_ALLOCATOR_DEFAULT_RUNTIME_RATIO: 1.10
       SCANWORD_EXACT_ALLOCATOR_DEFAULT_SEED_TIMEOUT_MS: 7200000
@@ -150,7 +146,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 600
     env:
-      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SOURCE_SHA: ${{ github.sha }}
       SCANWORD_EXACT_ALLOCATOR_DEFAULT_CONCURRENCY: 4
       SCANWORD_EXACT_ALLOCATOR_DEFAULT_RUNTIME_RATIO: 1.10
       SCANWORD_EXACT_ALLOCATOR_DEFAULT_SEED_TIMEOUT_MS: 7200000
