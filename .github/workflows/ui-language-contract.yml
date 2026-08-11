@@ -1,0 +1,45 @@
+name: UI language contract
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "ui.js"
+      - "tools/ui-language-contract-v1.cjs"
+      - ".github/workflows/ui-language-contract.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "ui.js"
+      - "tools/ui-language-contract-v1.cjs"
+      - ".github/workflows/ui-language-contract.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ui-language-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  language-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify generated Russian language semantics
+        run: |
+          node --check tools/ui-language-contract-v1.cjs
+          node tools/ui-language-contract-v1.cjs
