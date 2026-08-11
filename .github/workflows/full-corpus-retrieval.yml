@@ -14,7 +14,6 @@ on:
       - tools/full-corpus-*.cjs
       - tools/node-benchmark-bootstrap-v1.cjs
       - research/full-corpus-retrieval/**
-      - index.html
       - .github/workflows/full-corpus-retrieval.yml
   workflow_dispatch:
 
@@ -61,11 +60,12 @@ jobs:
           node tools/construction-pipeline-parity-test.cjs
 
   development:
+    if: github.event_name == 'workflow_dispatch'
     needs: unit
     runs-on: ubuntu-latest
     timeout-minutes: 75
     env:
-      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      SOURCE_SHA: ${{ github.sha }}
       SCANWORD_RETRIEVAL_CONCURRENCY: 2
       SCANWORD_RETRIEVAL_ENFORCE: 1
       SCANWORD_RETRIEVAL_SEED_TIMEOUT_MS: 900000

@@ -9,7 +9,6 @@ on:
       - construction-preallocation-repair-potential-v1.js
       - construction-preallocation-ranked-frontier-v1.js
       - construction-preallocation-filter-v1.js
-      - index.html
       - tools/construction-pipeline-seed-v1.cjs
       - tools/preallocation-structural-frontier-test-v1.cjs
       - tools/preallocation-repair-potential-test-v1.cjs
