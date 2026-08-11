@@ -13,13 +13,17 @@ function fail(message) {
   throw new Error(`Static release build failed: ${message}`);
 }
 
+function compareAscii(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 function sha256(buffer) {
   return crypto.createHash("sha256").update(buffer).digest("hex");
 }
 
 function normalizeAsset(asset) {
   const raw = String(asset || "").trim().split(/[?#]/, 1)[0];
-  if (!raw || /^(?:[a-z]+:)?\/\//i.test(raw) || raw.startsWith("data:")) {
+  if (!raw || /^(?:[a-z]+:)?\/\//i.test(raw)) {
     fail(`remote or empty asset reference is not packageable: ${asset}`);
   }
   if (raw.includes("\\")) fail(`asset path uses backslashes: ${raw}`);
@@ -41,7 +45,42 @@ function parseBrowserAssets(html) {
 function parseBulkLoaderAssets(loader) {
   const files = [...loader.matchAll(/["']([^"']+\.js)["']/g)].map((match) => match[1]);
   if (!files.length) fail("bulk lexicon loader contains no chunk files");
-  return [...new Set(files)].map((file) => normalizeAsset(`bulk-lexicon/${file}`));
+  return [...new Set(files)]
+    .map((file) => normalizeAsset(`bulk-lexicon/${file}`))
+    .sort(compareAscii);
+}
+
+function parseCssAssets(stylesheetPath, css) {
+  const references = [];
+  for (const match of css.matchAll(/url\(\s*(["']?)([^"')]+)\1\s*\)/g)) references.push(match[2].trim());
+  for (const match of css.matchAll(/@import\s+["']([^"']+)["']/g)) references.push(match[1].trim());
+
+  const base = path.posix.dirname(stylesheetPath);
+  const assets = [];
+  for (const reference of references) {
+    if (!reference || reference.startsWith("#") || reference.startsWith("data:")) continue;
+    if (/^(?:[a-z]+:)?\/\//i.test(reference)) fail(`remote CSS dependency is not packageable: ${reference}`);
+    assets.push(normalizeAsset(path.posix.join(base, reference)));
+  }
+  return [...new Set(assets)].sort(compareAscii);
+}
+
+function collectCssDependencyClosure(initialStylesheets) {
+  const pending = [...new Set(initialStylesheets.filter((asset) => asset.endsWith(".css")))];
+  const visited = new Set();
+  const dependencies = new Set();
+  while (pending.length) {
+    const stylesheet = pending.shift();
+    if (visited.has(stylesheet)) continue;
+    visited.add(stylesheet);
+    const source = path.join(root, stylesheet);
+    if (!fs.existsSync(source) || !fs.statSync(source).isFile()) fail(`missing stylesheet: ${stylesheet}`);
+    for (const dependency of parseCssAssets(stylesheet, fs.readFileSync(source, "utf8"))) {
+      dependencies.add(dependency);
+      if (dependency.endsWith(".css") && !visited.has(dependency)) pending.push(dependency);
+    }
+  }
+  return [...dependencies].sort(compareAscii);
 }
 
 function sourceCommit() {
@@ -59,20 +98,22 @@ function collectSourceAssets() {
 
   const loader = fs.readFileSync(path.join(root, "bulk-lexicon", "loader.js"), "utf8");
   const bulkChunks = parseBulkLoaderAssets(loader);
+  const cssDependencies = collectCssDependencyClosure(browser.links);
   const assets = [
     "index.html",
     ...browser.links,
+    ...cssDependencies,
     ...browser.scripts,
     ...bulkChunks,
     "bulk-lexicon/manifest.json",
   ];
-  return [...new Set(assets)].sort();
+  return [...new Set(assets)].sort(compareAscii);
 }
 
 function listFiles(directory, relative = "") {
   const absolute = path.join(directory, relative);
   const entries = fs.readdirSync(absolute, { withFileTypes: true })
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => compareAscii(a.name, b.name));
   const files = [];
   for (const entry of entries) {
     const child = relative ? path.posix.join(relative, entry.name) : entry.name;
@@ -86,7 +127,7 @@ function listFiles(directory, relative = "") {
 function manifestEntries(outputDirectory) {
   return listFiles(outputDirectory)
     .filter((file) => file !== MANIFEST_NAME)
-    .sort()
+    .sort(compareAscii)
     .map((file) => {
       const bytes = fs.readFileSync(path.join(outputDirectory, file));
       return { path: file, bytes: bytes.length, sha256: sha256(bytes) };
