@@ -82,6 +82,51 @@ for (const [workflow, job] of manualResearchJobs) {
   );
 }
 
+const qualityWorkflow = ".github/workflows/quality.yml";
+const qualitySource = read(qualityWorkflow);
+const qualityPullRequest = pullRequestBlock(qualityWorkflow);
+assert(qualityPullRequest.includes("paths:"), "Arrowword quality gate must keep explicit PR path ownership");
+for (const expected of [
+  '"closed-fill.js"',
+  '"construction-victim*.js"',
+  '"construction-clue-*.js"',
+  '"tools/closed-fill-*.cjs"',
+  '"tools/construction-*.cjs"',
+  '"tools/dictionary-audit.cjs"',
+  '"tools/benchmark-seed.cjs"',
+  '".github/workflows/quality.yml"',
+]) {
+  assert(qualityPullRequest.includes(expected), `Arrowword quality gate lost owned path: ${expected}`);
+}
+for (const forbidden of [
+  "index.html",
+  "styles.css",
+  "renderer.js",
+  "ui.js",
+  "CONTINUATION.md",
+  "tools/browser-release-smoke-v1.cjs",
+]) {
+  assert(!qualityPullRequest.includes(forbidden), `Arrowword quality gate must not own unrelated PR path: ${forbidden}`);
+}
+assert(!qualitySource.includes("r-and-d/valid-arrowword-generator"), "Arrowword quality gate retained stale R&D push branch");
+assert(!qualitySource.includes("r-and-d/coverage-090"), "Arrowword quality gate retained stale coverage R&D push branch");
+assert(
+  !jobBlock(qualityWorkflow, "validate").includes("github.event_name == 'workflow_dispatch'"),
+  "Arrowword quality validate job must remain an automatic PR module contract",
+);
+
+const manualHistoricalJobs = [
+  [qualityWorkflow, "historical-diagnostics"],
+  [qualityWorkflow, "tail-probe"],
+  [qualityWorkflow, "portfolio-checkpoint"],
+];
+for (const [workflow, job] of manualHistoricalJobs) {
+  assert(
+    jobBlock(workflow, job).includes("github.event_name == 'workflow_dispatch'"),
+    `${workflow}:${job} must remain workflow_dispatch-only`,
+  );
+}
+
 const releaseSmoke = read("tools/production-release-smoke-v1.cjs");
 const centralizedDefaults = [
   'window.SCANWORD_PREALLOCATION_STRUCTURAL_FRONTIER = "off"',
@@ -100,5 +145,7 @@ console.log(JSON.stringify({
   productionIndexOwner: productionWorkflow,
   defaultOffResearchWorkflows: defaultOffResearchWorkflows.length,
   manualResearchJobs: manualResearchJobs.length,
+  qualityPathScoped: true,
+  manualHistoricalQualityJobs: manualHistoricalJobs.length,
   centralizedDefaultChecks: centralizedDefaults.length,
 }));
