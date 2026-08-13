@@ -172,6 +172,12 @@
     if (currentResult) els.preview.innerHTML = renderAccessibleSvg(currentResult, els.showAnswers.checked);
   }
 
+  function generationErrorMessage(error) {
+    if (error && typeof error.message === "string" && error.message.trim()) return error.message.trim();
+    if (typeof error === "string" && error.trim()) return error.trim();
+    return "Unexpected generation error.";
+  }
+
   function runGeneration() {
     const settings = readSettings();
     syncSettingsControls(settings);
@@ -206,7 +212,8 @@
         currentResult = null;
         currentSettings = null;
         setExportEnabled(false);
-        els.preview.innerHTML = `<div class="generation-error" role="alert"><strong>Generation failed.</strong><br>${escapeXml(error.message)}</div>`;
+        const message = generationErrorMessage(error);
+        els.preview.innerHTML = `<div class="generation-error" role="alert"><strong>Generation failed.</strong><br>${escapeXml(message)}</div>`;
         els.stats.innerHTML = "";
         els.wordsTable.innerHTML = "";
         els.generationStatus.textContent = "no valid grid";
