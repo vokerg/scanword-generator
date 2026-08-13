@@ -158,7 +158,10 @@
   }
 
   function renderAccessibleSvg(result, showAnswers) {
-    return renderSvg(result, showAnswers).replace("<svg ", '<svg lang="ru" xml:lang="ru" ');
+    return renderSvg(result, showAnswers).replace(
+      "<svg ",
+      '<svg lang="ru" xml:lang="ru" role="img" aria-label="Generated A5 arrowword grid" ',
+    );
   }
 
   function rerenderSvg() {
