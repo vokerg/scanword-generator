@@ -8,6 +8,7 @@ on:
       - "index.html"
       - "ui.js"
       - "tools/ui-effective-settings-test-v1.cjs"
+      - "tools/ui-export-settings-test-v1.cjs"
       - ".github/workflows/ui-effective-settings-contract.yml"
   push:
     branches:
@@ -16,6 +17,7 @@ on:
       - "index.html"
       - "ui.js"
       - "tools/ui-effective-settings-test-v1.cjs"
+      - "tools/ui-export-settings-test-v1.cjs"
       - ".github/workflows/ui-effective-settings-contract.yml"
   workflow_dispatch:
 
@@ -45,6 +47,10 @@ jobs:
         run: |
           node --check ui.js
           node --check tools/ui-effective-settings-test-v1.cjs
+          node --check tools/ui-export-settings-test-v1.cjs
 
       - name: Verify effective generation settings
         run: node tools/ui-effective-settings-test-v1.cjs
+
+      - name: Verify result-bound export settings
+        run: node tools/ui-export-settings-test-v1.cjs
