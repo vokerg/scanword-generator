@@ -136,7 +136,7 @@ window.ScanwordCore = {
   analyzeAssignments() {},
 };
 window.ScanwordRenderer = {
-  renderSvg: () => "<svg></svg>",
+  renderSvg: () => '<svg width="148mm"></svg>',
   escapeXml,
 };
 window.ScanwordSolver = {
@@ -170,6 +170,9 @@ require(path.resolve(__dirname, "..", "ui.js"));
 const api = window.ScanwordGenerator;
 assert(api && typeof api.getCurrentResult === "function", "public generator state API is unavailable");
 assert(typeof api.getCurrentSettings === "function", "current settings snapshot API is unavailable");
+assert(elements.generationStatus.getAttribute("role") === "status", "generation status must expose role=status");
+assert(elements.generationStatus.getAttribute("aria-live") === "polite", "generation status must expose polite live updates");
+assert(elements.generationStatus.getAttribute("aria-atomic") === "true", "generation status must expose atomic live updates");
 
 // Initial automatic generation must not expose stale or partial exports/print.
 assert(api.getCurrentResult() === null, "result must be empty while initial generation is pending");
@@ -190,6 +193,10 @@ assert(elements.downloadSvg.disabled === false, "SVG export was not enabled afte
 assert(elements.downloadJson.disabled === false, "JSON export was not enabled after success");
 assert(elements.printA5.disabled === false, "A5 print was not enabled after success");
 assert(elements.preview.getAttribute("aria-busy") === "false", "preview stayed busy after success");
+assert(elements.preview.innerHTML.includes('lang="ru"'), "preview SVG must expose Russian language metadata");
+assert(elements.preview.innerHTML.includes('xml:lang="ru"'), "preview SVG must expose XML Russian language metadata");
+assert(elements.wordsTable.innerHTML.includes('<td lang="ru">'), "generated clue cells must expose lang=ru");
+assert(elements.wordsTable.innerHTML.includes('<td class="word" lang="ru">'), "generated answer cells must expose lang=ru");
 assert(api.getCurrentSettings()?.seed === "ui-state-a", "generated settings did not preserve the original seed");
 elements.printA5.dispatch("click");
 assert(printCalls === 1, `expected one print call after valid generation, got ${printCalls}`);
@@ -228,6 +235,7 @@ assert(elements.downloadJson.disabled === true, "JSON export became enabled afte
 assert(elements.printA5.disabled === true, "A5 print became enabled after failure");
 assert(elements.preview.getAttribute("aria-busy") === "false", "preview stayed busy after failure");
 assert(elements.generationStatus.textContent === "no valid grid", "failure status is incorrect");
+assert(elements.preview.innerHTML.includes('role="alert"'), "generation failure must expose role=alert");
 assert(elements.preview.innerHTML.includes("Generation failed."), "failure message was not rendered");
 assert(elements.preview.innerHTML.includes("synthetic failure &lt;unsafe&gt;"), "failure message was not escaped");
 assert(elements.stats.innerHTML === "", "stale stats remained after failure");
@@ -256,6 +264,9 @@ console.log(JSON.stringify({
   generationCalls,
   printCalls,
   initialBusyContract: true,
+  generationStatusLiveRegion: true,
+  failureAlertBoundary: true,
+  generatedRussianLanguageSemantics: true,
   generatedSettingsSnapshot: true,
   exportSeedBoundToResult: true,
   exportQualitySchemaPreserved: true,
