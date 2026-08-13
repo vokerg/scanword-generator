@@ -22,10 +22,16 @@ assert(
   ui.includes('<td class="word" lang="ru">${escapeXml(word.answer)}</td>'),
   "generated Russian answer cells must declare lang=ru and preserve the escaped render boundary",
 );
-assert(
-  /function renderAccessibleSvg\(result, showAnswers\) \{[\s\S]*?renderSvg\(result, showAnswers\)\.replace\("<svg ", '<svg lang="ru" xml:lang="ru" '\);[\s\S]*?\}/.test(ui),
-  "preview/export SVG must receive Russian lang and xml:lang metadata",
-);
+const accessibleSvgBlock = ui.match(/function renderAccessibleSvg\(result, showAnswers\) \{([\s\S]*?)\n  \}/);
+assert(accessibleSvgBlock, "accessible SVG wrapper is missing");
+for (const expected of [
+  'lang="ru"',
+  'xml:lang="ru"',
+  'role="img"',
+  'aria-label="Generated A5 arrowword grid"',
+]) {
+  assert(accessibleSvgBlock[1].includes(expected), `preview/export SVG lost accessibility metadata: ${expected}`);
+}
 assert(
   /function rerenderSvg\(\) \{[\s\S]*?renderAccessibleSvg\(currentResult, els\.showAnswers\.checked\)/.test(ui),
   "browser preview must use the accessible SVG wrapper",
@@ -46,5 +52,7 @@ console.log(JSON.stringify({
   answerEscapingBoundary: true,
   previewSvgLanguage: "ru",
   exportedSvgLanguage: "ru",
+  svgRole: "img",
+  svgAccessibleName: "Generated A5 arrowword grid",
   englishTableContextPreserved: true,
 }));
