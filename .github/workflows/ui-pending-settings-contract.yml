@@ -1,0 +1,46 @@
+name: UI pending settings contract
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "index.html"
+      - "tools/ui-pending-settings-guard-test-v1.cjs"
+      - ".github/workflows/ui-pending-settings-contract.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "index.html"
+      - "tools/ui-pending-settings-guard-test-v1.cjs"
+      - ".github/workflows/ui-pending-settings-contract.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ui-pending-settings-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate pending guard syntax
+        run: node --check tools/ui-pending-settings-guard-test-v1.cjs
+
+      - name: Verify pending settings ownership
+        run: node tools/ui-pending-settings-guard-test-v1.cjs
