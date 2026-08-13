@@ -80,7 +80,9 @@
   function exportResult(result) {
     const boundSettings = resultSettings.get(result)
       || (result === currentResult && currentSettings ? currentSettings : null);
-    const generatedSeed = boundSettings?.seed || els.seed.value.trim();
+    const generatedSeed = result === currentResult && currentSettings
+      ? currentSettings.seed
+      : boundSettings?.seed || els.seed.value.trim();
     return {
       version: "0.9.0",
       page: { format: "A5", orientation: "portrait", widthMm: 148, heightMm: 210 },
