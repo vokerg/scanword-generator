@@ -143,5 +143,34 @@
   <script src="construction-wrapper-retirement-audit-v1.js"></script>
   <script src="renderer.js"></script>
   <script src="ui.js"></script>
+  <script id="generationSettingsGuard">
+    (() => {
+      "use strict";
+      const preview = document.querySelector("#preview");
+      const controls = ["seed", "cols", "rows", "poolSize", "targetWords"]
+        .map((id) => document.querySelector(`#${id}`));
+      let snapshot = null;
+
+      function syncPendingState() {
+        const busy = preview?.getAttribute("aria-busy") === "true";
+        if (busy) {
+          if (!snapshot) snapshot = controls.map((control) => control.value);
+          for (const control of controls) control.disabled = true;
+          return;
+        }
+        if (snapshot) {
+          controls.forEach((control, index) => { control.value = snapshot[index]; });
+          snapshot = null;
+        }
+        for (const control of controls) control.disabled = false;
+      }
+
+      new MutationObserver(syncPendingState).observe(preview, {
+        attributes: true,
+        attributeFilter: ["aria-busy"],
+      });
+      syncPendingState();
+    })();
+  </script>
 </body>
 </html>
