@@ -70,8 +70,8 @@
     `).join("");
 
     els.wordsTable.innerHTML = `
-      <table>
-        <thead><tr><th>#</th><th>Clue</th><th>Answer</th><th>Length</th><th>Direction</th><th>Start</th></tr></thead>
+      <table aria-label="Assigned answers">
+        <thead><tr><th scope="col">#</th><th scope="col">Clue</th><th scope="col">Answer</th><th scope="col">Length</th><th scope="col">Direction</th><th scope="col">Start</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     `;
