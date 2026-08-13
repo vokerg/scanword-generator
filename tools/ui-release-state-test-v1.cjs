@@ -53,7 +53,9 @@ const elements = {
 
 const timers = [];
 let shouldFail = false;
+let validationValid = true;
 let generationCalls = 0;
+let validationCalls = 0;
 let printCalls = 0;
 
 function escapeXml(value) {
@@ -149,10 +151,11 @@ window.ScanwordSolver = {
     return makeResult(seed, rows, cols);
   },
   validateGrid() {
+    validationCalls += 1;
     return {
-      valid: true,
-      accidentalRuns: [],
-      conflicts: 0,
+      valid: validationValid,
+      accidentalRuns: validationValid ? [] : [{ synthetic: true }],
+      conflicts: validationValid ? 0 : 1,
       orphanLetters: 0,
       clueDirectionConflicts: 0,
     };
@@ -214,19 +217,35 @@ assert(exported.quality?.structurallyValid === true, "existing export quality sc
 assert(exported.quality?.panelCells === 5, "existing export quality metrics were not preserved");
 assert(Array.isArray(exported.placedWords) && exported.placedWords.length === 1, "placedWords export changed unexpectedly");
 
-// A retry immediately invalidates the previous exportable/printable result before work starts.
-shouldFail = true;
+// A validator rejection must fail closed before any result becomes current/exportable.
+validationValid = false;
+elements.seed.value = "ui-state-invalid";
 elements.generate.dispatch("click");
-assert(api.getCurrentResult() === null, "old result remained current during retry");
-assert(api.getCurrentSettings() === null, "old settings remained current during retry");
-assert(elements.generate.disabled === true, "Generate must be disabled during retry");
-assert(elements.downloadSvg.disabled === true, "SVG export remained enabled during retry");
-assert(elements.downloadJson.disabled === true, "JSON export remained enabled during retry");
-assert(elements.printA5.disabled === true, "A5 print remained enabled during retry");
-assert(elements.preview.getAttribute("aria-busy") === "true", "retry did not mark preview busy");
-
+assert(api.getCurrentResult() === null, "old result remained current during validation retry");
+assert(api.getCurrentSettings() === null, "old settings remained current during validation retry");
+assert(elements.downloadSvg.disabled === true, "SVG export remained enabled during validation retry");
+assert(elements.downloadJson.disabled === true, "JSON export remained enabled during validation retry");
+assert(elements.printA5.disabled === true, "A5 print remained enabled during validation retry");
+assert(elements.preview.getAttribute("aria-busy") === "true", "validation retry did not mark preview busy");
 flushGeneration();
+assert(api.getCurrentResult() === null, "structurally invalid result was published");
+assert(api.getCurrentSettings() === null, "structurally invalid settings were published");
+assert(elements.downloadSvg.disabled === true, "SVG export was enabled for an invalid result");
+assert(elements.downloadJson.disabled === true, "JSON export was enabled for an invalid result");
+assert(elements.printA5.disabled === true, "A5 print was enabled for an invalid result");
+assert(elements.generationStatus.textContent === "no valid grid", "validator rejection status is incorrect");
+assert(elements.preview.innerHTML.includes("Generated grid did not pass structural validation."), "validator rejection reason was not rendered");
+assert(validationCalls === 2, `expected two validator calls after invalid retry, got ${validationCalls}`);
+assert(printCalls === 1, "invalid result triggered print unexpectedly");
 
+// A generator exception must continue to use the same safe failure boundary and escape details.
+validationValid = true;
+shouldFail = true;
+elements.seed.value = "ui-state-b";
+elements.generate.dispatch("click");
+assert(api.getCurrentResult() === null, "result became current before failing retry completed");
+assert(elements.generate.disabled === true, "Generate must be disabled during failing retry");
+flushGeneration();
 assert(api.getCurrentResult() === null, "failed retry published a result");
 assert(api.getCurrentSettings() === null, "failed retry published settings");
 assert(elements.generate.disabled === false, "Generate was not restored after failure");
@@ -242,7 +261,7 @@ assert(elements.stats.innerHTML === "", "stale stats remained after failure");
 assert(elements.wordsTable.innerHTML === "", "stale word table remained after failure");
 assert(printCalls === 1, "failed generation triggered print unexpectedly");
 
-// Recovery from failure must publish a new state and re-enable exports/print.
+// Recovery from both validation rejection and generator failure must publish a valid state.
 shouldFail = false;
 elements.seed.value = "ui-state-c";
 elements.generate.dispatch("click");
@@ -257,11 +276,13 @@ assert(elements.printA5.disabled === false, "A5 print was not restored after rec
 assert(api.exportResult(api.getCurrentResult()).seed === "ui-state-c", "recovery export seed is incorrect");
 elements.printA5.dispatch("click");
 assert(printCalls === 2, `expected print to recover after valid retry, got ${printCalls} calls`);
-assert(generationCalls === 3, `expected three generation attempts, got ${generationCalls}`);
+assert(generationCalls === 4, `expected four generation attempts, got ${generationCalls}`);
+assert(validationCalls === 3, `expected three validator calls, got ${validationCalls}`);
 
 console.log(JSON.stringify({
   passed: true,
   generationCalls,
+  validationCalls,
   printCalls,
   initialBusyContract: true,
   generationStatusLiveRegion: true,
@@ -270,6 +291,7 @@ console.log(JSON.stringify({
   generatedSettingsSnapshot: true,
   exportSeedBoundToResult: true,
   exportQualitySchemaPreserved: true,
+  invalidGridRejectedBeforePublish: true,
   staleExportBlockedDuringRetry: true,
   a5PrintStateBound: true,
   failureStateSafe: true,

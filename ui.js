@@ -163,6 +163,9 @@
           settings.clueDensity,
         );
         nextResult.validation = validateGrid(nextResult.grid, nextResult.placed);
+        if (!nextResult.validation?.valid) {
+          throw new Error("Generated grid did not pass structural validation.");
+        }
         currentResult = nextResult;
         currentSettings = { ...settings };
         rerenderSvg();
