@@ -60,8 +60,8 @@
     const rows = result.placed.map((word) => `
       <tr>
         <td>${word.id}</td>
-        <td>${escapeXml(word.clue)}</td>
-        <td class="word">${word.answer}</td>
+        <td lang="ru">${escapeXml(word.clue)}</td>
+        <td class="word" lang="ru">${word.answer}</td>
         <td>${word.length}</td>
         <td>${DIRECTIONS[word.direction].label} ${DIRECTIONS[word.direction].arrow}</td>
         <td>${word.startRow + 1}:${word.startCol + 1}</td>
@@ -137,8 +137,12 @@
     };
   }
 
+  function renderAccessibleSvg(result, showAnswers) {
+    return renderSvg(result, showAnswers).replace("<svg ", '<svg lang="ru" xml:lang="ru" ');
+  }
+
   function rerenderSvg() {
-    if (currentResult) els.preview.innerHTML = renderSvg(currentResult, els.showAnswers.checked);
+    if (currentResult) els.preview.innerHTML = renderAccessibleSvg(currentResult, els.showAnswers.checked);
   }
 
   function runGeneration() {
@@ -170,7 +174,7 @@
         currentResult = null;
         currentSettings = null;
         setExportEnabled(false);
-        els.preview.innerHTML = `<div class="generation-error"><strong>Generation failed.</strong><br>${escapeXml(error.message)}</div>`;
+        els.preview.innerHTML = `<div class="generation-error" role="alert"><strong>Generation failed.</strong><br>${escapeXml(error.message)}</div>`;
         els.stats.innerHTML = "";
         els.wordsTable.innerHTML = "";
         els.generationStatus.textContent = "no valid grid";
@@ -183,7 +187,7 @@
   els.generate.addEventListener("click", runGeneration);
   els.showAnswers.addEventListener("change", rerenderSvg);
   els.downloadSvg.addEventListener("click", () => {
-    if (currentResult) download("arrowword-a5.svg", renderSvg(currentResult, els.showAnswers.checked), "image/svg+xml;charset=utf-8");
+    if (currentResult) download("arrowword-a5.svg", renderAccessibleSvg(currentResult, els.showAnswers.checked), "image/svg+xml;charset=utf-8");
   });
   els.downloadJson.addEventListener("click", () => {
     if (currentResult) download("arrowword-project.json", JSON.stringify(exportResult(currentResult), null, 2), "application/json;charset=utf-8");
@@ -203,6 +207,9 @@
     getCurrentResult: () => currentResult,
     getCurrentSettings: () => currentSettings ? { ...currentSettings } : null,
   };
+  els.generationStatus.setAttribute("role", "status");
+  els.generationStatus.setAttribute("aria-live", "polite");
+  els.generationStatus.setAttribute("aria-atomic", "true");
   setExportEnabled(false);
   runGeneration();
 })();
