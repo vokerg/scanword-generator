@@ -19,8 +19,8 @@ assert(
   "generated Russian clue cells must declare lang=ru",
 );
 assert(
-  ui.includes('<td class="word" lang="ru">${word.answer}</td>'),
-  "generated Russian answer cells must declare lang=ru",
+  ui.includes('<td class="word" lang="ru">${escapeXml(word.answer)}</td>'),
+  "generated Russian answer cells must declare lang=ru and preserve the escaped render boundary",
 );
 assert(
   /function renderAccessibleSvg\(result, showAnswers\) \{[\s\S]*?renderSvg\(result, showAnswers\)\.replace\("<svg ", '<svg lang="ru" xml:lang="ru" '\);[\s\S]*?\}/.test(ui),
@@ -43,6 +43,7 @@ console.log(JSON.stringify({
   passed: true,
   clueLanguage: "ru",
   answerLanguage: "ru",
+  answerEscapingBoundary: true,
   previewSvgLanguage: "ru",
   exportedSvgLanguage: "ru",
   englishTableContextPreserved: true,
