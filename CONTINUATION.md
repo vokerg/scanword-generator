@@ -1,35 +1,33 @@
 # Canonical continuation handoff
 
-Last updated: 2026-08-11
+Last updated: 2026-08-13
 
 Read this file first in a new chat or coding session.
 
-Phase 12 algorithm experimentation is complete. The initial productization sequence, CI lifecycle cleanup, release-package consolidation, frozen-v8 corpus hardening and baseline real-browser interaction acceptance are complete. Do not reopen those tracks merely to continue phase numbering or increase CI check count.
+Phase 12 algorithm experimentation is complete. Productization, reproducible packaging, CI lifecycle cleanup, frozen-v8 hardening, real-browser acceptance and the current UI/state hardening pass are integrated into `main`.
 
 Current production checkpoint before this handoff update:
 
 ```text
-main: 9865062af5a232b7c9bf498308f2a987aa558793
+main: 343dccb31b6cc69fb23a95e8ab99e00d6ce1e7eb
 ```
 
-That squash merge (#53) extended the packaged-site Chrome smoke to exercise real interaction wiring. The exact-main post-merge `Static release package` run also completed successfully through real Chrome.
+## Production baseline
 
-## Current production baseline
-
-Production pipeline:
+The generator baseline is unchanged:
 
 ```text
 40,966-entry attributed corpus v8
 -> deterministic 2,500/3,500 working sets
 -> indexed construction
 -> exact clue allocation with linear top-three selection
--> width-four repair-potential complete-pipeline frontier
--> full clue, repair and editorial chain per finalist
+-> width-four complete-pipeline frontier
+-> full clue/repair/editorial chain
 -> complete validation
 -> canonical panel-first comparison
 ```
 
-Canonical browser/runtime flags:
+Canonical flags:
 
 ```text
 SCANWORD_EXPLICIT_PIPELINE=on
@@ -54,7 +52,7 @@ execution owner:            direct-production-stage-runtime-v2
 rollback owner:             legacy-wrapper-chain
 ```
 
-Pinned productization seed:
+Pinned release checkpoint:
 
 ```text
 seed:         release-smoke-v1
@@ -65,326 +63,175 @@ gridDigest:   85bc32d1dd4be3b511ee73a91d0b66ada9c26cb7e32f140fc1a7fbce868d34ef
 placedDigest: 0d2971716aaadeced6a2b93459bc45b93b5271f9f921fa59e7009b7de7208d11
 ```
 
-This seed is a regression checkpoint, not a tuning target.
+Do not tune against this pinned seed.
 
 ## Static distribution baseline
 
-Initial reproducible distribution was published from:
+Initial reproducible release:
 
 ```text
 source commit: 97847f42412e81af88194c7cfe04261f2a2f7c0a
 tag:           static-97847f42412e
-publish run:   31457512985
-```
-
-Published payload:
-
-```text
-payload files:  86
-payload bytes:  19,327,085
-bundle digest:  636c695161dce8b9cef793564a4fe0aaa0c09c486172ec03b91c0b7df770d820
-archive bytes:  1,893,063
+bundle digest: 636c695161dce8b9cef793564a4fe0aaa0c09c486172ec03b91c0b7df770d820
 archive SHA256: d17b15189aa4ce596af5ebb36cc8692f35d9ea8299cf35a01caa2f122b489927
 ```
 
-Assets:
+GitHub Pages is not configured. There is no canonical live Pages URL. If live hosting becomes a requirement, deploy the already-verified static bundle instead of creating another packaging path.
+
+## Current product/UI state
+
+Recent merged hardening:
 
 ```text
-scanword-generator-site.tar.gz
-scanword-generator-site.tar.gz.sha256
-release-manifest.json
+#57 accessibility/language reconciliation        394dadb2db7d89d6b0412a68efca9aea6201aa7a
+#58 structural validation fail-closed            9600642188c410fb596d67dc37d221e364b09298
+#59 effective settings follow UI bounds          188172b22b8acfb353cd5a941d0ff15b986097d5
+#60 pending settings ownership guard             b4f782babdc23cf62538dac318f93e1767ed2070
+#61 exact-selector index trigger cleanup         eb4840a0b1153a651df7142ce361558545d4ab80
+#62 rendered answer escaping                     f54c2f2dc8d06507eb34df10d4bff4d392580779
+#63 generated SVG role/name                      2cd06c07cd21dbeebd41da46c51b583851e28f00
+#64 result-bound JSON generationSettings         56eaaac4fe919117c24a1e2c9d011aca703de9bc
+#66 result-table accessible metadata             9ee41c9a9eef8005856ecd50085299946d8e9b43
+#67 robust generation failure-message fallback  343dccb31b6cc69fb23a95e8ab99e00d6ce1e7eb
 ```
 
-The workflow guarantee is commit-addressed reproducibility with a SHA-derived tag and fail-on-duplicate behavior. The GitHub release object itself was reported as `immutable: false`; do not describe platform-level release immutability unless repository settings change.
+PR #55 was superseded by #57. PR #65 was superseded by clean one-commit PR #66.
 
-GitHub Pages is not configured. There is no canonical live Pages URL. If live hosting becomes a product requirement, deploy the already-verified static bundle rather than creating a second packaging path.
+Required UI behavior now includes:
 
-## Productization and hardening history
+- prior result/settings are invalidated before a new attempt starts;
+- exports/print are disabled while pending and after failure;
+- structurally invalid output is rejected before publication/export;
+- numeric settings derive bounds from the actual HTML controls and visible controls are normalized to effective values;
+- pending editable settings are captured while the preview is busy and restored at completion;
+- generation status is a polite atomic live region and the failure boundary is an alert;
+- failure detail supports `Error.message`, thrown strings and the generic fallback `Unexpected generation error.` for opaque/blank values;
+- generated Russian clue/answer cells declare `lang=ru`;
+- clue/answer text is escaped at the HTML boundary while structured export values remain unchanged;
+- the result table is named `Assigned answers` and all six headers use `scope=col`;
+- preview/download SVG declares `lang=ru`, `xml:lang=ru`, `role=img` and `aria-label="Generated A5 arrowword grid"`;
+- JSON export keeps `version: 0.9.0` and adds result-bound `generationSettings` containing `seed`, `cols`, `rows`, `poolSize`, `targetWords`, `clueDensity`;
+- historical result objects keep their original settings through a private `WeakMap`; exported metadata is copied, not shared mutable state.
 
-Initial productization:
+## CI and release ownership
 
-```text
-#32 release/production robustness        708f5b33cfd79b5d2655607ba0bd1cc9d828b51b
-#33 UI generation/failure/export state   38c0e4df30cdf93207925b4de3b099ef5eeb5ed8
-#34 print-safe A5                        d3fd0f77ca6f40bb8d4c9d065ad90af79425c3d1
-#35 reproducible static bundle           632ffaaee46f0da60112998363ff0f3802cb79b9
-#36 commit-addressed release publishing  97847f42412e81af88194c7cfe04261f2a2f7c0a
-```
+Important current boundaries:
 
-CI/browser/release hardening:
+- `Production release smoke` owns canonical browser defaults, browser/Node load-order parity, UI lifecycle/A5, production ownership/rollback and pinned generator output.
+- `Static release package` owns one exact package tree for reproducibility, dependency/manifest verification, HTTP smoke and real Chrome acceptance.
+- Closed/default-off research workflows do not own index-only product PRs.
+- Historical development/promotion/stability corpus replays are manual-only after an experiment/promotion is closed.
+- Production deterministic unit/ownership/parity checks remain automatic on relevant implementation changes.
+- `Phase 12 exact allocator top-three` no longer triggers on index-only PRs, but still proves browser default, parity and rollback when selector/module/tooling changes.
+- Archived lexical report/sweep workflows are manual-only.
+- Workflow `contents: write` is allowed only for the guarded static-release publisher.
+- `V8 baseline lock` remains intentionally heavy and narrowly scoped to frozen-baseline changes.
 
-```text
-#37 handoff + stale Phase11 coupling            cfae37eac624c4a5dd384f0b725ff31bfb9b8920
-#38 Phase10 corpus checkpoints manual-only      f91650ab42034240ccae2f55111d2595036816f9
-#39 Phase12 default-off index decoupling        6e29c996c800b4d4a9f42f61a63588bcc7690867
-#40 default-off research checkpoints manual     69ec9df94fd4369a90d936ca4c31dc9b3a20fd61
-#41 CI lifecycle contract                       b6dede503c16840a057213a9366dd73788c27d4b
-#42 first real-browser release smoke             1a84dec71d35b5dae82ddf1f04995c84fcab2843
-#43 handoff refresh                              e24ae815aa196397a0b780903c42471d43babc1c
-#44 legacy quality gate lifecycle                4b5167d56841d4e3f2d1408ce2e43c6577bd8c8b
-#45 obsolete write-capable lexicon bot retired  efa86d6700382bee25465932244f5d89659980a5
-#46 vocabulary milestone comparisons manual     3881d0418e4014a105319ba5d4ef060e7ae64979
-#47 retained vocabulary research comparisons    c6f61cb71ee7a8eb6a374a2353fea16af2928797
-#48 dead lexical ref triggers retired            e6167beb8f35ba1c5a4ad9588e0e6a78b5d3cbda
-#49 dead lexical branch pushes retired           73dbe5ea1f52b5fa28a0f25c61e74389755e9ed5
-#50 static + browser release acceptance merged  fd223c7701a438ec141d0e2dd7eaf6c9c1e840e6
-#51 frozen v8 corpus contract / upstream split  56b124daf5122e08e472a5d5f53ebd3cd8104a10
-#52 production-promotion corpus replays manual  08e4335f820974d809bb34b4fe3ac0fbfa03d6e4
-#53 real-browser interaction wiring              9865062af5a232b7c9bf498308f2a987aa558793
-```
-
-## Current CI lifecycle contract
-
-`tools/ci-lifecycle-contract-v1.cjs` protects the intended ownership model.
-
-Important boundaries:
-
-- `Production release smoke` owns `index.html`, canonical browser defaults, browser/Node load-order parity, production ownership/rollback and pinned output.
-- `Static release package` owns one exact package tree for reproducibility, manifest/dependency verification, HTTP smoke and real-browser acceptance.
-- The standalone browser workflow was retired in #50; do not reintroduce a second package build/browser workflow without a concrete requirement.
-- Closed/default-off research workflows do not own index-only PRs.
-- Historical development/promotion/stability corpus replays are manual-only where the experiment/promotion has already been accepted or rejected.
-- Production-promotion unit/ownership/stage/selector contracts remain automatic on relevant module changes; frozen multi-seed evidence is manual-only.
-- `Arrowword quality gate` is path-scoped to the legacy modules it actually tests. Its deterministic contracts remain automatic; historical corpus diagnostics are manual-only.
-- Retained vocabulary/editorial research keeps lightweight/unit contracts automatic, while multi-seed comparisons are manual-only.
-- Seven archived lexical report/sweep workflows are manual-only. Deleted research branch names must not silently reactivate them.
-- The obsolete write-capable lexicon workflow is retired.
-- Workflow `contents: write` is allowed only for `publish-static-release.yml`, and only its guarded publish job should hold that permission.
-- `V8 baseline lock` remains intentionally heavy and automatic only when frozen baseline/config/seed-hash tooling changes. Do not weaken it merely for CI speed.
-
-Do not restore automatic historical corpus fan-out merely to increase check count.
+Do not restore historical corpus fan-out merely to increase check count.
 
 ## Frozen v8 corpus boundary
 
-PR #51 discovered a real reproducibility limitation in the old live rebuild harness.
+The committed v8 corpus remains frozen at 40,966 entries with exact clue coverage. PR #51 proved that current mutable upstream data is not an exact historical reconstruction source; GeoNames source `1668341` no longer satisfies the frozen `ТАЙБЕЙ` assumption.
 
-The frozen committed v8 corpus remains:
+Policy:
 
-```text
-version:                    8
-entries:                    40,966
-entities:                   1,469
-invalid entries:            0
-duplicate answers:          0
-exact clue coverage:        100%
-generic-template checkpoint 13.84%
-```
-
-Automatic corpus CI now checks the committed v8 baseline and builder syntax without downloading mutable upstream datasets.
-
-The previous automatic live rebuild used current GeoNames dump URLs. During #51, current upstream data failed the frozen canonical source assumption for:
-
-```text
-sourceId: 1668341
-frozen canonical answer: ТАЙБЕЙ
-```
-
-The committed manifest does not contain immutable checksums/snapshot identifiers for those source dumps. Therefore rebuilding against today's mutable upstreams is **not** proof of exact historical reproducibility and must not silently retune frozen v8.
-
-Current policy:
-
-- `Vocabulary baseline 1.1 corpus contract` automatically verifies committed v8 and builder invariants.
-- `live-upstream-rebuild` is `workflow_dispatch` only.
-- A live-upstream failure is diagnostic source-drift evidence, not permission to alter the accepted corpus.
-- Do not tune or rewrite frozen v8 to satisfy today's GeoNames data without a new explicit corpus/product requirement and new evaluation boundary.
-
-## Current real-browser release acceptance
-
-`Static release package` now builds one exact site and applies all package-level acceptance to that same tree:
-
-```text
-byte-identical rebuild proof
--> exact static build
--> release-manifest/dependency closure verification
--> local HTTP asset/404 smoke
--> installed Chrome/Chromium discovery
--> real-browser generation + A5/UI/export interaction smoke
--> deployable artifact + machine-readable evidence
-```
-
-PR #53 exact-head evidence:
-
-```text
-run:          31525725116
-browser:      Google Chrome 150.0.7871.128
-payload:      86 files / 19,327,085 bytes
-bundle digest 636c695161dce8b9cef793564a4fe0aaa0c09c486172ec03b91c0b7df770d820
-status:       selected attempt 106 · searched 120 · valid · 1 component · active 96.8%
-answer rows:  47
-```
-
-Real-browser interactions verified:
-
-```text
-Reveal answers changes SVG              yes
-Reveal off restores prior SVG           yes
-export seed remains generated-state-bound yes
-A5 148 x 210 export metadata            yes
-SVG download handler                    yes
-JSON download handler                   yes
-Print A5 handler                        yes
-```
-
-The exact-main post-merge package run for `9865062af5a232b7c9bf498308f2a987aa558793` also completed successfully through the Chrome interaction step and artifact uploads.
-
-Browser DOM digests are run/browser evidence, not cross-version invariants.
+- automatic CI verifies committed v8 and builder invariants;
+- live-upstream rebuild is manual diagnostic work;
+- upstream drift must not silently rewrite frozen v8;
+- corpus changes require a new explicit product requirement and evaluation boundary.
 
 ## Normal product/release checks
 
-Fast deterministic contracts:
+Fast UI/release contracts include:
 
 ```bash
 node tools/ui-release-state-test-v1.cjs
+node tools/ui-effective-settings-test-v1.cjs
+node tools/ui-export-settings-test-v1.cjs
+node tools/ui-output-escaping-test-v1.cjs
+node tools/ui-error-message-contract-v1.cjs
+node tools/ui-language-contract-v1.cjs
+node tools/ui-pending-settings-guard-test-v1.cjs
 node tools/a5-print-contract-test-v1.cjs
 node tools/production-release-smoke-v1.cjs
 node tools/static-release-reproducibility-test-v1.cjs
-node tools/build-static-release-v1.cjs release/scanword-generator-site
 node tools/verify-static-release-v1.cjs release/scanword-generator-site
 node tools/static-release-http-smoke-v1.cjs release/scanword-generator-site
 node tools/ci-lifecycle-contract-v1.cjs
 ```
 
-Core generator checks:
-
-```bash
-node tools/bulk-lexicon-audit.cjs
-node tools/dictionary-count-v3.cjs
-node tools/complete-pipeline-frontier-test-v1.cjs
-node tools/construction-stage-runtime-test-v2.cjs
-NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
-  node tools/wrapper-retirement-test-v1.cjs
-NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
-  node tools/exact-allocator-top-three-test-v1.cjs
-NODE_OPTIONS=--require=./tools/node-benchmark-bootstrap-v1.cjs \
-  node tools/exact-allocator-occupancy-index-test-v1.cjs
-```
-
-Retained Phase 11 module checks when those modules change:
-
-```bash
-node tools/preallocation-structural-frontier-test-v1.cjs
-node tools/preallocation-repair-potential-test-v1.cjs
-node tools/preallocation-ranked-frontier-test-v1.cjs
-node tools/preallocation-filter-test-v1.cjs
-```
-
-The real-browser interaction smoke runs through the `Static release package` workflow because it needs an installed browser and the exact packaged tree.
+Core generator checks remain unchanged, including complete-pipeline, direct-stage runtime, wrapper retirement and exact-selector/occupancy tests.
 
 ## What to do next
 
-There is no pre-approved Phase 13 algorithm experiment and there are currently no open GitHub issues.
+There is no pre-approved Phase 13 algorithm experiment.
 
-CI lifecycle cleanup is now mature enough that further optimization should require a measured trigger/cost/coverage problem. Do not keep narrowing workflows merely because they are old.
+Default next work must come from a concrete product/release signal:
 
-Default next work should be driven by a concrete product/release need:
-
-1. **Live-host activation only if required.** GitHub Pages is still unconfigured. If a canonical live URL becomes necessary, resolve repository/account Pages enablement or choose another static host, deploy the exact verified bundle, and add post-deploy HTTP checks.
-2. **Concrete browser/interaction defect.** Extend real-browser acceptance only when a reproducible download, print, interaction, accessibility or browser-specific defect is identified. Do not create a broad compatibility matrix without evidence of need.
-3. **Concrete product/UI defect.** Add a failing regression test first, then change UI/runtime behavior.
-4. **Measured generator defect or new product requirement.** Only reopen layout/allocator/corpus research with a reproducible user-facing defect, measurable acceptance criterion and fresh tuning/holdout boundary.
+1. live hosting only if a canonical URL becomes necessary;
+2. a reproducible UI/browser/print/download/accessibility defect with a regression criterion;
+3. public-result mutation hardening only if a concrete mutation hazard is demonstrated without breaking the public/test API;
+4. disabled-state visual styling only if a usability/visual acceptance requirement justifies it;
+5. generator/corpus work only for a measured user-facing requirement with a fresh tuning/holdout boundary.
 
 Do not invent Phase 13 solely to continue experiment numbering.
 
-## Phase 11 closure remains unchanged
+## Frozen Phase 11/12 evidence
 
-Phase 11 width-96 pre-allocation structural filter remains retained, reproducible and default-off.
-
-Canonical stability regression:
-
-```text
-v8-stability-058: 4 panels -> 7 panels
-```
-
-Do not tune against that seed or locked Phase 11 promotion/stability seeds.
-
-Frozen Phase 11 implementation/evidence ref:
+Phase 11 retained default-off structural filter:
 
 ```text
 5f8fb8dcb446d1dcf13e1ef5fc1cee0c151906e4
 refs/heads/research/archive-phase-11-preallocation-structural-filter-evidence-2026-07-25
 ```
 
-## Phase 12 closure remains unchanged
+Known Phase 11 stability regression remains:
 
-Accepted exact linear top-three selector:
+```text
+v8-stability-058: 4 panels -> 7 panels
+```
+
+Accepted Phase 12 linear top-three selector:
 
 ```text
 5db8d25de2422ce1f62d21d4ffa2da7bb3cafb3e
 refs/heads/research/archive-phase-12-linear-top-three-selector-2026-07-30
 ```
 
-Production-promotion head:
+Production-promotion evidence:
 
 ```text
 77616780d11377f1fe44bcd74d17ba8f0adb5cae
 refs/heads/research/archive-phase-12-exact-selector-default-promotion-2026-07-31
 ```
 
-Accepted selector evidence:
+Default-off occupancy evidence:
 
-| seed set | exact/audit parity | allocator ratio | total ratio | errors |
-| --- | ---: | ---: | ---: | ---: |
-| development-20 | 20/20 | 0.9590 | 0.9940 | 0 |
-| promotion-50 | 50/50 | 0.9500 | 0.9900 | 0 |
-| stability-100 | 100/100 | 0.9562 | 0.9891 | 0 |
+```text
+a5826b4e250ce39da71edfa0aa715c12146c7992
+refs/heads/research/archive-phase-12-exact-occupancy-index-implementation-2026-07-31
+2036baa507a829abd6966a74911d0aee06054984
+refs/heads/research/archive-phase-12-exact-occupancy-index-stability-2026-08-04
+```
 
 Exact rollback remains:
 
 ```text
 SCANWORD_EXACT_ALLOCATOR_SELECTOR=off
-```
-
-Accepted default-off occupancy evidence:
-
-```text
-a5826b4e250ce39da71edfa0aa715c12146c7992
-refs/heads/research/archive-phase-12-exact-occupancy-index-implementation-2026-07-31
-
-2036baa507a829abd6966a74911d0aee06054984
-refs/heads/research/archive-phase-12-exact-occupancy-index-stability-2026-08-04
-```
-
-| seed set | exact/audit parity | allocator ratio | total ratio | errors |
-| --- | ---: | ---: | ---: | ---: |
-| development-20 | 20/20 | 0.8845 | 0.9937 | 0 |
-| promotion-50 | 50/50 | 0.8814 | 0.9856 | 0 |
-| stability-100 | 100/100 | 0.9012 | 0.9830 | 0 |
-
-Occupancy remains default-off:
-
-```text
 SCANWORD_EXACT_ALLOCATOR_OCCUPANCY=off
 ```
 
-Stability-100 concluded Phase 12 algorithm experimentation.
-
-Detailed Phase 12 evidence:
-
-```text
-research/exact-allocator-acceleration/README.md
-research/exact-allocator-acceleration/linear-top-three-selector.md
-research/exact-allocator-acceleration/default-promotion.md
-research/exact-allocator-acceleration/occupancy-index.md
-docs/milestones/phase-12-exact-allocator-research-closure.md
-```
-
-## Archive state
-
-Accepted Phase 0-12 evidence is preserved under immutable `research/archive-*` refs and tracked by `research/archive-manifest.json`.
-
-Archive refs are evidence, not active development branches.
+Accepted Phase 0-12 evidence remains under immutable `research/archive-*` refs and `research/archive-manifest.json`.
 
 ## Non-negotiable rules
 
 - `main` is the only long-lived development branch.
-- Branch from exact current `main` for every logical change.
+- Branch from exact current `main` for each logical change.
 - Squash-merge each completed logical block into `main`.
 - Archive refs are immutable evidence, not active development lines.
 - Do not weaken complete validation.
 - Do not replace the canonical lexicographic objective with a weighted score.
-- Do not tune on promotion or stability seeds.
-- Preserve negative results and harness defects.
+- Do not tune on promotion/stability seeds or the pinned productization seed.
 - Preserve exact allocator RNG/output contracts unless a future requirement explicitly changes them.
-- The pinned productization release seed is a regression checkpoint, not a tuning target.
-- Static release artifacts must be derivable from the exact source commit and pass dependency-closure/checksum/HTTP/browser verification.
+- Static release artifacts must derive from the exact source commit and pass dependency/checksum/HTTP/browser verification.
 - Mutable upstream corpus diagnostics must not silently alter frozen v8.
