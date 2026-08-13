@@ -10,7 +10,6 @@ on:
       - main
     paths:
       - "construction-exact-allocator-top-three-v1.js"
-      - "index.html"
       - "tools/construction-pipeline-seed-v1.cjs"
       - "tools/exact-allocator-top-three-test-v1.cjs"
       - "tools/exact-allocator-top-three-checkpoint-v1.cjs"
