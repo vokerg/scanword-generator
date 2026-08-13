@@ -61,7 +61,7 @@
       <tr>
         <td>${word.id}</td>
         <td lang="ru">${escapeXml(word.clue)}</td>
-        <td class="word" lang="ru">${word.answer}</td>
+        <td class="word" lang="ru">${escapeXml(word.answer)}</td>
         <td>${word.length}</td>
         <td>${DIRECTIONS[word.direction].label} ${DIRECTIONS[word.direction].arrow}</td>
         <td>${word.startRow + 1}:${word.startCol + 1}</td>
