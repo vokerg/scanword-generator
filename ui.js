@@ -126,15 +126,35 @@
     setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
+  function readBoundedInteger(element, fallback, runtimeMax = Infinity) {
+    const declaredMin = Number(element.min);
+    const declaredMax = Number(element.max);
+    const min = Number.isFinite(declaredMin) ? declaredMin : -Infinity;
+    const max = Math.min(Number.isFinite(declaredMax) ? declaredMax : Infinity, runtimeMax);
+    const parsed = Number(element.value);
+    const candidate = element.value.trim() && Number.isFinite(parsed) ? Math.round(parsed) : fallback;
+    return Math.max(Math.min(min, max), Math.min(max, candidate));
+  }
+
   function readSettings() {
+    const corpusSize = Math.max(1, window.RUSSIAN_WORDS?.length || 3500);
     return {
       seed: els.seed.value.trim() || "arrowword",
-      cols: Math.max(11, Math.min(19, Number(els.cols.value) || 13)),
-      rows: Math.max(13, Math.min(27, Number(els.rows.value) || 17)),
-      poolSize: Math.max(100, Math.min(window.RUSSIAN_WORDS?.length || 800, Number(els.poolSize.value) || window.RUSSIAN_WORDS?.length || 800)),
-      targetWords: Math.max(12, Math.min(60, Number(els.targetWords.value) || 30)),
-      clueDensity: Math.max(16, Math.min(38, Number(els.clueDensity.value) || 27)),
+      cols: readBoundedInteger(els.cols, 13),
+      rows: readBoundedInteger(els.rows, 17),
+      poolSize: readBoundedInteger(els.poolSize, 3500, corpusSize),
+      targetWords: readBoundedInteger(els.targetWords, 30),
+      clueDensity: readBoundedInteger(els.clueDensity, 27),
     };
+  }
+
+  function syncSettingsControls(settings) {
+    els.seed.value = settings.seed;
+    els.cols.value = String(settings.cols);
+    els.rows.value = String(settings.rows);
+    els.poolSize.value = String(settings.poolSize);
+    els.targetWords.value = String(settings.targetWords);
+    els.clueDensity.value = String(settings.clueDensity);
   }
 
   function renderAccessibleSvg(result, showAnswers) {
@@ -147,6 +167,7 @@
 
   function runGeneration() {
     const settings = readSettings();
+    syncSettingsControls(settings);
     currentResult = null;
     currentSettings = null;
     els.generationStatus.textContent = "generating…";
