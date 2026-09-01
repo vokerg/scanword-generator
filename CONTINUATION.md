@@ -1,16 +1,30 @@
 # Canonical continuation handoff
 
-Last updated: 2026-08-13
+Last updated: 2026-09-01
 
 Read this file first in a new chat or coding session.
 
 Phase 12 algorithm experimentation is complete. Productization, reproducible packaging, CI lifecycle cleanup, frozen-v8 hardening, real-browser acceptance and the current UI/state hardening pass are integrated into `main`.
 
-Current production checkpoint before this handoff update:
+## Final handoff closure state
+
+As of this handoff:
+
+- the repository has **0 open pull requests**;
+- there is **no unfinished product/runtime change outside `main`**;
+- the abandoned `agent/result-snapshot-20260813` ref is commit-identical to the pre-wrap `main` and contains no additional work;
+- legacy `agent/*`, `docs/*`, `planning/*`, `backup/*` and `r-and-d/*` refs are historical leftovers only and must **not** be resumed as development lines;
+- immutable `research/archive-*` refs remain evidence and must not be deleted or rewritten;
+- the next chat/session must start from the exact current default branch `main`, read this file, and create any new logical slice from that exact head;
+- there is no completed work after PR #68 hidden on another branch.
+
+The pre-final-wrap `main` was:
 
 ```text
-main: 343dccb31b6cc69fb23a95e8ab99e00d6ce1e7eb
+ce50abf54544d7903802b9d1d48fd813798908b0
 ```
+
+This handoff update is documentation-only; after it is squash-merged, the resulting default `main` is the sole canonical continuation point.
 
 ## Production baseline
 
@@ -93,6 +107,7 @@ Recent merged hardening:
 #64 result-bound JSON generationSettings         56eaaac4fe919117c24a1e2c9d011aca703de9bc
 #66 result-table accessible metadata             9ee41c9a9eef8005856ecd50085299946d8e9b43
 #67 robust generation failure-message fallback  343dccb31b6cc69fb23a95e8ab99e00d6ce1e7eb
+#68 canonical handoff refresh                    ce50abf54544d7903802b9d1d48fd813798908b0
 ```
 
 PR #55 was superseded by #57. PR #65 was superseded by clean one-commit PR #66.
@@ -229,6 +244,7 @@ Accepted Phase 0-12 evidence remains under immutable `research/archive-*` refs a
 - Branch from exact current `main` for each logical change.
 - Squash-merge each completed logical block into `main`.
 - Archive refs are immutable evidence, not active development lines.
+- Do not resume legacy working refs; start every new development slice from exact current `main`.
 - Do not weaken complete validation.
 - Do not replace the canonical lexicographic objective with a weighted score.
 - Do not tune on promotion/stability seeds or the pinned productization seed.
