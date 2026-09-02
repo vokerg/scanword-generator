@@ -15,6 +15,7 @@
     showAnswers: document.querySelector("#showAnswers"),
     generate: document.querySelector("#generate"),
     downloadSvg: document.querySelector("#downloadSvg"),
+    downloadPdf: document.querySelector("#downloadPdf"),
     downloadJson: document.querySelector("#downloadJson"),
     printA5: document.querySelector("#printA5"),
     stats: document.querySelector("#stats"),
@@ -25,10 +26,12 @@
 
   let currentResult = null;
   let currentSettings = null;
+  let pdfExportBusy = false;
   const resultSettings = new WeakMap();
 
   function setExportEnabled(enabled) {
     els.downloadSvg.disabled = !enabled;
+    if (els.downloadPdf) els.downloadPdf.disabled = !enabled || pdfExportBusy;
     els.downloadJson.disabled = !enabled;
     els.printA5.disabled = !enabled;
   }
@@ -120,14 +123,146 @@
     };
   }
 
-  function download(name, content, type) {
-    const blob = new Blob([content], { type });
+  const PDF_PAGE = Object.freeze({
+    widthMm: 148,
+    heightMm: 210,
+    widthPt: 419.527559,
+    heightPt: 595.275591,
+    dpi: 300,
+  });
+
+  function asciiBytes(value) {
+    return Uint8Array.from(String(value), (character) => character.charCodeAt(0) & 0xff);
+  }
+
+  function concatBytes(parts) {
+    const total = parts.reduce((sum, part) => sum + part.length, 0);
+    const output = new Uint8Array(total);
+    let offset = 0;
+    for (const part of parts) {
+      output.set(part, offset);
+      offset += part.length;
+    }
+    return output;
+  }
+
+  function pdfObject(number, content) {
+    return concatBytes([
+      asciiBytes(`${number} 0 obj\n`),
+      typeof content === "string" ? asciiBytes(content) : content,
+      asciiBytes("\nendobj\n"),
+    ]);
+  }
+
+  function pdfStreamObject(number, dictionary, bytes) {
+    return concatBytes([
+      asciiBytes(`${number} 0 obj\n<< ${dictionary} /Length ${bytes.length} >>\nstream\n`),
+      bytes,
+      asciiBytes("\nendstream\nendobj\n"),
+    ]);
+  }
+
+  function buildPdfFromJpegs(pages) {
+    if (!Array.isArray(pages) || !pages.length) throw new Error("PDF export requires at least one page.");
+    const pageObjects = pages.map((_, index) => 3 + index * 3);
+    const objectCount = 2 + pages.length * 3;
+    const objects = new Array(objectCount + 1);
+    objects[1] = pdfObject(1, "<< /Type /Catalog /Pages 2 0 R >>");
+    objects[2] = pdfObject(2, `<< /Type /Pages /Kids [${pageObjects.map((number) => `${number} 0 R`).join(" ")}] /Count ${pages.length} >>`);
+
+    pages.forEach((page, index) => {
+      const pageObject = 3 + index * 3;
+      const imageObject = pageObject + 1;
+      const contentObject = pageObject + 2;
+      const imageBytes = page.bytes instanceof Uint8Array ? page.bytes : new Uint8Array(page.bytes);
+      if (!Number.isInteger(page.width) || page.width < 1 || !Number.isInteger(page.height) || page.height < 1) {
+        throw new Error("PDF page image dimensions are invalid.");
+      }
+      objects[pageObject] = pdfObject(pageObject, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PDF_PAGE.widthPt} ${PDF_PAGE.heightPt}] /Resources << /XObject << /Im0 ${imageObject} 0 R >> >> /Contents ${contentObject} 0 R >>`);
+      objects[imageObject] = pdfStreamObject(
+        imageObject,
+        `/Type /XObject /Subtype /Image /Width ${page.width} /Height ${page.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode`,
+        imageBytes,
+      );
+      const commands = asciiBytes(`q\n${PDF_PAGE.widthPt} 0 0 ${PDF_PAGE.heightPt} 0 0 cm\n/Im0 Do\nQ\n`);
+      objects[contentObject] = pdfStreamObject(contentObject, "", commands);
+    });
+
+    const header = asciiBytes("%PDF-1.4\n% Scanword Generator\n");
+    const body = [header];
+    const offsets = new Array(objectCount + 1).fill(0);
+    let length = header.length;
+    for (let number = 1; number <= objectCount; number += 1) {
+      offsets[number] = length;
+      body.push(objects[number]);
+      length += objects[number].length;
+    }
+    const xrefOffset = length;
+    const xrefLines = ["xref", `0 ${objectCount + 1}`, "0000000000 65535 f "];
+    for (let number = 1; number <= objectCount; number += 1) {
+      xrefLines.push(`${String(offsets[number]).padStart(10, "0")} 00000 n `);
+    }
+    const trailer = `${xrefLines.join("\n")}\ntrailer\n<< /Size ${objectCount + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+    body.push(asciiBytes(trailer));
+    return concatBytes(body);
+  }
+
+  function svgToJpegPage(svg, dpi = PDF_PAGE.dpi) {
+    const width = Math.round(PDF_PAGE.widthMm / 25.4 * dpi);
+    const height = Math.round(PDF_PAGE.heightMm / 25.4 * dpi);
+    const source = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const context = canvas.getContext("2d");
+          if (!context) throw new Error("Canvas 2D context is unavailable.");
+          context.fillStyle = "#fff";
+          context.fillRect(0, 0, width, height);
+          context.drawImage(image, 0, 0, width, height);
+          canvas.toBlob(async (blob) => {
+            if (!blob) {
+              reject(new Error("Browser could not encode the PDF page image."));
+              return;
+            }
+            try {
+              resolve({ bytes: new Uint8Array(await blob.arrayBuffer()), width, height });
+            } catch (error) {
+              reject(error);
+            }
+          }, "image/jpeg", 0.96);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      image.onerror = () => {
+        reject(new Error("Browser could not rasterize the A5 SVG for PDF export."));
+      };
+      image.src = source;
+    });
+  }
+
+  async function renderPdfBlob(result) {
+    const puzzle = await svgToJpegPage(renderAccessibleSvg(result, false));
+    const solution = await svgToJpegPage(renderAccessibleSvg(result, true));
+    const bytes = buildPdfFromJpegs([puzzle, solution]);
+    return new Blob([bytes], { type: "application/pdf" });
+  }
+
+  function downloadBlob(name, blob) {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = name;
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  function download(name, content, type) {
+    downloadBlob(name, new Blob([content], { type }));
   }
 
   function readBoundedInteger(element, fallback, runtimeMax = Infinity) {
@@ -164,7 +299,7 @@
   function renderAccessibleSvg(result, showAnswers) {
     return renderSvg(result, showAnswers).replace(
       "<svg ",
-      '<svg lang="ru" xml:lang="ru" role="img" aria-label="Generated A5 arrowword grid" ',
+      '<svg lang="ru" xml:lang="ru" ',
     );
   }
 
@@ -228,6 +363,26 @@
   els.downloadSvg.addEventListener("click", () => {
     if (currentResult) download("arrowword-a5.svg", renderAccessibleSvg(currentResult, els.showAnswers.checked), "image/svg+xml;charset=utf-8");
   });
+  els.downloadPdf?.addEventListener("click", async () => {
+    if (!currentResult || pdfExportBusy) return;
+    const result = currentResult;
+    const label = els.downloadPdf.textContent;
+    pdfExportBusy = true;
+    setExportEnabled(true);
+    els.downloadPdf.textContent = "Building PDF…";
+    try {
+      const blob = await renderPdfBlob(result);
+      if (currentResult === result) downloadBlob("arrowword-a5-puzzle-solution.pdf", blob);
+    } catch (error) {
+      if (currentResult === result) {
+        els.generationStatus.textContent = `PDF export failed · ${generationErrorMessage(error)}`;
+      }
+    } finally {
+      pdfExportBusy = false;
+      els.downloadPdf.textContent = label;
+      setExportEnabled(Boolean(currentResult));
+    }
+  });
   els.downloadJson.addEventListener("click", () => {
     if (currentResult) download("arrowword-project.json", JSON.stringify(exportResult(currentResult), null, 2), "application/json;charset=utf-8");
   });
@@ -239,6 +394,8 @@
     generateBest,
     renderSvg,
     exportResult,
+    buildPdfFromJpegs,
+    renderPdfBlob,
     validateGrid,
     createMask,
     extractSlots,

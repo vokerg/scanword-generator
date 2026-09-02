@@ -19,6 +19,8 @@ const ui = read("ui.js");
 const renderer = read("renderer.js");
 
 assert(/id=["']printA5["']/.test(html), "Print A5 control is missing from index.html");
+assert(/id=["']downloadPdf["']/.test(html), "Download PDF control is missing from index.html");
+assert(html.includes("SVG + PDF + JSON"), "A5 export badge does not advertise PDF");
 assert(/\.button-grid\s*\{[^}]*grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/s.test(styles), "desktop export actions are not laid out as three controls");
 
 const pageRule = styles.match(/@page\s*\{([\s\S]*?)\}/);
@@ -40,8 +42,28 @@ assert(/\.paper-wrap\s*\{[^}]*width:\s*148mm\s*;[^}]*height:\s*210mm\s*;[^}]*pad
 assert(/\.paper-wrap svg\s*\{[^}]*width:\s*148mm\s*;[^}]*height:\s*210mm\s*;[^}]*box-shadow:\s*none\s*;[^}]*print-color-adjust:\s*exact\s*;/s.test(printCss), "printed SVG is not exact A5 with print color preservation");
 
 assert(ui.includes('printA5: document.querySelector("#printA5")'), "ui.js does not bind the Print A5 control");
+assert(ui.includes('downloadPdf: document.querySelector("#downloadPdf")'), "ui.js does not bind the Download PDF control");
 assert(/function setExportEnabled\(enabled\) \{[\s\S]*?els\.downloadSvg\.disabled = !enabled;[\s\S]*?els\.downloadJson\.disabled = !enabled;[\s\S]*?els\.printA5\.disabled = !enabled;[\s\S]*?\}/.test(ui), "Print A5 is not governed by the same valid-result state as exports");
+assert(/if \(els\.downloadPdf\) els\.downloadPdf\.disabled = !enabled \|\| pdfExportBusy;/.test(ui), "PDF export is not governed by valid-result/busy state");
 assert(/els\.printA5\.addEventListener\("click", \(\) => \{[\s\S]*?if \(currentResult\) window\.print\(\);[\s\S]*?\}\);/.test(ui), "Print A5 is not guarded by currentResult before window.print()");
+assert(/els\.downloadPdf\?\.addEventListener\("click", async \(\) => \{[\s\S]*?if \(!currentResult \|\| pdfExportBusy\) return;[\s\S]*?renderPdfBlob\(result\)[\s\S]*?arrowword-a5-puzzle-solution\.pdf[\s\S]*?\}\);/.test(ui), "PDF export is not guarded and bound to the current result");
+
+for (const expected of [
+  "widthMm: 148",
+  "heightMm: 210",
+  "widthPt: 419.527559",
+  "heightPt: 595.275591",
+  "dpi: 300",
+  "function buildPdfFromJpegs(pages)",
+  "async function renderPdfBlob(result)",
+  "renderAccessibleSvg(result, false)",
+  "renderAccessibleSvg(result, true)",
+  "/Count ${pages.length}",
+  "/Filter /DCTDecode",
+]) {
+  assert(ui.includes(expected), `direct PDF contract drifted: ${expected}`);
+}
+assert(!ui.includes('xml:lang="ru" role="img" aria-label="Generated A5 arrowword grid"'), "serialized SVG must not duplicate renderer role/aria-label attributes");
 
 for (const expected of [
   'width="148mm"',
@@ -60,5 +82,9 @@ console.log(JSON.stringify({
   uiHiddenForPrint: true,
   printColorPreserved: true,
   stateBoundPrintAction: true,
+  directPdfPages: 2,
+  directPdfDpi: 300,
+  directPdfStateBound: true,
+  serializedSvgAttributesValid: true,
   rendererA5Parity: true,
 }));
