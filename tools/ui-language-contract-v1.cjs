@@ -5,6 +5,7 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const ui = fs.readFileSync(path.join(root, "ui.js"), "utf8");
+const renderer = fs.readFileSync(path.join(root, "renderer.js"), "utf8");
 
 function fail(message) {
   throw new Error(`UI language contract failed: ${message}`);
@@ -32,16 +33,27 @@ assert(
   (renderWordsBlock[1].match(/<th scope="col">/g) || []).length === 6,
   "result table must expose six explicit column header scopes",
 );
+
 const accessibleSvgBlock = ui.match(/function renderAccessibleSvg\(result, showAnswers\) \{([\s\S]*?)\n  \}/);
 assert(accessibleSvgBlock, "accessible SVG wrapper is missing");
 for (const expected of [
   'lang="ru"',
   'xml:lang="ru"',
-  'role="img"',
-  'aria-label="Generated A5 arrowword grid"',
 ]) {
-  assert(accessibleSvgBlock[1].includes(expected), `preview/export SVG lost accessibility metadata: ${expected}`);
+  assert(accessibleSvgBlock[1].includes(expected), `preview/export SVG lost language metadata: ${expected}`);
 }
+assert(
+  renderer.includes('role="img"'),
+  'renderer-owned preview/export SVG lost role="img"',
+);
+assert(
+  renderer.includes('aria-label="Generated arrowword"'),
+  "renderer-owned preview/export SVG lost its accessible name",
+);
+assert(
+  !accessibleSvgBlock[1].includes('role="img" aria-label='),
+  "UI wrapper must not duplicate renderer-owned SVG role/aria-label attributes",
+);
 assert(
   /function rerenderSvg\(\) \{[\s\S]*?renderAccessibleSvg\(currentResult, els\.showAnswers\.checked\)/.test(ui),
   "browser preview must use the accessible SVG wrapper",
@@ -64,7 +76,9 @@ console.log(JSON.stringify({
   resultTableScopedColumns: 6,
   previewSvgLanguage: "ru",
   exportedSvgLanguage: "ru",
+  svgAccessibilityOwner: "renderer",
   svgRole: "img",
-  svgAccessibleName: "Generated A5 arrowword grid",
+  svgAccessibleName: "Generated arrowword",
+  duplicateSvgAccessibilityAttributes: false,
   englishTableContextPreserved: true,
 }));
