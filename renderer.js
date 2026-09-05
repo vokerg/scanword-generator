@@ -14,16 +14,25 @@
     const words = String(text).split(/\s+/).filter(Boolean);
     const lines = [];
     let current = "";
-    for (const word of words) {
+    const flush = () => { if (current) { lines.push(current); current = ""; } };
+    for (const original of words) {
+      let word = original;
+      while (word.length > maxChars) {
+        flush();
+        const take = Math.max(2, maxChars - 1);
+        lines.push(`${word.slice(0, take)}-`);
+        word = word.slice(take);
+        if (lines.length >= maxLines) return lines.slice(0, maxLines);
+      }
       const next = current ? `${current} ${word}` : word;
       if (next.length <= maxChars) current = next;
       else {
-        if (current) lines.push(current);
-        current = word.length > maxChars ? `${word.slice(0, maxChars - 1)}…` : word;
+        flush();
+        current = word;
       }
-      if (lines.length >= maxLines) break;
+      if (lines.length >= maxLines) return lines.slice(0, maxLines);
     }
-    if (current && lines.length < maxLines) lines.push(current);
+    flush();
     return lines.slice(0, maxLines);
   }
 
@@ -31,6 +40,94 @@
     return `<text x="${x.toFixed(3)}" y="${startY.toFixed(3)}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${fontSize.toFixed(3)}" fill="#111">${lines
       .map((line, index) => `<tspan x="${x.toFixed(3)}" dy="${index === 0 ? 0 : lineHeight.toFixed(3)}">${escapeXml(line)}</tspan>`)
       .join("")}</text>`;
+  }
+
+  const PUBLICATION_CLUE_OVERRIDES = Object.freeze({
+    "АПК": "Сельхоз и заводы",
+    "БТИ": "Учёт жилья и зданий",
+    "ГРЭС": "Районная эл. станция",
+    "ГУСЬ": "Домашняя водоплавающая птица",
+    "ЖБО": "Бытовые стоки",
+    "ЖЭУ": "Жилищная служба",
+    "ЖИР": "Вещество в организме",
+    "ЗАМ": "Заместитель",
+    "КАНТРИ": "Жанр музыки США",
+    "МИФ": "Ходячая выдумка",
+    "ОРДЕР": "Документ на получение",
+    "ИЛ": "Донный осадок",
+    "ОМ": "Ед. сопротивления",
+    "САМБО": "Борьба без оружия",
+    "СМОГ": "Туман с дымом и выхлопами",
+    "СУД": "Разбирательство дела",
+    "ФИ": "Греч. буква φ",
+    "ФЛЭШ": "USB-накопитель",
+    "УЗЫ": "Бремя, тяготы",
+    "ЮЛА": "Игрушка, что крутится",
+  });
+
+  function normalizeClueText(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
+  }
+
+  function stripParentheticals(text) {
+    return normalizeClueText(text.replace(/\s*\([^()]*\)\s*/g, " "));
+  }
+
+  function titleCaseLabel(value) {
+    const text = normalizeClueText(value).toLocaleLowerCase("ru-RU");
+    return text ? text[0].toLocaleUpperCase("ru-RU") + text.slice(1) : text;
+  }
+
+  function compactGeographyClue(text) {
+    const source = normalizeClueText(text);
+    const country = source.match(/(?:^|;\s*)страна:\s*([^;]+)/i)?.[1]?.trim();
+    if (!country) return null;
+    const head = source.split(";")[0].trim();
+    if (/^город$/i.test(head)) return `Город, ${country}`;
+    if (/^регион$/i.test(head)) return `Регион, ${country}`;
+    if (/^река$/i.test(head)) return `Река, ${country}`;
+    if (/^горная вершина$/i.test(head)) return `Вершина, ${country}`;
+    if (/^гора$/i.test(head)) return `Гора, ${country}`;
+    if (/^озеро$/i.test(head)) return `Озеро, ${country}`;
+    if (/^остров$/i.test(head)) return `Остров, ${country}`;
+    return `${titleCaseLabel(head)}, ${country}`;
+  }
+
+  function trimAtWord(text, maxLength) {
+    const source = normalizeClueText(text);
+    if (source.length <= maxLength) return source;
+    const slice = source.slice(0, Math.max(1, maxLength - 1));
+    const boundary = slice.lastIndexOf(" ");
+    const prefix = boundary >= Math.floor(maxLength * 0.58) ? slice.slice(0, boundary) : slice;
+    return `${prefix.replace(/[,:;.!?]+$/g, "")}…`;
+  }
+
+  function publicationClueCandidates(clue) {
+    const original = normalizeClueText(clue?.text);
+    if (!original) return [""];
+    const candidates = [];
+    const push = (value) => {
+      const normalized = normalizeClueText(value);
+      if (normalized && !candidates.includes(normalized)) candidates.push(normalized);
+    };
+
+    push(PUBLICATION_CLUE_OVERRIDES[normalizeClueText(clue?.answer).toLocaleUpperCase("ru-RU")]);
+    push(compactGeographyClue(original));
+
+    const cleaned = stripParentheticals(original);
+    const semicolonClause = cleaned.split(";")[0].trim();
+    const commaClause = semicolonClause.split(",")[0].trim();
+    if (original.length <= 42) push(original);
+    if (cleaned.length <= 48) push(cleaned);
+    if (semicolonClause.length >= 8 && semicolonClause.length <= 52) push(semicolonClause);
+    if (commaClause.length >= 8 && commaClause.length <= 46) push(commaClause);
+    if (original.length > 42) push(trimAtWord(cleaned, 44));
+    push(original);
+    return candidates;
+  }
+
+  function publicationClueText(clue) {
+    return publicationClueCandidates(clue)[0] || normalizeClueText(clue?.text);
   }
 
   function renderArrow(x, y, cell, direction, dual = false) {
@@ -43,14 +140,62 @@
     return `<path d="M ${xx.toFixed(3)} ${(y + cell * 0.58).toFixed(3)} L ${xx.toFixed(3)} ${(y + cell * 0.94).toFixed(3)}" fill="none" stroke="#111" stroke-width="${stroke}" marker-end="url(#arrowhead)"/>`;
   }
 
-  function renderClueTextCell(data, x, y, cell) {
+  function footprintForClue(result, clue, arrowRow, arrowCol) {
+    return (result.clueFootprints || []).find((footprint) => (
+      footprint.slotId === clue.slotId
+      && footprint.arrowRow === arrowRow
+      && footprint.arrowCol === arrowCol
+    )) || null;
+  }
+
+  function footprintAttachmentSide(footprint, arrowRow, arrowCol) {
+    if (!footprint?.cells?.length) return null;
+    const counts = { top: 0, right: 0, bottom: 0, left: 0 };
+    for (const item of footprint.cells) {
+      if (item.row === arrowRow - 1 && item.col === arrowCol) counts.top += 1;
+      if (item.row === arrowRow && item.col === arrowCol + 1) counts.right += 1;
+      if (item.row === arrowRow + 1 && item.col === arrowCol) counts.bottom += 1;
+      if (item.row === arrowRow && item.col === arrowCol - 1) counts.left += 1;
+    }
+    const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return ranked[0][1] > 0 ? ranked[0][0] : null;
+  }
+
+  function renderAnchoredArrow(x, y, cell, direction, side) {
+    if (!side) return renderArrow(x, y, cell, direction);
+    const stroke = Math.max(0.22, cell * 0.032).toFixed(3);
+    const points = {
+      top: [x + cell * 0.50, y],
+      right: [x + cell, y + cell * 0.50],
+      bottom: [x + cell * 0.50, y + cell],
+      left: [x, y + cell * 0.50],
+    };
+    const start = points[side];
+    if (!start) return renderArrow(x, y, cell, direction);
+    let bend;
+    let end;
+    if (direction === "right") {
+      bend = [x + cell * 0.50, y + cell * 0.50];
+      end = [x + cell * 0.90, y + cell * 0.50];
+      if (side === "right") bend = [x + cell * 0.62, y + cell * 0.32];
+    } else {
+      bend = [x + cell * 0.50, y + cell * 0.50];
+      end = [x + cell * 0.50, y + cell * 0.90];
+      if (side === "bottom") bend = [x + cell * 0.32, y + cell * 0.62];
+    }
+    const d = `M ${start[0].toFixed(3)} ${start[1].toFixed(3)} L ${bend[0].toFixed(3)} ${bend[1].toFixed(3)} L ${end[0].toFixed(3)} ${end[1].toFixed(3)}`;
+    return `<path d="${d}" fill="none" stroke="#111" stroke-width="${stroke}" stroke-linejoin="round" marker-end="url(#arrowhead)"/>`;
+  }
+
+  function renderClueTextCell(data, x, y, cell, clipId = null) {
     const clue = data.clues[0];
     const fontSize = Math.max(1.15, cell * 0.155);
     const maxChars = Math.max(7, Math.floor(cell / (fontSize * 0.52)));
     const lines = wrapText(clue.text, maxChars, 5);
     const totalHeight = Math.max(1, lines.length) * fontSize * 1.04;
     const startY = y + Math.max(fontSize, (cell - totalHeight) / 2 + fontSize * 0.72);
-    return svgTextLines(lines, x + cell * 0.5, startY, fontSize, fontSize * 1.04);
+    const text = svgTextLines(lines, x + cell * 0.5, startY, fontSize, fontSize * 1.04);
+    return clipId ? `<g clip-path="url(#${clipId})">${text}</g>` : text;
   }
 
   function renderArrowOnly(x, y, cell, clues) {
@@ -66,32 +211,50 @@
     return `${diagonal}${renderArrow(x, y, cell, "right", true)}${renderArrow(x, y, cell, "down", true)}`;
   }
 
-  function renderClueContent(data, x, y, cell) {
+  function renderClueContent(result, data, row, col, x, y, cell, clipId = null) {
     if (!data.clues.length) return "";
     const external = data.clues.filter((clue) => clue.externalText);
     const internal = data.clues.filter((clue) => !clue.externalText);
-    if (!internal.length) return renderArrowOnly(x, y, cell, external);
+    const clip = (markup) => clipId ? `<g clip-path="url(#${clipId})">${markup}</g>` : markup;
+    const externalArrows = () => external.map((clue) => {
+      const footprint = footprintForClue(result, clue, row, col);
+      const side = footprintAttachmentSide(footprint, row, col);
+      return renderAnchoredArrow(x, y, cell, clue.direction, side);
+    }).join("");
+
+    if (!internal.length) {
+      if (external.length && (result.clueFootprints || []).length) return externalArrows();
+      return renderArrowOnly(x, y, cell, external);
+    }
     if (!external.length) {
       if (data.clues.length === 1) {
         const clue = data.clues[0];
-        const fontSize = Math.max(1.2, cell * 0.165);
-        const lines = wrapText(clue.text, Math.max(7, Math.floor(cell / (fontSize * 0.52))), 4);
-        return `${svgTextLines(lines, x + cell * 0.48, y + cell * 0.18, fontSize, fontSize * 1.08)}${renderArrow(x, y, cell, clue.direction)}`;
+        const textBoxX = x + cell * 0.07;
+        const textBoxY = y + cell * 0.05;
+        const textBoxWidth = cell * 0.86;
+        const textBoxHeight = cell * 0.66;
+        const fitted = fitFootprintText(clue, textBoxWidth, textBoxHeight, cell);
+        const totalHeight = Math.max(1, fitted.lines.length) * fitted.lineHeight;
+        const startY = textBoxY + Math.max(fitted.fontSize, (textBoxHeight - totalHeight) / 2 + fitted.fontSize * 0.78);
+        const text = svgTextLines(fitted.lines, textBoxX + textBoxWidth / 2, startY, fitted.fontSize, fitted.lineHeight);
+        return `${clip(text)}${renderArrow(x, y, cell, clue.direction)}`;
       }
       const rightClue = data.clues.find((clue) => clue.direction === "right") || data.clues[0];
       const downClue = data.clues.find((clue) => clue.direction === "down") || data.clues[1];
       const fontSize = Math.max(0.98, cell * 0.112);
       const diagonal = `<path d="M ${x.toFixed(3)} ${(y + cell).toFixed(3)} L ${(x + cell).toFixed(3)} ${y.toFixed(3)}" fill="none" stroke="#111" stroke-width="${Math.max(0.16, cell * 0.02).toFixed(3)}"/>`;
-      return `${diagonal}${svgTextLines(wrapText(rightClue.text, 9, 3), x + cell * 0.35, y + cell * 0.12, fontSize, fontSize)}${svgTextLines(wrapText(downClue.text, 9, 3), x + cell * 0.65, y + cell * 0.61, fontSize, fontSize)}${renderArrow(x, y, cell, "right", true)}${renderArrow(x, y, cell, "down", true)}`;
+      const rightText = svgTextLines(wrapText(publicationClueText(rightClue), 9, 3), x + cell * 0.35, y + cell * 0.12, fontSize, fontSize);
+      const downText = svgTextLines(wrapText(publicationClueText(downClue), 9, 3), x + cell * 0.65, y + cell * 0.61, fontSize, fontSize);
+      return `${diagonal}${clip(`${rightText}${downText}`)}${renderArrow(x, y, cell, "right", true)}${renderArrow(x, y, cell, "down", true)}`;
     }
     const clue = internal[0];
     const fontSize = Math.max(0.95, cell * 0.112);
-    const lines = wrapText(clue.text, 9, 3);
+    const lines = wrapText(publicationClueText(clue), 9, 3);
     const textX = clue.direction === "right" ? x + cell * 0.35 : x + cell * 0.65;
     const textY = clue.direction === "right" ? y + cell * 0.13 : y + cell * 0.61;
     const diagonal = `<path d="M ${x.toFixed(3)} ${(y + cell).toFixed(3)} L ${(x + cell).toFixed(3)} ${y.toFixed(3)}" fill="none" stroke="#111" stroke-width="${Math.max(0.16, cell * 0.02).toFixed(3)}"/>`;
-    const arrows = data.clues.map((item) => renderArrow(x, y, cell, item.direction, true)).join("");
-    return `${diagonal}${svgTextLines(lines, textX, textY, fontSize, fontSize)}${arrows}`;
+    const arrows = `${externalArrows()}${internal.map((item) => renderArrow(x, y, cell, item.direction, true)).join("")}`;
+    return `${diagonal}${clip(svgTextLines(lines, textX, textY, fontSize, fontSize))}${arrows}`;
   }
 
   function renderPanel(x, y, cell, row, col) {
@@ -99,7 +262,6 @@
     const alternating = (row + col) % 2 === 0;
     return `<rect x="${(x + inset).toFixed(3)}" y="${(y + inset).toFixed(3)}" width="${(cell - inset * 2).toFixed(3)}" height="${(cell - inset * 2).toFixed(3)}" rx="${(cell * 0.08).toFixed(3)}" fill="${alternating ? "#c8c8c8" : "#bdbdbd"}"/>`;
   }
-
 
   function footprintPath(cells, left, top, cell) {
     return cells.map((item) => {
@@ -159,8 +321,9 @@
       let word = original;
       while (word.length > maxChars) {
         if (current) { lines.push(current); current = ""; }
-        lines.push(`${word.slice(0, Math.max(2, maxChars - 1))}…`);
-        word = word.slice(Math.max(2, maxChars - 1));
+        const take = Math.max(2, maxChars - 1);
+        lines.push(`${word.slice(0, take)}-`);
+        word = word.slice(take);
       }
       const next = current ? `${current} ${word}` : word;
       if (next.length <= maxChars) current = next;
@@ -173,29 +336,39 @@
     return lines;
   }
 
-  function fitFootprintText(text, width, height, cell) {
+  function fitFootprintText(clue, width, height, cell) {
     const padding = cell * 0.10;
     const usableWidth = Math.max(cell * 0.65, width - padding * 2);
     const usableHeight = Math.max(cell * 0.65, height - padding * 2);
-    const maximum = Math.max(1.15, cell * 0.165);
-    const minimum = Math.max(0.82, cell * 0.095);
-    for (let fontSize = maximum; fontSize >= minimum; fontSize -= Math.max(0.04, cell * 0.006)) {
-      const maxChars = Math.max(4, Math.floor(usableWidth / (fontSize * 0.53)));
-      const lines = wrapAllText(text, maxChars);
-      const lineHeight = fontSize * 1.06;
-      if (lines.length * lineHeight <= usableHeight) return { lines, fontSize, lineHeight, truncated: false };
+    const maximum = Math.max(1.35, cell * 0.18);
+    const minimum = Math.max(1.05, cell * 0.12);
+    const step = Math.max(0.04, cell * 0.006);
+
+    for (const candidate of publicationClueCandidates(clue)) {
+      for (let fontSize = maximum; fontSize >= minimum; fontSize -= step) {
+        const maxChars = Math.max(4, Math.floor(usableWidth / (fontSize * 0.53)));
+        const longestWord = Math.max(...candidate.split(/\s+/).filter(Boolean).map((word) => word.length), 0);
+        if (longestWord > maxChars && fontSize - step >= minimum) continue;
+        const lines = wrapAllText(candidate, maxChars);
+        const lineHeight = fontSize * 1.06;
+        if (lines.length * lineHeight <= usableHeight) {
+          return { lines, fontSize, lineHeight, truncated: false, publicationText: candidate };
+        }
+      }
     }
+
+    const candidate = publicationClueCandidates(clue).reduce((best, value) => value.length < best.length ? value : best);
     const fontSize = minimum;
     const lineHeight = fontSize * 1.04;
     const maxChars = Math.max(4, Math.floor(usableWidth / (fontSize * 0.53)));
     const maxLines = Math.max(1, Math.floor(usableHeight / lineHeight));
-    const allLines = wrapAllText(text, maxChars);
+    const allLines = wrapAllText(candidate, maxChars);
     const lines = allLines.slice(0, maxLines);
     if (allLines.length > maxLines && lines.length) {
       const last = lines.length - 1;
-      lines[last] = `${lines[last].slice(0, Math.max(1, maxChars - 1))}…`;
+      lines[last] = trimAtWord(lines[last], Math.max(4, maxChars));
     }
-    return { lines, fontSize, lineHeight, truncated: allLines.length > maxLines };
+    return { lines, fontSize, lineHeight, truncated: allLines.length > maxLines, publicationText: candidate };
   }
 
   function renderFootprint(result, footprint, left, top, cell, lineWidth) {
@@ -210,7 +383,7 @@
     const boxWidth = textRect.width * cell;
     const boxHeight = textRect.height * cell;
     const clipId = `clue-footprint-${footprint.id}`;
-    const fitted = fitFootprintText(clue.text, boxWidth, boxHeight, cell);
+    const fitted = fitFootprintText(clue, boxWidth, boxHeight, cell);
     const totalHeight = Math.max(1, fitted.lines.length) * fitted.lineHeight;
     const startY = boxY + Math.max(fitted.fontSize, (boxHeight - totalHeight) / 2 + fitted.fontSize * 0.78);
     const fill = `<path d="${footprintPath(footprint.cells, left, top, cell)}" fill="#f1f1f1"/>`;
@@ -231,7 +404,7 @@
 
     const parts = [
       `<svg xmlns="http://www.w3.org/2000/svg" width="148mm" height="210mm" viewBox="0 0 148 210" role="img" aria-label="Generated arrowword">`,
-      `<defs><marker id="arrowhead" markerWidth="5" markerHeight="5" refX="4.2" refY="2.5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L5,2.5 L0,5 Z" fill="#111"/></marker>${(result.clueFootprints || []).map((footprint) => `<clipPath id="clue-footprint-${footprint.id}">${footprint.cells.map((item) => `<rect x="${(left + item.col * cell).toFixed(3)}" y="${(top + item.row * cell).toFixed(3)}" width="${cell.toFixed(3)}" height="${cell.toFixed(3)}"/>`).join("")}</clipPath>`).join("")}</defs>`,
+      `<defs><marker id="arrowhead" markerWidth="5" markerHeight="5" refX="4.2" refY="2.5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L5,2.5 L0,5 Z" fill="#111"/></marker>${(result.clueFootprints || []).map((footprint) => `<clipPath id="clue-footprint-${footprint.id}">${footprint.cells.map((item) => `<rect x="${(left + item.col * cell).toFixed(3)}" y="${(top + item.row * cell).toFixed(3)}" width="${cell.toFixed(3)}" height="${cell.toFixed(3)}"/>`).join("")}</clipPath>`).join("")}${result.grid.map((gridRow, rowIndex) => gridRow.map((data, colIndex) => (data.type === "clue" || data.type === "clueText" || data.type === "clueTextContinuation") ? `<clipPath id="clue-cell-${rowIndex}-${colIndex}"><rect x="${(left + colIndex * cell + lineWidth).toFixed(3)}" y="${(top + rowIndex * cell + lineWidth).toFixed(3)}" width="${Math.max(0, cell - lineWidth * 2).toFixed(3)}" height="${Math.max(0, cell - lineWidth * 2).toFixed(3)}"/></clipPath>` : "").join("")).join("")}</defs>`,
       `<metadata>structurally-valid=${valid}; words=${result.placed.length}; accidental-runs=${result.validation?.accidentalRuns?.length || 0}</metadata>`,
       `<rect width="148" height="210" fill="#fff"/>`,
     ];
@@ -243,11 +416,11 @@
         const data = result.grid[row][col];
         const fill = data.type === "clue" || data.type === "clueText" || data.type === "clueTextContinuation" ? "#f1f1f1" : data.type === "panel" ? "#d2d2d2" : "#fff";
         parts.push(`<rect x="${x.toFixed(3)}" y="${y.toFixed(3)}" width="${cell.toFixed(3)}" height="${cell.toFixed(3)}" fill="${fill}" stroke="#111" stroke-width="${lineWidth.toFixed(3)}"/>`);
-        if (data.type === "clueText" && !(result.clueFootprints || []).length) parts.push(renderClueTextCell(data, x, y, cell));
+        if (data.type === "clueText" && !(result.clueFootprints || []).length) parts.push(renderClueTextCell(data, x, y, cell, `clue-cell-${row}-${col}`));
         if (data.type === "letter" && showAnswers) {
           parts.push(`<text x="${(x + cell / 2).toFixed(3)}" y="${(y + cell * 0.68).toFixed(3)}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${letterSize.toFixed(3)}" font-weight="700" fill="#111">${escapeXml(data.char)}</text>`);
         }
-        if (data.type === "clue") parts.push(renderClueContent(data, x, y, cell));
+        if (data.type === "clue") parts.push(renderClueContent(result, data, row, col, x, y, cell, `clue-cell-${row}-${col}`));
       }
     }
 
@@ -259,5 +432,5 @@
     return parts.join("");
   }
 
-  window.ScanwordRenderer = { renderSvg, escapeXml };
+  window.ScanwordRenderer = { renderSvg, escapeXml, publicationClueText, publicationClueCandidates, footprintAttachmentSide, renderAnchoredArrow, fitFootprintText };
 })();
