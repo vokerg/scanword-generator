@@ -73,6 +73,21 @@ for (const expected of [
   assert(renderer.includes(expected), `renderer A5 contract drifted: ${expected}`);
 }
 
+for (const expected of [
+  "const PUBLICATION_CLUE_OVERRIDES",
+  '"КАНТРИ": "Жанр музыки США"',
+  "function compactGeographyClue(text)",
+  "function footprintAttachmentSide(footprint, arrowRow, arrowCol)",
+  "function renderAnchoredArrow(x, y, cell, direction, side)",
+  "function fitFootprintText(clue, width, height, cell)",
+  'clipPath id="clue-cell-${rowIndex}-${colIndex}"',
+  'lines.push(`${word.slice(0, take)}-`)',
+]) {
+  assert(renderer.includes(expected), `publication renderer contract drifted: ${expected}`);
+}
+assert(renderer.includes('const minimum = Math.max(1.05, cell * 0.12);'), "publication clue minimum readable size drifted");
+assert(/footprintForClue\(result, clue, row, col\)[\s\S]*?footprintAttachmentSide\(footprint, row, col\)[\s\S]*?renderAnchoredArrow/.test(renderer), "external clue arrows are not anchored to their footprint side");
+
 console.log(JSON.stringify({
   passed: true,
   page: "A5 portrait",
@@ -87,4 +102,8 @@ console.log(JSON.stringify({
   directPdfStateBound: true,
   serializedSvgAttributesValid: true,
   rendererA5Parity: true,
+  publicationClues: true,
+  footprintAnchoredArrows: true,
+  clueCellClipping: true,
+  boundedWordWrapping: true,
 }));
